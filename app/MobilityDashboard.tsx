@@ -904,7 +904,7 @@ export function MobilityDashboard() {
     <main className="shell">
       <header className="topbar">
         <a className="brand" href="#map" aria-label="Liveopweg">
-          <img className="brandLogo" src="/liveopweg-logo.png?v=2" alt="Liveopweg" />
+          <img className="brandLogo" src="/liveopweg-logo.png?v=3" alt="Liveopweg" />
         </a>
         <div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live" : connection}</div>
       </header>
