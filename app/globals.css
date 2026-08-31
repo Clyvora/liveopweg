@@ -377,15 +377,29 @@ h1 em { color:var(--orange); font-family:Georgia,serif; font-weight:400; }
   .hero { padding-top:56px; }
 }
 
-/* Laatste merklaag: rustig, compact en direct herkenbaar. */
-.topbar { padding:8px 12px; background:rgba(255,255,255,.94); }
-.brandLogo { width:clamp(126px,18vw,164px); }
-.sourcePill { padding:8px 11px; background:rgba(255,255,255,.72); }
+/* Laatste merklaag: geen zwevende kaart, alleen een rustige kaart-overlay. */
+.topbar {
+  padding:0 4px;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  backdrop-filter:none;
+}
+.brandLogo { width:clamp(126px,18vw,164px); filter:drop-shadow(0 2px 5px rgba(22,37,40,.12)); }
+.sourcePill {
+  margin-top:8px;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:var(--ink);
+  text-shadow:0 1px 8px rgba(255,255,255,.9);
+}
 .mapLegend { gap:6px; }
 .mapLegend span { padding:7px 9px; background:rgba(255,255,255,.9); }
 
 @media (max-width:760px) {
   .brandLogo { width:126px; }
-  .sourcePill { padding:7px 9px; }
+  .sourcePill { margin-top:6px; }
   .mapLegend span { padding:6px 8px; }
 }
