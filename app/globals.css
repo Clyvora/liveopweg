@@ -699,3 +699,163 @@ body {
   }
   .fleetTools .trainResults { max-height:min(250px,calc(100dvh - 126px)); }
 }
+
+/* Compact treindetail, opgebouwd als een rustig radar-informatiepaneel. */
+.observationPanel {
+  width:360px;
+  padding:0;
+  overflow-y:auto;
+  border:1px solid rgba(255,255,255,.9);
+  border-radius:16px;
+  background:rgba(255,255,255,.98);
+  box-shadow:0 20px 55px rgba(16,42,67,.24);
+}
+.observationPanel::before {
+  content:"";
+  position:sticky;
+  z-index:2;
+  top:0;
+  display:block;
+  height:4px;
+  background:#2877d4;
+}
+.selectedTrainHeader {
+  padding:14px 16px 12px;
+  border-bottom:1px solid #e4eaee;
+}
+.selectedTrainIdentity { min-width:0; }
+.selectedTrainEyebrow {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin:0;
+  color:#617582;
+  font:700 8px/1.2 var(--font-geist-mono);
+  letter-spacing:.09em;
+  text-transform:uppercase;
+}
+.selectedTrainEyebrow i {
+  width:6px;
+  height:6px;
+  flex:0 0 auto;
+  border-radius:50%;
+  background:#b15c43;
+}
+.selectedTrainEyebrow i.fresh {
+  background:#1c9a66;
+  box-shadow:0 0 0 3px rgba(28,154,102,.1);
+}
+.selectedTrainHeader h2 {
+  margin:7px 0 0;
+  font-size:24px;
+  line-height:1.05;
+}
+.selectedTrainMeta {
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  margin:9px 0 0 !important;
+}
+.selectedTrainMeta span {
+  padding:4px 7px;
+  border-radius:5px;
+  background:#edf3f7;
+  color:#405968;
+  font:700 8px/1 var(--font-geist-mono);
+}
+.nextStopCard {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto auto;
+  align-items:center;
+  gap:0;
+  margin:12px 14px 0;
+  overflow:hidden;
+  border:1px solid #dfe8ed;
+  border-radius:11px;
+  background:#f5f8fa;
+}
+.nextStopCard>div { min-width:0; padding:11px 12px; }
+.nextStopCard>div+div { border-left:1px solid #dfe8ed; }
+.nextStopCard span,
+.trainQuickFacts span {
+  display:block;
+  color:#758792;
+  font:700 7px/1.2 var(--font-geist-mono);
+  letter-spacing:.07em;
+  text-transform:uppercase;
+}
+.nextStopCard strong {
+  display:block;
+  margin-top:6px;
+  color:var(--ui-navy);
+  font-size:12px;
+  line-height:1.15;
+}
+.nextStopName strong {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.nextStopArrival,
+.nextStopTrack { text-align:center; }
+.nextStopArrival strong { font-family:var(--font-geist-mono); }
+.nextStopTrack strong {
+  min-width:24px;
+  color:#1f69b6;
+  font-family:var(--font-geist-mono);
+}
+.trainQuickFacts {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:0;
+  margin:12px 14px 0;
+  overflow:hidden;
+  border:1px solid #e1e8ec;
+  border-radius:10px;
+  background:#fff;
+}
+.trainQuickFacts div {
+  min-height:52px;
+  padding:10px 11px;
+  border-radius:0;
+  background:#fff;
+}
+.trainQuickFacts div:nth-child(even) { border-left:1px solid #e1e8ec; }
+.trainQuickFacts div:nth-child(n+3) { border-top:1px solid #e1e8ec; }
+.trainQuickFacts strong {
+  margin-top:6px;
+  color:var(--ui-navy);
+  font:700 10px/1.25 var(--font-geist-mono);
+}
+.delayLate { color:#bd4c38 !important; }
+.delayOnTime { color:#16855a !important; }
+.selectedTrainState {
+  display:block;
+  margin:8px 15px 11px !important;
+  color:#82919a !important;
+  font-size:8px !important;
+}
+.observationDetails {
+  margin:0;
+  padding:0;
+  border-top:1px solid #e4eaee;
+}
+.observationDetails>summary {
+  padding:12px 16px;
+  color:#315e7d;
+  font-size:10px;
+}
+.observationDetailsBody { padding:0 16px 16px; }
+
+@media (max-width:760px) {
+  .observationPanel {
+    width:calc(100% - 20px);
+    max-height:min(52dvh,450px);
+  }
+  .selectedTrainHeader { padding:12px 14px 10px; }
+  .selectedTrainHeader h2 { font-size:21px; }
+  .nextStopCard,
+  .trainQuickFacts { margin-top:10px; }
+  .nextStopCard { margin-left:12px; margin-right:12px; }
+  .trainQuickFacts { margin-left:12px; margin-right:12px; }
+}

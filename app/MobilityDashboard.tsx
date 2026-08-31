@@ -68,6 +68,15 @@ function formatTime(value: string | null): string {
   }).format(new Date(value));
 }
 
+function formatJourneyClock(value: string | null): string {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("nl-NL", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Amsterdam",
+  }).format(new Date(value));
+}
+
 function formatAge(value: string | null, now: number): string {
   if (!value) return "Onbekend";
   const seconds = Math.max(0, Math.round((now - Date.parse(value)) / 1_000));
@@ -1169,6 +1178,17 @@ export function MobilityDashboard() {
     }) ?? null;
   }, [journey, now]);
   const currentDelay = nextStop?.departure.exactDelaySeconds ?? nextStop?.arrival.exactDelaySeconds ?? null;
+  const nextStopArrivalTime = nextStop?.arrival.actualAt
+    ?? nextStop?.arrival.plannedAt
+    ?? nextStop?.departure.actualAt
+    ?? nextStop?.departure.plannedAt
+    ?? null;
+  const nextStopTrack = nextStop?.arrival.actualTrack
+    ?? nextStop?.departure.actualTrack
+    ?? nextStop?.arrival.plannedTrack
+    ?? nextStop?.departure.plannedTrack
+    ?? null;
+  const operatorName = journey?.operator ?? "Onbekend";
   const selectedTrackMatch = selectedVehicleId ? trackMatchesByVehicle[selectedVehicleId] ?? null : null;
   const acceptedSelectedMatch = selectedTrackMatch?.snappedPosition && selectedTrackMatch.status.startsWith("MATCHED")
     ? selectedTrackMatch
@@ -1275,26 +1295,42 @@ export function MobilityDashboard() {
         </div>
         {observation && <aside className="observationPanel" aria-live="polite">
           <div className="selectedTrainHeader">
-            <div>
-              <p className="panelKicker">Trein {observation.trainNumber} · {selectedRollingStock.label}</p>
+            <div className="selectedTrainIdentity">
+              <p className="selectedTrainEyebrow"><i className={computedState === "FRESH_SOURCE" ? "fresh" : "stale"} /> Trein {observation.trainNumber} · {computedState === "FRESH_SOURCE" ? "live" : "verouderd"}</p>
               <h2>{journey?.destination.actual ?? journey?.destination.planned ?? `Materieel ${observation.materialNumber ?? "onbekend"}`}</h2>
+              <p className="selectedTrainMeta"><span>{selectedRollingStock.label}</span><span>{operatorName}</span></p>
             </div>
             <button type="button" onClick={clearVehicleSelection} aria-label="Sluit treininformatie">×</button>
           </div>
-          <p className="selectedTrainState"><i className={computedState === "FRESH_SOURCE" ? "fresh" : "stale"} /> {computedState === "FRESH_SOURCE" ? "Live" : "Verouderd"} · {measuredAge} geleden</p>
-          <div className="trainQuickFacts">
-            <div><span>Snelheid</span><strong>{observation?.speed ? `${observation.speed.valueKmh} km/h` : "—"}</strong></div>
-            <div><span>Volgende halte</span><strong>{nextStop?.station.shortName ?? nextStop?.station.longName ?? "—"}</strong></div>
-            <div><span>Vertraging</span><strong className={currentDelay && currentDelay > 0 ? "staleText" : "freshText"}>{formatDelay(currentDelay)}</strong></div>
+          <div className="nextStopCard">
+            <div className="nextStopName">
+              <span>Volgende halte</span>
+              <strong>{nextStop?.station.longName ?? nextStop?.station.shortName ?? "Nog niet bekend"}</strong>
+            </div>
+            <div className="nextStopArrival">
+              <span>Aankomst</span>
+              <strong>{formatJourneyClock(nextStopArrivalTime)}</strong>
+            </div>
+            <div className="nextStopTrack">
+              <span>Spoor</span>
+              <strong>{nextStopTrack ?? "—"}</strong>
+            </div>
           </div>
+          <div className="trainQuickFacts">
+            <div><span>Treintype</span><strong>{selectedRollingStock.label}</strong></div>
+            <div><span>Vervoerder</span><strong>{operatorName}</strong></div>
+            <div><span>Snelheid</span><strong>{observation.speed ? `${Math.round(observation.speed.valueKmh)} km/h` : "—"}</strong></div>
+            <div><span>Vertraging</span><strong className={currentDelay && currentDelay > 0 ? "delayLate" : "delayOnTime"}>{formatDelay(currentDelay)}</strong></div>
+          </div>
+          <p className="selectedTrainState">Bijgewerkt {measuredAge} geleden</p>
           <details className="observationDetails">
-            <summary>Meer treindetails</summary>
+            <summary>Meer details</summary>
             <div className="observationDetailsBody">
             <div className="timestampGrid">
             <span>Brontijd</span><strong>{formatTime(observation?.time.sourceMeasuredAt ?? null)}</strong>
             <span>Ontvangsttijd</span><strong>{formatTime(observation?.time.receivedAt ?? null)}</strong>
             <span>Bronleeftijd</span><strong>{measuredAge}</strong>
-            <span>Snelheid</span><strong>{observation?.speed ? `${observation.speed.valueKmh} km/h · GPS` : "Onbekend"}</strong>
+            <span>Snelheid</span><strong>{observation?.speed ? `${Math.round(observation.speed.valueKmh)} km/h · GPS` : "Onbekend"}</strong>
             <span>Materieeltype</span><strong>{selectedRollingStock.label} · {selectedRollingStock.confidence}</strong>
             <span>Status</span><strong className={computedState === "FRESH_SOURCE" ? "freshText" : "staleText"}>{computedState}</strong>
             <span>Rendering</span><strong>{acceptedSelectedMatch ? "MAP_MATCHED · bronhold" : motionLabel}</strong>
