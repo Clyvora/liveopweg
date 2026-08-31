@@ -903,9 +903,8 @@ export function MobilityDashboard() {
   return (
     <main className="shell">
       <header className="topbar">
-        <a className="brand" href="#map" aria-label="MobilityRadar Nederland">
-          <span className="brandMark" aria-hidden="true">MR</span>
-          <span>MobilityRadar <b>NL</b></span>
+        <a className="brand" href="#map" aria-label="Liveopweg">
+          <img className="brandLogo" src="/liveopweg-logo.png" alt="Liveopweg" />
         </a>
         <div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live" : connection}</div>
       </header>
@@ -1002,9 +1001,9 @@ export function MobilityDashboard() {
           <canvas ref={trainOverlayElement} className="trainOverlay" aria-hidden="true" />
           {!vehicles.length && <div className="waitingMarker"><span /> Wachten op eerste vlootbatch</div>}
           <div className="mapLegend" aria-label="Kaartlegenda">
-            <span><i className="replayLine" /> Replay · niet live</span>
-            <span><i className="roadCongestion" /> File</span>
-            <span><i className="roadIncident" /> Incident</span>
+            <span><i className="replayLine" /> Replay</span>
+            <span><i className="roadCongestion" /> Files</span>
+            <span><i className="roadIncident" /> Incidenten</span>
             <span><i className="roadWorks" /> Werk / afsluiting</span>
             <span><i className="trackLine" /> ProRail-spoorgeometrie</span>
             <span><i className="matchedDot" /> Afgeleide spoorpositie</span>

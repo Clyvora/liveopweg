@@ -1,6 +1,6 @@
-# MobilityRadar NL
+# Liveopweg
 
-MobilityRadar NL maakt Nederlandse mobiliteitsdata realtime zichtbaar met een expliciet onderscheid tussen bronfeit, afleiding en onbekende informatie.
+Liveopweg maakt Nederlandse mobiliteitsdata realtime zichtbaar met een expliciet onderscheid tussen bronfeit, afleiding en onbekende informatie.
 
 Fase 11 voegt het productierijpe fundament toe: echte PostGIS-historie, persistence-health, Prometheus-metrics, een beveiligde reverse-proxyroute, productiecontainers en continue kwaliteitscontrole. De file-backed ontwikkelmodus blijft beschikbaar.
 

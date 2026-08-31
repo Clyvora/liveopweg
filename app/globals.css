@@ -7,9 +7,8 @@ html { scroll-behavior:smooth; }
 body { margin:0; background:var(--cream); color:var(--ink); font-family:Arial, Helvetica, sans-serif; }
 .shell { min-height:100vh; padding:24px clamp(20px,4vw,64px) 48px; }
 .topbar { display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid rgba(22,37,40,.18); padding-bottom:18px; }
-.brand { color:inherit; text-decoration:none; display:flex; align-items:center; gap:12px; font-weight:700; letter-spacing:-.03em; }
-.brandMark { width:38px; height:38px; display:grid; place-items:center; border-radius:50%; background:var(--orange); color:white; font:800 12px/1 var(--font-geist-mono); }
-.brand b { color:var(--orange); }
+.brand { color:inherit; text-decoration:none; display:flex; align-items:center; min-width:0; }
+.brandLogo { display:block; width:148px; height:auto; }
 .sourcePill { border:1px solid rgba(22,37,40,.2); border-radius:999px; padding:9px 13px; font:600 11px/1 var(--font-geist-mono); text-transform:uppercase; letter-spacing:.08em; }
 .sourcePill span { display:inline-block; width:7px; height:7px; border-radius:50%; background:#bf8845; margin-right:7px; }
 .sourcePill.live span { background:#36a46d; box-shadow:0 0 0 4px rgba(54,164,109,.12); }
@@ -376,4 +375,17 @@ h1 em { color:var(--orange); font-family:Georgia,serif; font-weight:400; }
   .mapLabel { bottom:calc(38svh + 28px); left:12px; max-width:calc(100% - 24px); }
   .mapAttribution { max-width:64%; line-height:1.25; }
   .hero { padding-top:56px; }
+}
+
+/* Laatste merklaag: rustig, compact en direct herkenbaar. */
+.topbar { padding:8px 12px; background:rgba(255,255,255,.94); }
+.brandLogo { width:clamp(126px,18vw,164px); }
+.sourcePill { padding:8px 11px; background:rgba(255,255,255,.72); }
+.mapLegend { gap:6px; }
+.mapLegend span { padding:7px 9px; background:rgba(255,255,255,.9); }
+
+@media (max-width:760px) {
+  .brandLogo { width:126px; }
+  .sourcePill { padding:7px 9px; }
+  .mapLegend span { padding:6px 8px; }
 }

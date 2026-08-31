@@ -18,7 +18,7 @@ test("server-renders fase 10 met replay, NDW-weglagen, spoor en drie 3D-stations
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>MobilityRadar NL/);
+  assert.match(html, /<title>Liveopweg/);
   assert.match(html, /Live vooruit/);
   assert.match(html, /Brongetrouw terug/);
   assert.match(html, /Fase 10 · Generalisatie &amp; replay/);

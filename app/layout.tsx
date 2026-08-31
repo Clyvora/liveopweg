@@ -14,19 +14,19 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
-  title: "MobilityRadar NL — Realtime spoor, weg en replay",
-  description: "Nederlandse realtime treinposities, officiële NDW-wegmeldingen en brongetrouwe replay met herleidbare tijden en geometrie.",
+  title: "Liveopweg — Nederland beweegt. Live.",
+  description: "Nederlandse realtime treinposities, officiële NDW-wegmeldingen en brongetrouwe replay.",
   openGraph: {
-    title: "MobilityRadar NL — Realtime spoor, weg en replay",
+    title: "Liveopweg — Nederland beweegt. Live.",
     description: "Landelijk realtime spoor, officiële NDW-wegmeldingen en brongetrouwe treinreplay.",
     type: "website",
-    images: [{ url: "/og.png", width: 1731, height: 909, alt: "MobilityRadar NL — Van GPS-punt naar spoor" }],
+    images: [{ url: "/liveopweg-logo.png", width: 1228, height: 324, alt: "Liveopweg — Nederland beweegt. Live." }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "MobilityRadar NL — Realtime spoor, weg en replay",
+    title: "Liveopweg — Nederland beweegt. Live.",
     description: "Landelijk realtime spoor, officiële NDW-wegmeldingen en brongetrouwe treinreplay.",
-    images: ["/og.png"],
+    images: ["/liveopweg-logo.png"],
   },
   icons: {
     icon: "/favicon.svg",
