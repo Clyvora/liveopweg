@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xs:schema xmlns="http://www.w3.org/2001/XMLSchema"
+  xmlns:tns="http://schemas.datacontract.org/2004/07/Cognos.Infrastructure.Models"
+  xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified"
+  targetNamespace="http://schemas.datacontract.org/2004/07/Cognos.Infrastructure.Models">
+  <xs:element name="ArrayOfTreinLocation">
+    <xs:complexType><xs:sequence>
+      <xs:element maxOccurs="unbounded" name="TreinLocation">
+        <xs:complexType><xs:sequence>
+          <xs:element name="TreinNummer" type="xs:string" />
+          <xs:element maxOccurs="unbounded" name="TreinMaterieelDelen" type="tns:TreinMaterieelDelenType" />
+        </xs:sequence></xs:complexType>
+      </xs:element>
+    </xs:sequence></xs:complexType>
+  </xs:element>
+  <xs:element name="TreinLocation">
+    <xs:complexType><xs:sequence>
+      <xs:element name="TreinNummer" type="xs:string" />
+      <xs:element maxOccurs="unbounded" name="TreinMaterieelDelen" type="tns:TreinMaterieelDelenType" />
+    </xs:sequence></xs:complexType>
+  </xs:element>
+  <xs:element name="TreinMaterieelDeelLocation" type="tns:TreinMaterieelDelenType"/>
+  <xs:element name="ArrayOfTreinMaterieelDeelLocation">
+    <xs:complexType><xs:sequence>
+      <xs:element maxOccurs="unbounded" name="TreinMaterieelDeelLocation" type="tns:TreinMaterieelDelenType" />
+    </xs:sequence></xs:complexType>
+  </xs:element>
+  <xs:element name="TreinMaterieelDelen" type="tns:TreinMaterieelDelenType" />
+  <xs:complexType name="TreinMaterieelDelenType"><xs:sequence>
+    <xs:element maxOccurs="1" minOccurs="0" name="MaterieelDeelNummer" type="xs:string" />
+    <xs:element maxOccurs="1" minOccurs="0" name="Materieelvolgnummer" type="xs:string" />
+    <xs:element maxOccurs="1" minOccurs="0" name="GeneratieTijd" type="xs:string" />
+    <xs:element maxOccurs="1" minOccurs="0" name="GpsDatumTijd" type="xs:string" />
+    <xs:element maxOccurs="1" minOccurs="0" name="Orientatie" type="xs:string" />
+    <xs:element maxOccurs="1" minOccurs="0" name="BronId" type="xs:string" />
+    <xs:element maxOccurs="1" minOccurs="0" name="Bron" type="xs:string" />
+    <xs:element maxOccurs="1" minOccurs="0" name="Fix" type="xs:string" />
+    <xs:element maxOccurs="1" minOccurs="0" name="Berichttype" type="xs:string" />
+    <xs:element maxOccurs="1" minOccurs="0" name="Longitude" type="xs:decimal" />
+    <xs:element maxOccurs="1" minOccurs="0" name="Latitude" type="xs:decimal" />
+    <xs:element maxOccurs="1" minOccurs="0" name="Elevation" type="xs:decimal" />
+    <xs:element maxOccurs="1" minOccurs="0" name="Snelheid" type="xs:decimal" />
+    <xs:element maxOccurs="1" minOccurs="0" name="Richting" type="xs:decimal" />
+    <xs:element maxOccurs="1" minOccurs="0" name="Rijrichting" type="xs:string" />
+    <xs:element maxOccurs="1" minOccurs="0" name="Hdop" type="xs:decimal" />
+    <xs:element maxOccurs="1" minOccurs="0" name="AantalSatelieten" type="xs:decimal" />
+  </xs:sequence></xs:complexType>
+</xs:schema>

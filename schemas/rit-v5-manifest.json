@@ -1,0 +1,10 @@
+{
+  "sourceArchive": "https://data.ndovloket.nl/docs/infoplus/RIT/RIT-v5-wsdl-xsd.zip",
+  "publishedAtSource": "2024-06-27T14:47:00Z",
+  "verifiedAt": "2026-08-20T19:41:52Z",
+  "files": {
+    "ri-cdm-common-v5.xsd": "9908e1432873c522e485e77d2e51bad13c65e5e23a32e8678f25c4c2b424655a",
+    "ri-cdm-rit-v5.xsd": "18386414560b00d96d025806785e6901b0c9f322a9f3b73e2d423ea6f57f7ed4",
+    "RIT-service-definities-v5.xsd": "787fe922093e184e1848a1435a3baf536ed81944372ed4265adf12b7fcae0cf0"
+  }
+}
