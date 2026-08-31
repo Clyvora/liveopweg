@@ -148,6 +148,57 @@ function trackMotionPosition(
   };
 }
 
+function roundRectPath(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): void {
+  const corner = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.moveTo(x + corner, y);
+  context.arcTo(x + width, y, x + width, y + height, corner);
+  context.arcTo(x + width, y + height, x, y + height, corner);
+  context.arcTo(x, y + height, x, y, corner);
+  context.arcTo(x, y, x + width, y, corner);
+  context.closePath();
+}
+
+function drawTrainIcon(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  rotation: number,
+  selected: boolean,
+  matched: boolean,
+): void {
+  const width = selected ? 13 : 10;
+  const height = selected ? 19 : 15;
+  const bodyColor = selected ? "#fff1a8" : matched ? "#a7dfc5" : "#f17845";
+  context.save();
+  context.translate(x, y);
+  context.rotate(rotation);
+  context.shadowColor = "rgba(22,37,40,.32)";
+  context.shadowBlur = selected ? 7 : 3;
+  context.shadowOffsetY = 1;
+  roundRectPath(context, -width / 2, -height / 2, width, height, 3);
+  context.fillStyle = bodyColor;
+  context.fill();
+  context.shadowColor = "transparent";
+  context.lineWidth = selected ? 2.2 : 1.4;
+  context.strokeStyle = selected ? "#162528" : "#fffdf7";
+  context.stroke();
+  roundRectPath(context, -width * 0.29, -height * 0.27, width * 0.58, height * 0.25, 1.5);
+  context.fillStyle = "#163e35";
+  context.fill();
+  context.fillStyle = selected ? "#f17845" : "#163e35";
+  context.fillRect(-width * 0.28, height * 0.17, width * 0.18, height * 0.2);
+  context.fillRect(width * 0.1, height * 0.17, width * 0.18, height * 0.2);
+  context.restore();
+}
+
 export function MobilityDashboard() {
   const mapElement = useRef<HTMLDivElement>(null);
   const trainOverlayElement = useRef<HTMLCanvasElement>(null);
@@ -528,7 +579,7 @@ export function MobilityDashboard() {
         const nowMs = Date.now();
         const selectedId = selectedVehicleIdRef.current;
         const selectedSample = selectedId ? motionSamplesRef.current.get(selectedId) ?? null : null;
-            const selected = selectedSample ? renderMotion(selectedSample, nowMs, renderDelayMs) : null;
+        const selected = selectedSample ? renderMotion(selectedSample, nowMs, renderDelayMs) : null;
         const overlay = trainOverlayElement.current;
         const mapContainer = mapElement.current;
         if (overlay && mapContainer) {
@@ -553,13 +604,14 @@ export function MobilityDashboard() {
               const projected = instance.project([renderedPosition.longitude, renderedPosition.latitude]);
               if (projected.x < -16 || projected.x > width + 16 || projected.y < -16 || projected.y > height + 16) continue;
               const isSelected = vehicleId === selectedId;
-              context.beginPath();
-              context.arc(projected.x, projected.y, isSelected ? 10 : 5.5, 0, Math.PI * 2);
-              context.fillStyle = isSelected ? "#fff1a8" : matched ? "#a7dfc5" : "#f17845";
-              context.fill();
-              context.lineWidth = isSelected ? 3.5 : 1.75;
-              context.strokeStyle = isSelected ? "#162528" : "#fffdf7";
-              context.stroke();
+              const heading = sample.current.headingDegrees;
+              const derivedHeading = heading ?? (sample.previous
+                ? Math.atan2(
+                    sample.current.position.longitude - sample.previous.position.longitude,
+                    -(sample.current.position.latitude - sample.previous.position.latitude),
+                  ) * 180 / Math.PI
+                : 0);
+              drawTrainIcon(context, projected.x, projected.y, derivedHeading * Math.PI / 180, isSelected, matched);
             }
           }
         }
