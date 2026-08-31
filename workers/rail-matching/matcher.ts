@@ -27,9 +27,9 @@ interface Projection {
 }
 
 interface MatcherHistory {
-  match: RailTrackMatch;
   rawPosition: [number, number];
   sourceTimeMs: number | null;
+  lastMatchedEdgeId: string | null;
 }
 
 interface ScoredCandidate extends Projection {
@@ -189,6 +189,36 @@ class TrackMatcher {
     this.history.delete(vehicleId);
   }
 
+  seed(observation: RailObservation, match: RailTrackMatch): void {
+    if (observation.vehicleId !== match.vehicleId || observation.observationId !== match.observationId) {
+      throw new Error("Historische match hoort niet bij deze observatie");
+    }
+    this.remember(
+      observation.vehicleId,
+      match,
+      [observation.position.longitude, observation.position.latitude],
+      sourceTimeMs(observation),
+    );
+  }
+
+  private remember(
+    vehicleId: string,
+    match: RailTrackMatch,
+    rawPosition: [number, number],
+    measuredAt: number | null,
+  ): void {
+    const previous = this.history.get(vehicleId);
+    const acceptedEdgeId = match.status.startsWith("MATCHED") ? match.edgeId : null;
+    this.history.set(vehicleId, {
+      rawPosition,
+      sourceTimeMs: measuredAt,
+      // Een onzekere of ontbrekende meting mag de laatst betrouwbare
+      // spoor-keuze niet wissen. Anders kan de volgende GPS-fix opnieuw naar
+      // een parallel spoor springen alsof er geen voorgeschiedenis bestaat.
+      lastMatchedEdgeId: acceptedEdgeId ?? previous?.lastMatchedEdgeId ?? null,
+    });
+  }
+
   private connected(left: TrackEdge, right: TrackEdge): boolean {
     return left.id === right.id
       || left.fromNode === right.fromNode
@@ -293,7 +323,7 @@ class TrackMatcher {
         ? "IGNORED_LOW_SPEED" as const
         : "USED" as const;
     const quality = gpsQuality(observation);
-    const previousEdge = previous?.match.edgeId ? this.edgeById.get(previous.match.edgeId) : undefined;
+    const previousEdge = previous?.lastMatchedEdgeId ? this.edgeById.get(previous.lastMatchedEdgeId) : undefined;
     const scoreCandidates = (radiusMeters: number): ScoredCandidate[] => {
       const scored: ScoredCandidate[] = [];
       for (const edge of this.candidateEdges(...rawPosition, radiusMeters)) {
@@ -376,7 +406,7 @@ class TrackMatcher {
         candidates: [],
         components,
       };
-      this.history.set(observation.vehicleId, { match: result, rawPosition, sourceTimeMs: sourceTimeMs(observation) });
+      this.remember(observation.vehicleId, result, rawPosition, sourceTimeMs(observation));
       return result;
     }
 
@@ -415,7 +445,7 @@ class TrackMatcher {
         candidates: debugCandidates,
         components,
       };
-      this.history.set(observation.vehicleId, { match: result, rawPosition, sourceTimeMs: sourceTimeMs(observation) });
+      this.remember(observation.vehicleId, result, rawPosition, sourceTimeMs(observation));
       return result;
     }
 
@@ -442,7 +472,7 @@ class TrackMatcher {
       candidates: debugCandidates,
       components,
     };
-    this.history.set(observation.vehicleId, { match: result, rawPosition, sourceTimeMs: sourceTimeMs(observation) });
+    this.remember(observation.vehicleId, result, rawPosition, sourceTimeMs(observation));
     return result;
   }
 }

@@ -360,7 +360,12 @@ const server = createServer((request, response) => {
         type: "Feature" as const,
         id: edge.id,
         geometry: edge.geometry,
-        properties: { edgeId: edge.id },
+        properties: {
+          edgeId: edge.id,
+          fromNode: edge.fromNode,
+          toNode: edge.toNode,
+          lengthMeters: edge.lengthMeters,
+        },
       }));
     return writeJson(response, 200, { type: "FeatureCollection", features });
   }
@@ -717,7 +722,21 @@ const activeVehicleIds = new Set(restoredFleet.map((observation) => observation.
 for (const match of await trackMatchStore.restore()) {
   if (activeVehicleIds.has(match.vehicleId)) trackMatches.set(match.vehicleId, match);
 }
-if (trackMatcher) updateMatches(restoredFleet, []);
+if (trackMatcher) {
+  const observationsWithoutCurrentMatch: RailObservation[] = [];
+  for (const observation of restoredFleet) {
+    const restoredMatch = trackMatches.get(observation.vehicleId);
+    if (restoredMatch?.observationId === observation.observationId) {
+      trackMatcher.seed(observation, restoredMatch);
+    } else {
+      observationsWithoutCurrentMatch.push(observation);
+    }
+  }
+  // De volledige vloot opnieuw projecteren maakte iedere herstart onnodig
+  // traag. Alleen ontbrekende of verouderde matches worden opnieuw berekend;
+  // actuele matches voeden wel de continuiteitsgeschiedenis van de matcher.
+  updateMatches(observationsWithoutCurrentMatch, []);
+}
 server.listen(port, host, () => {
   console.log(JSON.stringify({ event: "realtime.listening", url: `http://${host}:${port}` }));
 });

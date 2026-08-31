@@ -91,6 +91,23 @@ describe("UtrechtTrackMatcher", () => {
     expect(second?.edgeId).not.toBeNull();
   });
 
+  it("onthoudt het laatst betrouwbare spoor na een meting zonder kandidaten", () => {
+    const matcher = new UtrechtTrackMatcher(graph([
+      line("parallel-a", [[5.05, 52.08], [5.08, 52.08]]),
+      line("parallel-b", [[5.05, 52.08008], [5.08, 52.08008]]),
+    ]));
+    const first = matcher.match(observation(5.06, 52.08));
+    expect(first?.status.startsWith("MATCHED")).toBe(true);
+
+    const missing = matcher.match(observation(5.06, 52.081, {}, "2026-08-21T12:00:10.000Z"));
+    expect(missing?.status).toBe("UNMATCHED_NO_CANDIDATES");
+
+    const recovered = matcher.match(observation(5.061, 52.08004, {}, "2026-08-21T12:00:20.000Z"));
+    expect(recovered?.status.startsWith("MATCHED")).toBe(true);
+    expect(recovered?.edgeId).toBe(first?.edgeId);
+    expect(recovered?.candidates[0].continuity).toBe("SAME_EDGE");
+  });
+
   it("verwerpt een fysiek onmogelijke GPS-sprong", () => {
     const matcher = new UtrechtTrackMatcher(graph([
       line("long-track", [[5, 52.08], [5.2, 52.08]]),

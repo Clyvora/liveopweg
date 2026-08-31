@@ -111,6 +111,12 @@ type TrackMotionSample = {
 };
 
 type TrackCoordinates = [number, number][];
+type TrackGeometry = {
+  coordinates: TrackCoordinates;
+  fromNode: string;
+  toNode: string;
+  lengthMeters: number;
+};
 
 function coordinateDistanceMeters(left: [number, number], right: [number, number]): number {
   const latitudeRadians = ((left[1] + right[1]) / 2) * Math.PI / 180;
@@ -142,6 +148,39 @@ function pointAlongTrack(coordinates: TrackCoordinates, progress: number): { lon
   return { longitude: last[0], latitude: last[1] };
 }
 
+function sharedTrackNode(left: TrackGeometry, right: TrackGeometry): string | null {
+  if (left.fromNode === right.fromNode || left.fromNode === right.toNode) return left.fromNode;
+  if (left.toNode === right.fromNode || left.toNode === right.toNode) return left.toNode;
+  return null;
+}
+
+function pointAlongConnectedTracks(
+  previousGeometry: TrackGeometry,
+  previousProgress: number,
+  currentGeometry: TrackGeometry,
+  currentProgress: number,
+  progress: number,
+): { longitude: number; latitude: number } | null {
+  const sharedNode = sharedTrackNode(previousGeometry, currentGeometry);
+  if (!sharedNode) return null;
+  const previousNodeProgress = sharedNode === previousGeometry.fromNode ? 0 : 1;
+  const currentNodeProgress = sharedNode === currentGeometry.fromNode ? 0 : 1;
+  const previousDistance = Math.abs(previousNodeProgress - previousProgress) * previousGeometry.lengthMeters;
+  const currentDistance = Math.abs(currentProgress - currentNodeProgress) * currentGeometry.lengthMeters;
+  const totalDistance = previousDistance + currentDistance;
+  if (totalDistance <= 0) return pointAlongTrack(currentGeometry.coordinates, currentProgress);
+  const targetDistance = Math.min(1, Math.max(0, progress)) * totalDistance;
+  if (targetDistance <= previousDistance && previousDistance > 0) {
+    const edgeProgress = previousProgress
+      + (previousNodeProgress - previousProgress) * (targetDistance / previousDistance);
+    return pointAlongTrack(previousGeometry.coordinates, edgeProgress);
+  }
+  if (currentDistance <= 0) return pointAlongTrack(currentGeometry.coordinates, currentProgress);
+  const edgeProgress = currentNodeProgress
+    + (currentProgress - currentNodeProgress) * ((targetDistance - previousDistance) / currentDistance);
+  return pointAlongTrack(currentGeometry.coordinates, edgeProgress);
+}
+
 function matchedPosition(match: RailTrackMatch | null | undefined): { longitude: number; latitude: number } | null {
   return match?.snappedPosition && match.status.startsWith("MATCHED") ? match.snappedPosition : null;
 }
@@ -150,18 +189,18 @@ function trackMotionPosition(
   sample: TrackMotionSample | null,
   nowMs: number,
   renderDelayMs: number,
-  geometries: Map<string, TrackCoordinates>,
+  geometries: Map<string, TrackGeometry>,
 ): { longitude: number; latitude: number } | null {
   const currentPosition = matchedPosition(sample?.current);
   if (!sample || !currentPosition) return null;
   const previousPosition = matchedPosition(sample.previous);
   const currentGeometry = sample.current.edgeId ? geometries.get(sample.current.edgeId) : undefined;
   const currentTrackPosition = currentGeometry && sample.current.edgeProgress !== null
-    ? pointAlongTrack(currentGeometry, sample.current.edgeProgress)
+    ? pointAlongTrack(currentGeometry.coordinates, sample.current.edgeProgress)
     : null;
   const previousGeometry = sample.previous?.edgeId ? geometries.get(sample.previous.edgeId) : undefined;
   const previousTrackPosition = previousGeometry && sample.previous?.edgeProgress !== null && sample.previous?.edgeProgress !== undefined
-    ? pointAlongTrack(previousGeometry, sample.previous.edgeProgress)
+    ? pointAlongTrack(previousGeometry.coordinates, sample.previous.edgeProgress)
     : null;
   if (!previousPosition) return currentTrackPosition ?? currentPosition;
 
@@ -173,14 +212,36 @@ function trackMotionPosition(
   if (targetTime >= currentTime) {
     const extrapolationSeconds = Math.min(30, (targetTime - currentTime) / 1_000);
     const elapsedSeconds = (currentTime - previousTime) / 1_000;
-    if (extrapolationSeconds > 0 && elapsedSeconds > 0) {
-      const scale = extrapolationSeconds / elapsedSeconds;
-      return {
-        longitude: (currentTrackPosition ?? currentPosition).longitude
-          + ((currentTrackPosition ?? currentPosition).longitude - (previousTrackPosition ?? previousPosition).longitude) * scale,
-        latitude: (currentTrackPosition ?? currentPosition).latitude
-          + ((currentTrackPosition ?? currentPosition).latitude - (previousTrackPosition ?? previousPosition).latitude) * scale,
-      };
+    if (
+      extrapolationSeconds > 0
+      && elapsedSeconds > 0
+      && currentGeometry
+      && sample.current.edgeProgress !== null
+    ) {
+      let signedDistanceMeters: number | null = null;
+      if (
+        previousGeometry
+        && sample.previous?.edgeId === sample.current.edgeId
+        && sample.previous.edgeProgress !== null
+      ) {
+        signedDistanceMeters = (sample.current.edgeProgress - sample.previous.edgeProgress) * currentGeometry.lengthMeters;
+      } else if (previousGeometry && sample.previous?.edgeProgress !== null && sample.previous?.edgeProgress !== undefined) {
+        const sharedNode = sharedTrackNode(previousGeometry, currentGeometry);
+        if (sharedNode) {
+          const currentNodeProgress = sharedNode === currentGeometry.fromNode ? 0 : 1;
+          const direction = Math.sign(sample.current.edgeProgress - currentNodeProgress);
+          const connectedDistance = Math.abs(
+            (sharedNode === previousGeometry.fromNode ? 0 : 1) - sample.previous.edgeProgress,
+          ) * previousGeometry.lengthMeters
+            + Math.abs(sample.current.edgeProgress - currentNodeProgress) * currentGeometry.lengthMeters;
+          signedDistanceMeters = connectedDistance * direction;
+        }
+      }
+      if (signedDistanceMeters !== null) {
+        const extrapolatedProgress = sample.current.edgeProgress
+          + (signedDistanceMeters / elapsedSeconds * extrapolationSeconds) / currentGeometry.lengthMeters;
+        return pointAlongTrack(currentGeometry.coordinates, extrapolatedProgress) ?? currentTrackPosition ?? currentPosition;
+      }
     }
     return currentTrackPosition ?? currentPosition;
   }
@@ -193,12 +254,28 @@ function trackMotionPosition(
   ) {
     const edgeProgress = sample.previous.edgeProgress
       + (sample.current.edgeProgress - sample.previous.edgeProgress) * progress;
-    return pointAlongTrack(currentGeometry, edgeProgress) ?? currentPosition;
+    return pointAlongTrack(currentGeometry.coordinates, edgeProgress) ?? currentPosition;
   }
-  return {
-    longitude: previousPosition.longitude + (currentPosition.longitude - previousPosition.longitude) * progress,
-    latitude: previousPosition.latitude + (currentPosition.latitude - previousPosition.latitude) * progress,
-  };
+  if (
+    previousGeometry
+    && currentGeometry
+    && sample.previous?.edgeProgress !== null
+    && sample.previous?.edgeProgress !== undefined
+    && sample.current.edgeProgress !== null
+  ) {
+    const connectedPosition = pointAlongConnectedTracks(
+      previousGeometry,
+      sample.previous.edgeProgress,
+      currentGeometry,
+      sample.current.edgeProgress,
+      progress,
+    );
+    if (connectedPosition) return connectedPosition;
+  }
+  // Zonder bewezen topologische verbinding houden we de laatste betrouwbare
+  // spoorpositie vast; een rechte lijn zou zichtbaar door weiland of gebouwen
+  // kunnen snijden.
+  return progress < 0.5 ? previousTrackPosition ?? previousPosition : currentTrackPosition ?? currentPosition;
 }
 
 function roundRectPath(
@@ -284,7 +361,7 @@ export function MobilityDashboard() {
   const motionSamplesRef = useRef(new Map<string, MotionSample>());
   const trackMatchesRef = useRef(new Map<string, RailTrackMatch>());
   const trackMotionSamplesRef = useRef(new Map<string, TrackMotionSample>());
-  const trackGeometriesRef = useRef(new Map<string, TrackCoordinates>());
+  const trackGeometriesRef = useRef(new Map<string, TrackGeometry>());
   const trackGeometryRequestsRef = useRef(new Set<string>());
   const selectedVehicleIdRef = useRef<string | null>(null);
   const selectRoadFromMapRef = useRef<(eventId: string) => void>(() => undefined);
@@ -321,16 +398,24 @@ export function MobilityDashboard() {
       const response = await fetch(url.toString());
       if (!response.ok) return;
       const payload = await response.json() as {
-        features?: Array<{ properties?: { edgeId?: unknown }; geometry?: { coordinates?: unknown } }>;
+        features?: Array<{
+          properties?: { edgeId?: unknown; fromNode?: unknown; toNode?: unknown; lengthMeters?: unknown };
+          geometry?: { coordinates?: unknown };
+        }>;
       };
       for (const feature of payload.features ?? []) {
         const edgeId = typeof feature.properties?.edgeId === "string" ? feature.properties.edgeId : null;
+        const fromNode = typeof feature.properties?.fromNode === "string" ? feature.properties.fromNode : null;
+        const toNode = typeof feature.properties?.toNode === "string" ? feature.properties.toNode : null;
+        const lengthMeters = typeof feature.properties?.lengthMeters === "number" ? feature.properties.lengthMeters : null;
         const coordinates = Array.isArray(feature.geometry?.coordinates)
           ? feature.geometry.coordinates
             .filter((point): point is number[] => Array.isArray(point) && point.length >= 2 && point.every((value) => typeof value === "number"))
             .map((point) => [point[0], point[1]] as [number, number])
           : [];
-        if (edgeId && coordinates.length >= 2) trackGeometriesRef.current.set(edgeId, coordinates);
+        if (edgeId && fromNode && toNode && lengthMeters && coordinates.length >= 2) {
+          trackGeometriesRef.current.set(edgeId, { coordinates, fromNode, toNode, lengthMeters });
+        }
       }
     } catch {
       // Een tijdelijke geometry-fout mag de live vloot niet blokkeren.
