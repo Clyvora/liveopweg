@@ -27,25 +27,10 @@ import {
   roadSnapshotMessageSchema,
   type RoadEvent,
 } from "../packages/protocol/road";
-import { Utrecht3DView } from "./Utrecht3DView";
-import { ReplayPanel, type ReplayCursor } from "./ReplayPanel";
 import { realtimeHttpUrl, realtimeWebSocketUrl } from "./realtime-url";
 
 type ConnectionState = "verbinden" | "live" | "herstellen" | "offline";
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
-type RailGraphAudit = {
-  method: string;
-  stats: {
-    edges: number;
-    invalidEdges: number;
-    normalZones: number;
-    cautionZones: number;
-    sparseZones: number;
-    blockedZones: number;
-    fallbackAllowedZones: number;
-  };
-};
-
 const configuredRenderDelayMs = Number(process.env.NEXT_PUBLIC_RENDER_DELAY_MS ?? DEFAULT_RENDER_DELAY_MS);
 const renderDelayMs = Number.isFinite(configuredRenderDelayMs) && configuredRenderDelayMs >= 0 && configuredRenderDelayMs <= 30_000
   ? configuredRenderDelayMs
@@ -88,11 +73,6 @@ function formatAge(value: string | null, now: number): string {
   const seconds = Math.max(0, Math.round((now - Date.parse(value)) / 1_000));
   if (seconds < 60) return `${seconds} s`;
   return `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
-}
-
-function formatJourneyTime(value: string | null): string {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("nl-NL", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
 function formatDelay(seconds: number | null): string {
@@ -426,16 +406,12 @@ export function MobilityDashboard() {
   const [query, setQuery] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [debugMatching, setDebugMatching] = useState(false);
-  const [graphAudit, setGraphAudit] = useState<RailGraphAudit | null>(null);
   const [roadEventsById, setRoadEventsById] = useState<Record<string, RoadEvent>>({});
-  const [roadPublicationTime, setRoadPublicationTime] = useState<string | null>(null);
   const [selectedRoadEventId, setSelectedRoadEventId] = useState<string | null>(null);
   const [showLayers, setShowLayers] = useState(false);
   const [roadLayers, setRoadLayers] = useState<Record<RoadLayerKey, boolean>>({
     congestion: true, incidents: true, roadworks: true, closures: true, safety: true,
   });
-  const [replayCursor, setReplayCursor] = useState<ReplayCursor | null>(null);
-  const updateReplayCursor = useCallback((cursor: ReplayCursor | null) => setReplayCursor(cursor), []);
 
   useEffect(() => {
     const virm = new Image();
@@ -543,6 +519,9 @@ export function MobilityDashboard() {
       map.current.easeTo({
         center: [selected.position.longitude, selected.position.latitude],
         zoom: Math.max(map.current.getZoom(), 10),
+        offset: window.innerWidth <= 760
+          ? [0, -Math.min(110, window.innerHeight * 0.14)]
+          : [-190, 0],
         duration: 700,
       });
     }
@@ -601,10 +580,6 @@ export function MobilityDashboard() {
       map.current = instance;
       instance.on("load", () => {
         if (disposed) return;
-        void fetch(realtimeHttpUrl("/v1/geometry/rail/audit"))
-          .then((response) => response.ok ? response.json() : Promise.reject(new Error("Graph-audit niet beschikbaar")))
-          .then((value) => { if (!disposed) setGraphAudit(value as RailGraphAudit); })
-          .catch(() => { if (!disposed) setGraphAudit(null); });
         instance.addSource("rail-fleet", {
           type: "geojson",
           data: { type: "FeatureCollection", features: [] },
@@ -795,31 +770,6 @@ export function MobilityDashboard() {
           filter: ["==", ["geometry-type"], "Point"],
           paint: { "circle-color": "#fffdf7", "circle-radius": 11, "circle-stroke-color": "#162528", "circle-stroke-width": 3 },
         });
-        instance.addSource("rail-replay", {
-          type: "geojson",
-          data: { type: "FeatureCollection", features: [] },
-        });
-        instance.addLayer({
-          id: "rail-replay-trail",
-          type: "line",
-          source: "rail-replay",
-          filter: ["==", ["get", "kind"], "TRAIL"],
-          paint: { "line-color": "#f17845", "line-width": 4, "line-opacity": 0.78, "line-dasharray": [2, 1.5] },
-        });
-        instance.addLayer({
-          id: "rail-replay-source",
-          type: "circle",
-          source: "rail-replay",
-          filter: ["==", ["get", "kind"], "SOURCE"],
-          paint: { "circle-radius": 10, "circle-color": "rgba(255,253,247,.28)", "circle-stroke-color": "#c94f3d", "circle-stroke-width": 3 },
-        });
-        instance.addLayer({
-          id: "rail-replay-match",
-          type: "circle",
-          source: "rail-replay",
-          filter: ["==", ["get", "kind"], "MATCH"],
-          paint: { "circle-radius": 7, "circle-color": "#a7dfc5", "circle-stroke-color": "#163e35", "circle-stroke-width": 3 },
-        });
         // Wegmeldingen worden na de vloot opgebouwd. Zet de treinlagen daarna
         // bewust terug bovenaan, zodat de primaire live-objecten zichtbaar en
         // aanklikbaar blijven op ieder zoomniveau.
@@ -831,9 +781,6 @@ export function MobilityDashboard() {
           "selected-track-match-point",
           "selected-road-event-line",
           "selected-road-event-point",
-          "rail-replay-trail",
-          "rail-replay-source",
-          "rail-replay-match",
         ]) instance.moveLayer(layerId);
         instance.on("click", "rail-fleet-points", (event) => {
           const vehicleId = event.features?.[0]?.properties?.vehicleId;
@@ -1049,39 +996,6 @@ export function MobilityDashboard() {
   }, [mapReady, roadEvents, roadLayers, selectedRoadEvent]);
 
   useEffect(() => {
-    const instance = map.current;
-    if (!mapReady || !instance) return;
-    const source = instance.getSource("rail-replay") as GeoJSONSource | undefined;
-    if (!replayCursor) {
-      source?.setData({ type: "FeatureCollection", features: [] });
-      return;
-    }
-    const current = replayCursor.frames[replayCursor.frameIndex];
-    const trail = replayCursor.frames.slice(0, replayCursor.frameIndex + 1)
-      .map((frame) => [frame.source.position.longitude, frame.source.position.latitude] as [number, number]);
-    const features: Array<{
-      type: "Feature";
-      geometry: { type: "Point"; coordinates: [number, number] } | { type: "LineString"; coordinates: [number, number][] };
-      properties: { kind: string; clockTime: string };
-    }> = [];
-    if (trail.length >= 2) features.push({
-      type: "Feature", geometry: { type: "LineString", coordinates: trail },
-      properties: { kind: "TRAIL", clockTime: replayCursor.clockTime },
-    });
-    features.push({
-      type: "Feature",
-      geometry: { type: "Point", coordinates: [current.source.position.longitude, current.source.position.latitude] },
-      properties: { kind: "SOURCE", clockTime: replayCursor.clockTime },
-    });
-    if (current.match?.snappedPosition && current.match.status.startsWith("MATCHED")) features.push({
-      type: "Feature",
-      geometry: { type: "Point", coordinates: [current.match.snappedPosition.longitude, current.match.snappedPosition.latitude] },
-      properties: { kind: "MATCH", clockTime: replayCursor.clockTime },
-    });
-    source?.setData({ type: "FeatureCollection", features });
-  }, [mapReady, replayCursor]);
-
-  useEffect(() => {
     let socket: WebSocket | null = null;
     let reconnectTimer: number | null = null;
     let closed = false;
@@ -1194,7 +1108,6 @@ export function MobilityDashboard() {
         const roadSnapshot = roadSnapshotMessageSchema.safeParse(decoded);
         if (roadSnapshot.success) {
           latestRoadSequence = roadSnapshot.data.sequence;
-          setRoadPublicationTime(roadSnapshot.data.publicationTime);
           setRoadEventsById(Object.fromEntries(roadSnapshot.data.data.map((roadEvent) => [roadEvent.id, roadEvent])));
           return;
         }
@@ -1205,7 +1118,6 @@ export function MobilityDashboard() {
             return;
           }
           latestRoadSequence = roadBatch.data.sequence;
-          setRoadPublicationTime(roadBatch.data.publicationTime);
           setRoadEventsById((current) => {
             const next = { ...current };
             for (const eventId of roadBatch.data.removedEventIds) delete next[eventId];
@@ -1256,27 +1168,14 @@ export function MobilityDashboard() {
       return relevantTime ? Date.parse(relevantTime) >= now - 60_000 : false;
     }) ?? null;
   }, [journey, now]);
-  const visibleStops = useMemo(() => {
-    if (!journey) return [];
-    const start = nextStop ? Math.max(0, nextStop.order - 1) : Math.max(0, journey.stops.length - 5);
-    return journey.stops.slice(start, start + 6);
-  }, [journey, nextStop]);
   const currentDelay = nextStop?.departure.exactDelaySeconds ?? nextStop?.arrival.exactDelaySeconds ?? null;
   const selectedTrackMatch = selectedVehicleId ? trackMatchesByVehicle[selectedVehicleId] ?? null : null;
-  const acceptedTrackMatches = useMemo(() => Object.values(trackMatchesByVehicle)
-    .filter((match) => match.status.startsWith("MATCHED")), [trackMatchesByVehicle]);
-  const ambiguousTrackMatches = useMemo(() => Object.values(trackMatchesByVehicle)
-    .filter((match) => match.status === "UNMATCHED_AMBIGUOUS"), [trackMatchesByVehicle]);
-  const regionalFallbackMatches = useMemo(() => Object.values(trackMatchesByVehicle)
-    .filter((match) => match.status === "MATCHED_LOW_REGIONAL_FALLBACK"), [trackMatchesByVehicle]);
   const acceptedSelectedMatch = selectedTrackMatch?.snappedPosition && selectedTrackMatch.status.startsWith("MATCHED")
     ? selectedTrackMatch
     : null;
   const displayedPosition = acceptedSelectedMatch?.snappedPosition ?? (selectedMotion
     ? { longitude: selectedMotion.longitude, latitude: selectedMotion.latitude }
     : null);
-  const activeRoadEvents = roadEvents.filter((event) => event.status === "ACTIVE").length;
-  const plannedRoadEvents = roadEvents.filter((event) => event.status === "PLANNED").length;
   const staleRoadEvents = roadEvents.filter((event) => event.status === "STALE").length;
 
   return (
@@ -1287,24 +1186,6 @@ export function MobilityDashboard() {
         </a>
         <div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live" : connection}</div>
       </header>
-
-      <section className="hero" id="top">
-        <div>
-          <p className="eyebrow">Fase 10 · Generalisatie & replay</p>
-          <h1>Live vooruit.<br /><em>Brongetrouw terug.</em></h1>
-          <p className="lede">De livekaart blijft intact, maar opgeslagen bronpunten kunnen nu deterministisch worden teruggekeken. Replay, herberekende spoormatches en live data krijgen ieder een zichtbaar eigen label.</p>
-        </div>
-        <dl className="statusCard">
-          <div><dt>Actuele wegmeldingen</dt><dd>{activeRoadEvents.toLocaleString("nl-NL")} actief · {plannedRoadEvents.toLocaleString("nl-NL")} gepland</dd></div>
-          <div><dt>NDW-bronmoment</dt><dd>{roadPublicationTime ? `${formatTime(roadPublicationTime)} · ${formatAge(roadPublicationTime, now)} oud` : "wordt opgehaald"}</dd></div>
-          <div><dt>Replay</dt><dd>{replayCursor ? `${formatTime(replayCursor.clockTime)} · niet live` : "20 minuten bronarchief per trein"}</dd></div>
-          <div><dt>Landelijk gematcht</dt><dd>{acceptedTrackMatches.length.toLocaleString("nl-NL")}</dd></div>
-          <div><dt>Bewust ambigu</dt><dd>{ambiguousTrackMatches.length.toLocaleString("nl-NL")}</dd></div>
-          <div><dt>Regionale fallback</dt><dd>{regionalFallbackMatches.length.toLocaleString("nl-NL")} · altijd LOW</dd></div>
-          <div><dt>Graph-audit</dt><dd>{graphAudit ? `${graphAudit.stats.cautionZones} aandacht · ${graphAudit.stats.sparseZones} schaars` : "wordt geladen"}</dd></div>
-            <div><dt>Stations 3D</dt><dd>Utrecht · Amsterdam · Rotterdam</dd></div>
-        </dl>
-      </section>
 
       <section className={`roadOverview mapDrawer ${showLayers ? "open" : ""}`} aria-label="NDW-weglagen en geselecteerde wegmelding" aria-hidden={!showLayers}>
         <button className="drawerClose" type="button" onClick={() => setShowLayers(false)} aria-label="Sluit kaartlagen">×</button>
@@ -1390,17 +1271,6 @@ export function MobilityDashboard() {
               <strong>{roadEvents.length}</strong>
             </button>
           </div>
-          <div className="mapLegend" aria-label="Kaartlegenda">
-            <span><i className="replayLine" /> Replay</span>
-            <span><i className="roadCongestion" /> Files</span>
-            <span><i className="roadIncident" /> Incidenten</span>
-            <span><i className="roadWorks" /> Werk / afsluiting</span>
-            <span><i className="trackLine" /> ProRail-spoorgeometrie</span>
-            <span><i className="matchedDot" /> Afgeleide spoorpositie</span>
-            <span><i className="renderedDot" /> Gerenderde positie</span>
-            <span><i className="sourceRing" /> Laatste bronpositie</span>
-          </div>
-          <div className="mapLabel">{vehicles.length} treinen · {roadEvents.length} wegmeldingen</div>
           <div className="mapAttribution">© OpenStreetMap-bijdragers · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
         </div>
         {observation && <aside className="observationPanel" aria-live="polite">
@@ -1475,59 +1345,6 @@ export function MobilityDashboard() {
         </aside>}
       </section>
 
-      <ReplayPanel
-        vehicleId={selectedVehicleId}
-        trainNumber={observation?.trainNumber ?? null}
-        onCursorChange={updateReplayCursor}
-      />
-
-      <Utrecht3DView
-        vehicles={vehicles}
-        matchesByVehicle={trackMatchesByVehicle}
-        selectedVehicleId={selectedVehicleId}
-      />
-
-      <section className="journeyPanel" aria-label="Ritinformatie van de geselecteerde trein">
-        <header className="journeyHeader">
-          <div>
-            <p className="panelKicker">Fase 3 · InfoPlus RIT v5</p>
-            <h2>{journey ? `Richting ${journey.destination.actual ?? journey.destination.planned ?? "onbekend"}` : "Ritinformatie wordt gekoppeld"}</h2>
-            <p>{journey
-              ? `${journey.trainCategory.name ?? "Trein"} ${journey.trainNumber} · ${journey.operator ?? "vervoerder onbekend"}`
-              : "Er verschijnt alleen een route als treinnummer en Nederlandse dienstdatum exact overeenkomen."}</p>
-          </div>
-          <div className="journeyFacts">
-            <div><span>Volgende halte</span><strong>{nextStop?.station.longName ?? "Onbekend"}</strong></div>
-            <div><span>Bronvertraging</span><strong className={currentDelay && currentDelay > 0 ? "staleText" : "freshText"}>{formatDelay(currentDelay)}</strong></div>
-            <div><span>Spoor</span><strong>{nextStop?.departure.actualTrack ?? nextStop?.arrival.actualTrack ?? "Onbekend"}</strong></div>
-          </div>
-        </header>
-
-        {journey ? (
-          <ol className="routeList">
-            {visibleStops.map((stop) => {
-              const isNext = stop.order === nextStop?.order;
-              const actualTime = stop.departure.actualAt ?? stop.arrival.actualAt;
-              const plannedTime = stop.departure.plannedAt ?? stop.arrival.plannedAt;
-              return (
-                <li className={isNext ? "next" : ""} key={`${stop.order}-${stop.station.code}`}>
-                  <span className="routeDot" aria-hidden="true" />
-                  <div><strong>{stop.station.longName}</strong><small>{isNext ? "Volgende halte" : stop.calls.actual === false ? "Stopt niet" : "Ritstation"}</small></div>
-                  <time dateTime={actualTime ?? plannedTime ?? undefined}>{formatJourneyTime(actualTime ?? plannedTime)}</time>
-                  <span className="track">{stop.departure.actualTrack ?? stop.arrival.actualTrack ? `spoor ${stop.departure.actualTrack ?? stop.arrival.actualTrack}` : "spoor —"}</span>
-                </li>
-              );
-            })}
-          </ol>
-        ) : (
-          <div className="journeyEmpty"><span /> Wachten op een actuele, exact koppelbare RIT-update</div>
-        )}
-
-        <footer className="journeyFooter">
-          <span>{journey ? `Bron gemaakt ${formatTime(journey.product.generatedAt)}` : "InfoPlus-stream actief"}</span>
-          <span>Identiteitskoppeling: DERIVED · treinnummer + lokale dienstdatum</span>
-        </footer>
-      </section>
     </main>
   );
 }

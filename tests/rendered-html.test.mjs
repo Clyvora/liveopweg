@@ -12,16 +12,13 @@ async function render() {
   );
 }
 
-test("server-renders de map-first startstaat met replay, NDW-lagen en drie 3D-stations", async () => {
+test("server-renders uitsluitend de fullscreen livekaart met contextuele lagen", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
   assert.match(html, /<title>Liveopweg/);
-  assert.match(html, /Live vooruit/);
-  assert.match(html, /Brongetrouw terug/);
-  assert.match(html, /Fase 10 · Generalisatie &amp; replay/);
   assert.match(html, /Files/);
   assert.match(html, /Ongevallen &amp; incidenten/);
   assert.match(html, /Werkzaamheden/);
@@ -29,21 +26,13 @@ test("server-renders de map-first startstaat met replay, NDW-lagen en drie 3D-st
   assert.match(html, /Veiligheidsmeldingen/);
   assert.match(html, /leveranciersinformatie kan ongevalideerd zijn/);
   assert.match(html, /Kies een melding op de kaart/);
-  assert.match(html, /Regionale fallback/);
-  assert.match(html, /Stations in meters/);
-  assert.match(html, /Niet in giswerk/);
-  assert.match(html, /Open 3D-station/);
-  assert.match(html, /Amsterdam Centraal/);
-  assert.match(html, /Rotterdam Centraal/);
-  assert.match(html, /REPLAY/);
-  assert.match(html, /geen livebeeld/);
-  assert.match(html, /Utrecht · Amsterdam · Rotterdam/);
   assert.match(html, /Kaartbediening/);
   assert.match(html, /Sluit kaartlagen/);
   assert.match(html, /Zoek treinnummer of materieel/);
-  assert.match(html, /InfoPlus RIT v5/);
-  assert.match(html, /Ritinformatie wordt gekoppeld/);
-  assert.match(html, /treinnummer \+ lokale dienstdatum/);
+  assert.doesNotMatch(html, /Open 3D-station/);
+  assert.doesNotMatch(html, /Stations in meters/);
+  assert.doesNotMatch(html, /REPLAY/);
+  assert.doesNotMatch(html, /Ritinformatie wordt gekoppeld/);
   assert.doesNotMatch(html, /De interne score is geen kanspercentage/);
   assert.doesNotMatch(html, /Geselecteerde trein/);
   assert.doesNotMatch(html, /Trein 8667/);
