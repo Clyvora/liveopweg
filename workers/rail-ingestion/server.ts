@@ -347,6 +347,23 @@ const server = createServer((request, response) => {
     return;
   }
   if (path === "/v1/matches/rail" || path === "/v1/matches/utrecht") return writeJson(response, 200, matchSnapshot());
+  if (path === "/v1/geometry/rail/edges") {
+    if (!trackGraph) return writeJson(response, 503, { error: "rail_graph_unavailable" });
+    const requestedIds = new Set((requestUrl.searchParams.get("ids") ?? "")
+      .split(",")
+      .map((edgeId) => edgeId.trim())
+      .filter(Boolean)
+      .slice(0, 500));
+    const features = trackGraph.edges
+      .filter((edge) => requestedIds.has(edge.id))
+      .map((edge) => ({
+        type: "Feature" as const,
+        id: edge.id,
+        geometry: edge.geometry,
+        properties: { edgeId: edge.id },
+      }));
+    return writeJson(response, 200, { type: "FeatureCollection", features });
+  }
   if (path === "/v1/geometry/rail") {
     void writeGeometryFile(response, railGeometryPath, "application/geo+json", "gzip");
     return;

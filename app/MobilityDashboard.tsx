@@ -110,6 +110,38 @@ type TrackMotionSample = {
   current: RailTrackMatch;
 };
 
+type TrackCoordinates = [number, number][];
+
+function coordinateDistanceMeters(left: [number, number], right: [number, number]): number {
+  const latitudeRadians = ((left[1] + right[1]) / 2) * Math.PI / 180;
+  const longitudeMeters = (right[0] - left[0]) * 111_320 * Math.max(0.2, Math.cos(latitudeRadians));
+  const latitudeMeters = (right[1] - left[1]) * 111_320;
+  return Math.hypot(longitudeMeters, latitudeMeters);
+}
+
+function pointAlongTrack(coordinates: TrackCoordinates, progress: number): { longitude: number; latitude: number } | null {
+  if (coordinates.length < 2) return null;
+  const lengths = coordinates.slice(1).map((point, index) => coordinateDistanceMeters(coordinates[index], point));
+  const totalLength = lengths.reduce((sum, length) => sum + length, 0);
+  if (totalLength <= 0) return { longitude: coordinates[0][0], latitude: coordinates[0][1] };
+  let distance = Math.min(1, Math.max(0, progress)) * totalLength;
+  for (let index = 1; index < coordinates.length; index += 1) {
+    const segmentLength = lengths[index - 1];
+    if (distance <= segmentLength || index === coordinates.length - 1) {
+      const ratio = segmentLength > 0 ? distance / segmentLength : 0;
+      const from = coordinates[index - 1];
+      const to = coordinates[index];
+      return {
+        longitude: from[0] + (to[0] - from[0]) * ratio,
+        latitude: from[1] + (to[1] - from[1]) * ratio,
+      };
+    }
+    distance -= segmentLength;
+  }
+  const last = coordinates.at(-1)!;
+  return { longitude: last[0], latitude: last[1] };
+}
+
 function matchedPosition(match: RailTrackMatch | null | undefined): { longitude: number; latitude: number } | null {
   return match?.snappedPosition && match.status.startsWith("MATCHED") ? match.snappedPosition : null;
 }
@@ -118,30 +150,51 @@ function trackMotionPosition(
   sample: TrackMotionSample | null,
   nowMs: number,
   renderDelayMs: number,
+  geometries: Map<string, TrackCoordinates>,
 ): { longitude: number; latitude: number } | null {
   const currentPosition = matchedPosition(sample?.current);
   if (!sample || !currentPosition) return null;
   const previousPosition = matchedPosition(sample.previous);
-  if (!previousPosition) return currentPosition;
+  const currentGeometry = sample.current.edgeId ? geometries.get(sample.current.edgeId) : undefined;
+  const currentTrackPosition = currentGeometry && sample.current.edgeProgress !== null
+    ? pointAlongTrack(currentGeometry, sample.current.edgeProgress)
+    : null;
+  const previousGeometry = sample.previous?.edgeId ? geometries.get(sample.previous.edgeId) : undefined;
+  const previousTrackPosition = previousGeometry && sample.previous?.edgeProgress !== null && sample.previous?.edgeProgress !== undefined
+    ? pointAlongTrack(previousGeometry, sample.previous.edgeProgress)
+    : null;
+  if (!previousPosition) return currentTrackPosition ?? currentPosition;
 
   const previousTime = Date.parse(sample.previous?.sourceMeasuredAt ?? sample.previous?.matchedAt ?? "");
   const currentTime = Date.parse(sample.current.sourceMeasuredAt ?? sample.current.matchedAt);
   const targetTime = nowMs - renderDelayMs;
-  if (!Number.isFinite(previousTime) || !Number.isFinite(currentTime) || currentTime <= previousTime) return currentPosition;
-  if (targetTime <= previousTime) return previousPosition;
+  if (!Number.isFinite(previousTime) || !Number.isFinite(currentTime) || currentTime <= previousTime) return currentTrackPosition ?? currentPosition;
+  if (targetTime <= previousTime) return previousTrackPosition ?? previousPosition;
   if (targetTime >= currentTime) {
     const extrapolationSeconds = Math.min(30, (targetTime - currentTime) / 1_000);
     const elapsedSeconds = (currentTime - previousTime) / 1_000;
     if (extrapolationSeconds > 0 && elapsedSeconds > 0) {
       const scale = extrapolationSeconds / elapsedSeconds;
       return {
-        longitude: currentPosition.longitude + (currentPosition.longitude - previousPosition.longitude) * scale,
-        latitude: currentPosition.latitude + (currentPosition.latitude - previousPosition.latitude) * scale,
+        longitude: (currentTrackPosition ?? currentPosition).longitude
+          + ((currentTrackPosition ?? currentPosition).longitude - (previousTrackPosition ?? previousPosition).longitude) * scale,
+        latitude: (currentTrackPosition ?? currentPosition).latitude
+          + ((currentTrackPosition ?? currentPosition).latitude - (previousTrackPosition ?? previousPosition).latitude) * scale,
       };
     }
-    return currentPosition;
+    return currentTrackPosition ?? currentPosition;
   }
   const progress = (targetTime - previousTime) / (currentTime - previousTime);
+  if (
+    currentGeometry
+    && sample.current.edgeId === sample.previous?.edgeId
+    && sample.previous.edgeProgress !== null
+    && sample.current.edgeProgress !== null
+  ) {
+    const edgeProgress = sample.previous.edgeProgress
+      + (sample.current.edgeProgress - sample.previous.edgeProgress) * progress;
+    return pointAlongTrack(currentGeometry, edgeProgress) ?? currentPosition;
+  }
   return {
     longitude: previousPosition.longitude + (currentPosition.longitude - previousPosition.longitude) * progress,
     latitude: previousPosition.latitude + (currentPosition.latitude - previousPosition.latitude) * progress,
@@ -231,6 +284,8 @@ export function MobilityDashboard() {
   const motionSamplesRef = useRef(new Map<string, MotionSample>());
   const trackMatchesRef = useRef(new Map<string, RailTrackMatch>());
   const trackMotionSamplesRef = useRef(new Map<string, TrackMotionSample>());
+  const trackGeometriesRef = useRef(new Map<string, TrackCoordinates>());
+  const trackGeometryRequestsRef = useRef(new Set<string>());
   const selectedVehicleIdRef = useRef<string | null>(null);
   const selectRoadFromMapRef = useRef<(eventId: string) => void>(() => undefined);
   const [vehiclesById, setVehiclesById] = useState<Record<string, RailObservation>>({});
@@ -254,6 +309,35 @@ export function MobilityDashboard() {
   });
   const [replayCursor, setReplayCursor] = useState<ReplayCursor | null>(null);
   const updateReplayCursor = useCallback((cursor: ReplayCursor | null) => setReplayCursor(cursor), []);
+  const requestTrackGeometries = useCallback(async (edgeIds: string[]) => {
+    const missing = [...new Set(edgeIds)].filter((edgeId) => (
+      !trackGeometriesRef.current.has(edgeId) && !trackGeometryRequestsRef.current.has(edgeId)
+    ));
+    if (!missing.length) return;
+    missing.forEach((edgeId) => trackGeometryRequestsRef.current.add(edgeId));
+    try {
+      const url = new URL(realtimeHttpUrl("/v1/geometry/rail/edges"));
+      url.searchParams.set("ids", missing.slice(0, 500).join(","));
+      const response = await fetch(url.toString());
+      if (!response.ok) return;
+      const payload = await response.json() as {
+        features?: Array<{ properties?: { edgeId?: unknown }; geometry?: { coordinates?: unknown } }>;
+      };
+      for (const feature of payload.features ?? []) {
+        const edgeId = typeof feature.properties?.edgeId === "string" ? feature.properties.edgeId : null;
+        const coordinates = Array.isArray(feature.geometry?.coordinates)
+          ? feature.geometry.coordinates
+            .filter((point): point is number[] => Array.isArray(point) && point.length >= 2 && point.every((value) => typeof value === "number"))
+            .map((point) => [point[0], point[1]] as [number, number])
+          : [];
+        if (edgeId && coordinates.length >= 2) trackGeometriesRef.current.set(edgeId, coordinates);
+      }
+    } catch {
+      // Een tijdelijke geometry-fout mag de live vloot niet blokkeren.
+    } finally {
+      missing.forEach((edgeId) => trackGeometryRequestsRef.current.delete(edgeId));
+    }
+  }, []);
 
   const vehicles = useMemo(() => Object.values(vehiclesById).sort((left, right) => (
     left.trainNumber.localeCompare(right.trainNumber, "nl", { numeric: true })
@@ -569,7 +653,12 @@ export function MobilityDashboard() {
           let nearest: { vehicleId: string; distance: number } | null = null;
           for (const [vehicleId, sample] of motionSamplesRef.current) {
             const motion = renderMotion(sample, Date.now(), renderDelayMs);
-            const position = trackMotionPosition(trackMotionSamplesRef.current.get(vehicleId) ?? null, Date.now(), renderDelayMs) ?? motion;
+            const position = trackMotionPosition(
+              trackMotionSamplesRef.current.get(vehicleId) ?? null,
+              Date.now(),
+              renderDelayMs,
+              trackGeometriesRef.current,
+            ) ?? motion;
             const projected = instance.project([position.longitude, position.latitude]);
             const distance = Math.hypot(projected.x - event.point.x, projected.y - event.point.y);
             if (distance <= 18 && (!nearest || distance < nearest.distance)) nearest = { vehicleId, distance };
@@ -621,7 +710,12 @@ export function MobilityDashboard() {
             context.clearRect(0, 0, width, height);
             for (const [vehicleId, sample] of motionSamplesRef.current) {
               const motion = renderMotion(sample, nowMs, renderDelayMs);
-              const position = trackMotionPosition(trackMotionSamplesRef.current.get(vehicleId) ?? null, nowMs, renderDelayMs);
+              const position = trackMotionPosition(
+                trackMotionSamplesRef.current.get(vehicleId) ?? null,
+                nowMs,
+                renderDelayMs,
+                trackGeometriesRef.current,
+              );
               const matched = Boolean(position);
               const renderedPosition = position ?? motion;
               const projected = instance.project([renderedPosition.longitude, renderedPosition.latitude]);
@@ -854,6 +948,7 @@ export function MobilityDashboard() {
           }
           trackMotionSamplesRef.current = trackMotionSamples;
           trackMatchesRef.current = matches;
+          void requestTrackGeometries(matchSnapshot.data.data.map((match) => match.edgeId).filter((edgeId): edgeId is string => Boolean(edgeId)));
           setTrackMatchesByVehicle(Object.fromEntries(matches));
           return;
         }
@@ -872,6 +967,7 @@ export function MobilityDashboard() {
           }
           trackMotionSamplesRef.current = trackMotionSamples;
           trackMatchesRef.current = matches;
+          void requestTrackGeometries(matchBatch.data.upserts.map((match) => match.edgeId).filter((edgeId): edgeId is string => Boolean(edgeId)));
           setTrackMatchesByVehicle(Object.fromEntries(matches));
           return;
         }
@@ -925,7 +1021,7 @@ export function MobilityDashboard() {
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
       socket?.close();
     };
-  }, []);
+  }, [requestTrackGeometries]);
 
   const measuredAge = selectedMotion
     ? `${Math.round(selectedMotion.sourceAgeSeconds)} s`
