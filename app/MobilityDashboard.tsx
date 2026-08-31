@@ -174,28 +174,51 @@ function drawTrainIcon(
   selected: boolean,
   matched: boolean,
 ): void {
-  const width = selected ? 13 : 10;
-  const height = selected ? 19 : 15;
-  const bodyColor = selected ? "#fff1a8" : matched ? "#a7dfc5" : "#f17845";
+  const width = selected ? 14 : 11;
+  const height = selected ? 22 : 17;
+  const statusColor = selected ? "#fff1a8" : matched ? "#a7dfc5" : "#f17845";
   context.save();
   context.translate(x, y);
   context.rotate(rotation);
-  context.shadowColor = "rgba(22,37,40,.32)";
+
+  // Statusring houdt de datakwaliteit herkenbaar; de trein zelf blijft
+  // consequent geel/blauw zoals een echte Nederlandse intercity.
+  context.beginPath();
+  context.arc(0, 0, Math.max(width, height) * 0.68, 0, Math.PI * 2);
+  context.lineWidth = selected ? 2.4 : 1.35;
+  context.strokeStyle = statusColor;
+  context.globalAlpha = selected ? 1 : 0.9;
+  context.stroke();
+  context.globalAlpha = 1;
+
+  context.shadowColor = "rgba(22,37,40,.36)";
   context.shadowBlur = selected ? 7 : 3;
   context.shadowOffsetY = 1;
-  roundRectPath(context, -width / 2, -height / 2, width, height, 3);
-  context.fillStyle = bodyColor;
+  roundRectPath(context, -width / 2, -height / 2, width, height, 3.5);
+  context.fillStyle = "#f2c928";
   context.fill();
   context.shadowColor = "transparent";
-  context.lineWidth = selected ? 2.2 : 1.4;
-  context.strokeStyle = selected ? "#162528" : "#fffdf7";
+  context.lineWidth = selected ? 1.9 : 1.35;
+  context.strokeStyle = "#172b55";
   context.stroke();
-  roundRectPath(context, -width * 0.29, -height * 0.27, width * 0.58, height * 0.25, 1.5);
-  context.fillStyle = "#163e35";
+
+  // Blauwe kap, doorlopende donkere ramen en een rood frontlicht geven de
+  // marker een herkenbare bovenaanzicht-trein in plaats van een stip.
+  roundRectPath(context, -width * 0.43, -height * 0.42, width * 0.86, height * 0.27, 2);
+  context.fillStyle = "#1e4f9c";
   context.fill();
-  context.fillStyle = selected ? "#f17845" : "#163e35";
-  context.fillRect(-width * 0.28, height * 0.17, width * 0.18, height * 0.2);
-  context.fillRect(width * 0.1, height * 0.17, width * 0.18, height * 0.2);
+  roundRectPath(context, -width * 0.31, -height * 0.25, width * 0.62, height * 0.27, 1.2);
+  context.fillStyle = "#213044";
+  context.fill();
+  context.fillStyle = "#9bc2d8";
+  context.fillRect(-width * 0.24, -height * 0.19, width * 0.18, height * 0.13);
+  context.fillRect(width * 0.06, -height * 0.19, width * 0.18, height * 0.13);
+  context.fillStyle = "#173a74";
+  context.fillRect(-width * 0.34, height * 0.08, width * 0.68, height * 0.12);
+  context.fillStyle = "#d74a3d";
+  context.beginPath();
+  context.arc(0, -height * 0.42, Math.max(0.9, width * 0.09), 0, Math.PI * 2);
+  context.fill();
   context.restore();
 }
 
