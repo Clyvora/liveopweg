@@ -12,7 +12,7 @@ async function render() {
   );
 }
 
-test("server-renders fase 10 met replay, NDW-weglagen, spoor en drie 3D-stations", async () => {
+test("server-renders de map-first startstaat met replay, NDW-lagen en drie 3D-stations", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -38,16 +38,14 @@ test("server-renders fase 10 met replay, NDW-weglagen, spoor en drie 3D-stations
   assert.match(html, /REPLAY/);
   assert.match(html, /geen livebeeld/);
   assert.match(html, /Utrecht · Amsterdam · Rotterdam/);
-  assert.match(html, /De interne score is geen kanspercentage/);
-  assert.match(html, /Buiten Nederland \/ niet beschikbaar/);
-  assert.match(html, /Renderconfidence/);
-  assert.match(html, /Displayed position/);
-  assert.match(html, /Last source position/);
+  assert.match(html, /Kaartbediening/);
+  assert.match(html, /Sluit kaartlagen/);
   assert.match(html, /Zoek treinnummer of materieel/);
-  assert.match(html, /Selecteer een trein/);
   assert.match(html, /InfoPlus RIT v5/);
   assert.match(html, /Ritinformatie wordt gekoppeld/);
   assert.match(html, /treinnummer \+ lokale dienstdatum/);
+  assert.doesNotMatch(html, /De interne score is geen kanspercentage/);
+  assert.doesNotMatch(html, /Geselecteerde trein/);
   assert.doesNotMatch(html, /Trein 8667/);
   assert.doesNotMatch(html, /96% zeker/);
 });

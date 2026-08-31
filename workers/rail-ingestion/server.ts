@@ -457,14 +457,14 @@ function send(socket: WebSocket, message: RailFleetRealtimeMessage | RailMatchRe
 }
 
 function sendSelectedContext(socket: WebSocket) {
-  const vehicleId = clientSelections.get(socket) ?? defaultVehicleId();
+  const vehicleId = clientSelections.get(socket) ?? null;
   send(socket, selectionSnapshot(vehicleId));
   send(socket, journeySnapshot(vehicleId));
 }
 
 sockets.on("connection", (socket) => {
   runtimeMetrics.setWebsocketClients(sockets.clients.size);
-  clientSelections.set(socket, defaultVehicleId());
+  clientSelections.set(socket, null);
   send(socket, fleetSnapshot());
   send(socket, matchSnapshot());
   send(socket, roadSnapshot());

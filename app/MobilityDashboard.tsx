@@ -303,23 +303,24 @@ function drawTrainIcon(
   rotation: number,
   selected: boolean,
   matched: boolean,
+  scale: number,
 ): void {
-  const width = selected ? 14 : 11;
-  const height = selected ? 22 : 17;
-  const statusColor = selected ? "#fff1a8" : matched ? "#a7dfc5" : "#f17845";
+  const selectedScale = selected ? Math.max(0.92, scale) : scale;
+  const width = (selected ? 14 : 11) * selectedScale;
+  const height = (selected ? 22 : 17) * selectedScale;
   context.save();
   context.translate(x, y);
   context.rotate(rotation);
 
-  // Statusring houdt de datakwaliteit herkenbaar; de trein zelf blijft
-  // consequent geel/blauw zoals een echte Nederlandse intercity.
-  context.beginPath();
-  context.arc(0, 0, Math.max(width, height) * 0.68, 0, Math.PI * 2);
-  context.lineWidth = selected ? 2.4 : 1.35;
-  context.strokeStyle = statusColor;
-  context.globalAlpha = selected ? 1 : 0.9;
-  context.stroke();
-  context.globalAlpha = 1;
+  // Alleen de geselecteerde trein krijgt een halo. Dat houdt het landelijke
+  // beeld rustig terwijl de trein zelf herkenbaar geel/blauw blijft.
+  if (selected) {
+    context.beginPath();
+    context.arc(0, 0, Math.max(width, height) * 0.66, 0, Math.PI * 2);
+    context.lineWidth = 2.5;
+    context.strokeStyle = "rgba(255,255,255,.96)";
+    context.stroke();
+  }
 
   context.shadowColor = "rgba(22,37,40,.36)";
   context.shadowBlur = selected ? 7 : 3;
@@ -328,8 +329,8 @@ function drawTrainIcon(
   context.fillStyle = "#f2c928";
   context.fill();
   context.shadowColor = "transparent";
-  context.lineWidth = selected ? 1.9 : 1.35;
-  context.strokeStyle = "#172b55";
+  context.lineWidth = selected ? 1.8 : Math.max(0.8, 1.15 * selectedScale);
+  context.strokeStyle = matched ? "#172b55" : "#9a4d35";
   context.stroke();
 
   // Blauwe kap, doorlopende donkere ramen en een rood frontlicht geven de
@@ -381,6 +382,7 @@ export function MobilityDashboard() {
   const [roadEventsById, setRoadEventsById] = useState<Record<string, RoadEvent>>({});
   const [roadPublicationTime, setRoadPublicationTime] = useState<string | null>(null);
   const [selectedRoadEventId, setSelectedRoadEventId] = useState<string | null>(null);
+  const [showLayers, setShowLayers] = useState(false);
   const [roadLayers, setRoadLayers] = useState<Record<RoadLayerKey, boolean>>({
     congestion: true, incidents: true, roadworks: true, closures: true, safety: true,
   });
@@ -446,6 +448,7 @@ export function MobilityDashboard() {
     selectedVehicleIdRef.current = vehicleId;
     setObservation(selected);
     setJourney(null);
+    setQuery("");
     socketRef.current?.send(JSON.stringify({ protocolVersion: 2, type: "select", vehicleId }));
     if (focusMap && map.current) {
       map.current.easeTo({
@@ -456,12 +459,23 @@ export function MobilityDashboard() {
     }
   }, [vehiclesById]);
 
+  const clearVehicleSelection = useCallback(() => {
+    setSelectedVehicleId(null);
+    selectedVehicleIdRef.current = null;
+    setObservation(null);
+    setJourney(null);
+    setQuery("");
+  }, []);
+
   useEffect(() => {
     selectFromMapRef.current = (vehicleId) => selectVehicle(vehicleId);
   }, [selectVehicle]);
 
   useEffect(() => {
-    selectRoadFromMapRef.current = (eventId) => setSelectedRoadEventId(eventId);
+    selectRoadFromMapRef.current = (eventId) => {
+      setSelectedRoadEventId(eventId);
+      setShowLayers(true);
+    };
   }, []);
 
   useEffect(() => {
@@ -475,8 +489,12 @@ export function MobilityDashboard() {
       if (disposed || !mapElement.current || map.current) return;
       const instance = new Map({
         container: mapElement.current,
-        center: [5.35, 52.16],
-        zoom: 6.6,
+        bounds: [[3.15, 50.7], [7.45, 53.7]],
+        fitBoundsOptions: {
+          padding: window.innerWidth <= 760
+            ? { top: 32, right: 22, bottom: 32, left: 22 }
+            : { top: 60, right: 60, bottom: 60, left: 60 },
+        },
         attributionControl: false,
         style: {
           version: 8,
@@ -793,6 +811,8 @@ export function MobilityDashboard() {
           if (context) {
             context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
             context.clearRect(0, 0, width, height);
+            const zoom = instance.getZoom();
+            const markerScale = zoom < 7 ? 0.5 : zoom < 8.5 ? 0.68 : zoom < 10.5 ? 0.86 : 1;
             for (const [vehicleId, sample] of motionSamplesRef.current) {
               const motion = renderMotion(sample, nowMs, renderDelayMs);
               const position = trackMotionPosition(
@@ -813,7 +833,7 @@ export function MobilityDashboard() {
                     -(sample.current.position.latitude - sample.previous.position.latitude),
                   ) * 180 / Math.PI
                 : 0);
-              drawTrainIcon(context, projected.x, projected.y, derivedHeading * Math.PI / 180, isSelected, matched);
+              drawTrainIcon(context, projected.x, projected.y, derivedHeading * Math.PI / 180, isSelected, matched, markerScale);
             }
           }
         }
@@ -1183,7 +1203,8 @@ export function MobilityDashboard() {
         </dl>
       </section>
 
-      <section className="roadOverview" aria-label="NDW-weglagen en geselecteerde wegmelding">
+      <section className={`roadOverview mapDrawer ${showLayers ? "open" : ""}`} aria-label="NDW-weglagen en geselecteerde wegmelding" aria-hidden={!showLayers}>
+        <button className="drawerClose" type="button" onClick={() => setShowLayers(false)} aria-label="Sluit kaartlagen">×</button>
         <div className="roadLayerPanel">
           <div className="roadLayerHeading">
             <div>
@@ -1256,6 +1277,13 @@ export function MobilityDashboard() {
           <div ref={mapElement} className="liveMap" aria-label="Kaart van Nederland met actuele bronposities" />
           <canvas ref={trainOverlayElement} className="trainOverlay" aria-hidden="true" />
           {!vehicles.length && <div className="waitingMarker"><span /> Wachten op eerste vlootbatch</div>}
+          <div className="mapActions" aria-label="Kaartbediening">
+            <button type="button" onClick={() => setShowLayers(true)} aria-expanded={showLayers}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4-8 4-8-4 8-4Zm-8 9 8 4 8-4M4 17l8 4 8-4" /></svg>
+              <span>Lagen</span>
+              <strong>{roadEvents.length}</strong>
+            </button>
+          </div>
           <div className="mapLegend" aria-label="Kaartlegenda">
             <span><i className="replayLine" /> Replay</span>
             <span><i className="roadCongestion" /> Files</span>
@@ -1269,16 +1297,19 @@ export function MobilityDashboard() {
           <div className="mapLabel">{vehicles.length} treinen · {roadEvents.length} wegmeldingen</div>
           <div className="mapAttribution">© OpenStreetMap-bijdragers · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
         </div>
-        <aside className="observationPanel" aria-live="polite">
-          <p className="panelKicker">Geselecteerde trein</p>
-          <h2>{observation ? `Trein ${observation.trainNumber}` : "Selecteer een trein"}</h2>
-          <p>{observation
-            ? `Materieel ${observation.materialNumber ?? "onbekend"}. Dit is exact het ontvangen WGS84-punt.`
-            : "Kies een marker of zoek op treinnummer. Iedere browser houdt zijn eigen selectie bij."}</p>
+        {observation && <aside className="observationPanel" aria-live="polite">
+          <div className="selectedTrainHeader">
+            <div>
+              <p className="panelKicker">Trein {observation.trainNumber}</p>
+              <h2>{journey?.destination.actual ?? journey?.destination.planned ?? `Materieel ${observation.materialNumber ?? "onbekend"}`}</h2>
+            </div>
+            <button type="button" onClick={clearVehicleSelection} aria-label="Sluit treininformatie">×</button>
+          </div>
+          <p className="selectedTrainState"><i className={computedState === "FRESH_SOURCE" ? "fresh" : "stale"} /> {computedState === "FRESH_SOURCE" ? "Live" : "Verouderd"} · {measuredAge} geleden</p>
           <div className="trainQuickFacts">
             <div><span>Snelheid</span><strong>{observation?.speed ? `${observation.speed.valueKmh} km/h` : "—"}</strong></div>
-            <div><span>Leeftijd</span><strong>{measuredAge}</strong></div>
-            <div><span>Status</span><strong className={computedState === "FRESH_SOURCE" ? "freshText" : "staleText"}>{observation ? (computedState === "FRESH_SOURCE" ? "Actueel" : "Verouderd") : "—"}</strong></div>
+            <div><span>Volgende halte</span><strong>{nextStop?.station.shortName ?? nextStop?.station.longName ?? "—"}</strong></div>
+            <div><span>Vertraging</span><strong className={currentDelay && currentDelay > 0 ? "staleText" : "freshText"}>{formatDelay(currentDelay)}</strong></div>
           </div>
           <details className="observationDetails">
             <summary>Meer treindetails</summary>
@@ -1334,7 +1365,7 @@ export function MobilityDashboard() {
           <div className="provenance">SOURCE + CLIENT RENDER{selectedTrackMatch ? " + DERIVED MATCH" : ""} · WS · seq {sequence}</div>
             </div>
           </details>
-        </aside>
+        </aside>}
       </section>
 
       <ReplayPanel
