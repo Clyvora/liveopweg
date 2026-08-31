@@ -296,32 +296,58 @@ function roundRectPath(
   context.closePath();
 }
 
+type TrainSprites = {
+  intercity: HTMLImageElement | null;
+  sprinter: HTMLImageElement | null;
+};
+
+function spriteForVehicle(vehicleId: string, sprites: TrainSprites): HTMLImageElement | null {
+  let hash = 0;
+  for (let index = 0; index < vehicleId.length; index += 1) {
+    hash = ((hash << 5) - hash + vehicleId.charCodeAt(index)) | 0;
+  }
+  return (hash & 1) === 0 ? sprites.intercity : sprites.sprinter;
+}
+
 function drawTrainIcon(
   context: CanvasRenderingContext2D,
   x: number,
   y: number,
   rotation: number,
+  sprite: HTMLImageElement | null,
   selected: boolean,
   matched: boolean,
   scale: number,
 ): void {
   const selectedScale = selected ? Math.max(0.92, scale) : scale;
-  const width = (selected ? 14 : 11) * selectedScale;
-  const height = (selected ? 22 : 17) * selectedScale;
+  const hasSprite = Boolean(sprite?.complete && sprite.naturalWidth > 0);
+  const width = (hasSprite ? (selected ? 18 : 14) : (selected ? 14 : 11)) * selectedScale;
+  const height = (hasSprite ? (selected ? 40 : 32) : (selected ? 22 : 17)) * selectedScale;
   context.save();
   context.translate(x, y);
   context.rotate(rotation);
 
-  // Alleen de geselecteerde trein krijgt een halo. Dat houdt het landelijke
-  // beeld rustig terwijl de trein zelf herkenbaar geel/blauw blijft.
+  // Alleen de geselecteerde trein krijgt een rustige witte contour. De echte
+  // bovenaanzicht-sprite blijft zo ook boven een druk emplacement herkenbaar.
   if (selected) {
-    context.beginPath();
-    context.arc(0, 0, Math.max(width, height) * 0.66, 0, Math.PI * 2);
-    context.lineWidth = 2.5;
+    roundRectPath(context, -width / 2 - 2, -height / 2 - 2, width + 4, height + 4, width / 2);
+    context.lineWidth = 2;
     context.strokeStyle = "rgba(255,255,255,.96)";
     context.stroke();
   }
 
+  if (hasSprite && sprite) {
+    context.imageSmoothingEnabled = true;
+    context.globalAlpha = matched ? 1 : 0.82;
+    context.shadowColor = selected ? "rgba(15,28,36,.32)" : "transparent";
+    context.shadowBlur = selected ? 4 : 0;
+    context.shadowOffsetY = selected ? 1 : 0;
+    context.drawImage(sprite, -width / 2, -height / 2, width, height);
+    context.restore();
+    return;
+  }
+
+  // Compacte fallback voor de paar frames waarin de PNG-sprites nog laden.
   context.shadowColor = "rgba(22,37,40,.36)";
   context.shadowBlur = selected ? 7 : 3;
   context.shadowOffsetY = 1;
@@ -356,6 +382,10 @@ function drawTrainIcon(
 export function MobilityDashboard() {
   const mapElement = useRef<HTMLDivElement>(null);
   const trainOverlayElement = useRef<HTMLCanvasElement>(null);
+  const trainSpritesRef = useRef<TrainSprites>({
+    intercity: null,
+    sprinter: null,
+  });
   const map = useRef<MapLibreMap | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const selectFromMapRef = useRef<(vehicleId: string) => void>(() => undefined);
@@ -388,6 +418,20 @@ export function MobilityDashboard() {
   });
   const [replayCursor, setReplayCursor] = useState<ReplayCursor | null>(null);
   const updateReplayCursor = useCallback((cursor: ReplayCursor | null) => setReplayCursor(cursor), []);
+
+  useEffect(() => {
+    const intercity = new Image();
+    const sprinter = new Image();
+    intercity.decoding = "async";
+    sprinter.decoding = "async";
+    intercity.src = "/train-intercity-real.png";
+    sprinter.src = "/train-sprinter-real.png";
+    trainSpritesRef.current = { intercity, sprinter };
+
+    return () => {
+      trainSpritesRef.current = { intercity: null, sprinter: null };
+    };
+  }, []);
   const requestTrackGeometries = useCallback(async (edgeIds: string[]) => {
     const missing = [...new Set(edgeIds)].filter((edgeId) => (
       !trackGeometriesRef.current.has(edgeId) && !trackGeometryRequestsRef.current.has(edgeId)
@@ -812,7 +856,7 @@ export function MobilityDashboard() {
             context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
             context.clearRect(0, 0, width, height);
             const zoom = instance.getZoom();
-            const markerScale = zoom < 7 ? 0.5 : zoom < 8.5 ? 0.68 : zoom < 10.5 ? 0.86 : 1;
+            const markerScale = zoom < 7 ? 0.48 : zoom < 8.5 ? 0.68 : zoom < 10.5 ? 0.86 : 1;
             for (const [vehicleId, sample] of motionSamplesRef.current) {
               const motion = renderMotion(sample, nowMs, renderDelayMs);
               const position = trackMotionPosition(
@@ -833,7 +877,19 @@ export function MobilityDashboard() {
                     -(sample.current.position.latitude - sample.previous.position.latitude),
                   ) * 180 / Math.PI
                 : 0);
-              drawTrainIcon(context, projected.x, projected.y, derivedHeading * Math.PI / 180, isSelected, matched, markerScale);
+              // Op landelijk niveau blijft de kaart rustig; vanaf regionaal
+              // niveau verschijnt het volledige, realistische treinmodel.
+              const sprite = zoom >= 9.3 ? spriteForVehicle(vehicleId, trainSpritesRef.current) : null;
+              drawTrainIcon(
+                context,
+                projected.x,
+                projected.y,
+                derivedHeading * Math.PI / 180,
+                sprite,
+                isSelected,
+                matched,
+                markerScale,
+              );
             }
           }
         }
