@@ -2,8 +2,9 @@ import type { RailObservation } from "../protocol/rail.js";
 
 export const DEFAULT_RENDER_DELAY_MS = 12_000;
 const MAX_PLAUSIBLE_SEGMENT_SPEED_KMH = 350;
+const MAX_EXTRAPOLATION_SECONDS = 30;
 
-export type RenderMode = "SOURCE_HOLD" | "INTERPOLATED" | "STALE_HOLD";
+export type RenderMode = "SOURCE_HOLD" | "INTERPOLATED" | "EXTRAPOLATED" | "STALE_HOLD";
 
 export interface MotionSample {
   previous: RailObservation | null;
@@ -61,6 +62,22 @@ function gpsQuality(observation: RailObservation): number | null {
   return null;
 }
 
+function moveByHeading(
+  longitude: number,
+  latitude: number,
+  speedKmh: number,
+  headingDegrees: number,
+  seconds: number,
+): { longitude: number; latitude: number } {
+  const distanceMetersValue = speedKmh / 3.6 * seconds;
+  const headingRadians = headingDegrees * Math.PI / 180;
+  const latitudeRadians = latitude * Math.PI / 180;
+  const latitudeDelta = distanceMetersValue * Math.cos(headingRadians) / 111_320;
+  const longitudeScale = Math.max(0.2, Math.cos(latitudeRadians));
+  const longitudeDelta = distanceMetersValue * Math.sin(headingRadians) / (111_320 * longitudeScale);
+  return { longitude: longitude + longitudeDelta, latitude: latitude + latitudeDelta };
+}
+
 function confidence(
   observation: RailObservation,
   sourceAgeSeconds: number,
@@ -73,7 +90,7 @@ function confidence(
     ? clamp(1 - 0.5 * (sourceAgeSeconds / freshThreshold))
     : clamp(0.5 * (1 - (sourceAgeSeconds - freshThreshold) / (staleStop - freshThreshold)));
   const measuredGpsQuality = gpsQuality(observation);
-  const renderMethod = mode === "INTERPOLATED" ? 0.9 : mode === "SOURCE_HOLD" ? 1 : 0;
+  const renderMethod = mode === "INTERPOLATED" ? 0.9 : mode === "EXTRAPOLATED" ? 0.72 : mode === "SOURCE_HOLD" ? 1 : 0;
   const components = [
     { value: positionAge, weight: 0.6 },
     { value: renderMethod, weight: 0.25 },
@@ -124,6 +141,33 @@ export function renderMotion(
       } else if (!stale && targetTime < previousTime) {
         longitude = sample.previous.position.longitude;
         latitude = sample.previous.position.latitude;
+      }
+    }
+  }
+
+  // De feed kan een paar seconden achterlopen. Houd een actuele trein dan in
+  // beweging met de laatst bekende snelheid en rijrichting, maar begrens de
+  // voorspelling zodat een langdurig ontbrekende bron niet tot een fictieve
+  // positie leidt.
+  if (!stale && movementPlausibility === 1 && targetTime >= currentTime) {
+    const extrapolationSeconds = Math.min(MAX_EXTRAPOLATION_SECONDS, (targetTime - currentTime) / 1_000);
+    if (extrapolationSeconds > 0) {
+      const speed = sample.current.speed?.valueKmh;
+      const heading = sample.current.headingDegrees;
+      if (speed !== undefined && speed !== null && heading !== null) {
+        ({ longitude, latitude } = moveByHeading(longitude, latitude, speed, heading, extrapolationSeconds));
+        mode = "EXTRAPOLATED";
+      } else if (sample.previous) {
+        const previousTime = observationTime(sample.previous);
+        const elapsedSeconds = (currentTime - previousTime) / 1_000;
+        if (elapsedSeconds > 0) {
+          const scale = extrapolationSeconds / elapsedSeconds;
+          longitude = sample.current.position.longitude
+            + (sample.current.position.longitude - sample.previous.position.longitude) * scale;
+          latitude = sample.current.position.latitude
+            + (sample.current.position.latitude - sample.previous.position.latitude) * scale;
+          mode = "EXTRAPOLATED";
+        }
       }
     }
   }

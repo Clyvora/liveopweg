@@ -43,10 +43,10 @@ describe("client motion", () => {
     expect(second.longitude).toBeLessThanOrEqual(5.01);
   });
 
-  it("extrapoleert nooit voorbij de nieuwste bronpositie", () => {
+  it("blijft kort doorbewegen tussen twee bronupdates", () => {
     const rendered = renderMotion(sample(), Date.parse("2026-08-21T12:00:25Z"), 12_000);
-    expect(rendered.mode).toBe("SOURCE_HOLD");
-    expect(rendered.longitude).toBe(5.01);
+    expect(rendered.mode).toBe("EXTRAPOLATED");
+    expect(rendered.longitude).toBeGreaterThan(5.01);
     expect(rendered.sourceLongitude).toBe(5.01);
   });
 

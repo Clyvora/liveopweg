@@ -129,7 +129,18 @@ function trackMotionPosition(
   const targetTime = nowMs - renderDelayMs;
   if (!Number.isFinite(previousTime) || !Number.isFinite(currentTime) || currentTime <= previousTime) return currentPosition;
   if (targetTime <= previousTime) return previousPosition;
-  if (targetTime >= currentTime) return currentPosition;
+  if (targetTime >= currentTime) {
+    const extrapolationSeconds = Math.min(30, (targetTime - currentTime) / 1_000);
+    const elapsedSeconds = (currentTime - previousTime) / 1_000;
+    if (extrapolationSeconds > 0 && elapsedSeconds > 0) {
+      const scale = extrapolationSeconds / elapsedSeconds;
+      return {
+        longitude: currentPosition.longitude + (currentPosition.longitude - previousPosition.longitude) * scale,
+        latitude: currentPosition.latitude + (currentPosition.latitude - previousPosition.latitude) * scale,
+      };
+    }
+    return currentPosition;
+  }
   const progress = (targetTime - previousTime) / (currentTime - previousTime);
   return {
     longitude: previousPosition.longitude + (currentPosition.longitude - previousPosition.longitude) * progress,
@@ -853,6 +864,8 @@ export function MobilityDashboard() {
   const confidencePercent = selectedMotion ? Math.round(selectedMotion.confidence.final * 100) : null;
   const motionLabel = selectedMotion?.mode === "INTERPOLATED"
     ? "INTERPOLATED"
+    : selectedMotion?.mode === "EXTRAPOLATED"
+      ? "EXTRAPOLATED · vloeiend door"
     : selectedMotion?.mode === "STALE_HOLD"
       ? "STALE · beweging gestopt"
       : "SOURCE HOLD";
