@@ -8,6 +8,7 @@ import {
   type MotionSample,
   type RenderedMotion,
 } from "../packages/domain-rail/client-motion";
+import { identifyRollingStock } from "../packages/domain-rail/rolling-stock";
 import {
   journeySnapshotMessageSchema,
   type RailJourney,
@@ -297,11 +298,23 @@ function roundRectPath(
 }
 
 type TrainSprites = {
+  virm: HTMLImageElement | null;
+  icng: HTMLImageElement | null;
+  icm: HTMLImageElement | null;
+  sng: HTMLImageElement | null;
+  slt: HTMLImageElement | null;
   intercity: HTMLImageElement | null;
   sprinter: HTMLImageElement | null;
 };
 
-function spriteForVehicle(vehicleId: string, sprites: TrainSprites): HTMLImageElement | null {
+function spriteForVehicle(
+  vehicleId: string,
+  materialNumber: string | null,
+  sprites: TrainSprites,
+): HTMLImageElement | null {
+  const identity = identifyRollingStock(materialNumber);
+  if (identity.family !== "unknown") return sprites[identity.family];
+
   let hash = 0;
   for (let index = 0; index < vehicleId.length; index += 1) {
     hash = ((hash << 5) - hash + vehicleId.charCodeAt(index)) | 0;
@@ -383,6 +396,11 @@ export function MobilityDashboard() {
   const mapElement = useRef<HTMLDivElement>(null);
   const trainOverlayElement = useRef<HTMLCanvasElement>(null);
   const trainSpritesRef = useRef<TrainSprites>({
+    virm: null,
+    icng: null,
+    icm: null,
+    sng: null,
+    slt: null,
     intercity: null,
     sprinter: null,
   });
@@ -420,16 +438,34 @@ export function MobilityDashboard() {
   const updateReplayCursor = useCallback((cursor: ReplayCursor | null) => setReplayCursor(cursor), []);
 
   useEffect(() => {
+    const virm = new Image();
+    const icng = new Image();
+    const icm = new Image();
+    const sng = new Image();
+    const slt = new Image();
     const intercity = new Image();
     const sprinter = new Image();
-    intercity.decoding = "async";
-    sprinter.decoding = "async";
+    const sprites = { virm, icng, icm, sng, slt, intercity, sprinter };
+    Object.values(sprites).forEach((sprite) => { sprite.decoding = "async"; });
+    virm.src = "/train-virm-v1.png";
+    icng.src = "/train-icng-v1.png";
+    icm.src = "/train-icm-v1.png";
+    sng.src = "/train-sng-v1.png";
+    slt.src = "/train-slt-v1.png";
     intercity.src = "/train-intercity-real.png";
     sprinter.src = "/train-sprinter-real.png";
-    trainSpritesRef.current = { intercity, sprinter };
+    trainSpritesRef.current = sprites;
 
     return () => {
-      trainSpritesRef.current = { intercity: null, sprinter: null };
+      trainSpritesRef.current = {
+        virm: null,
+        icng: null,
+        icm: null,
+        sng: null,
+        slt: null,
+        intercity: null,
+        sprinter: null,
+      };
     };
   }, []);
   const requestTrackGeometries = useCallback(async (edgeIds: string[]) => {
@@ -476,9 +512,18 @@ export function MobilityDashboard() {
   const searchResults = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return vehicles.slice(0, 12);
-    return vehicles.filter((vehicle) => [vehicle.trainNumber, vehicle.materialNumber, vehicle.vehicleId]
+    return vehicles.filter((vehicle) => [
+      vehicle.trainNumber,
+      vehicle.materialNumber,
+      vehicle.vehicleId,
+      identifyRollingStock(vehicle.materialNumber).label,
+    ]
       .some((value) => value?.toLowerCase().includes(needle))).slice(0, 12);
   }, [query, vehicles]);
+  const selectedRollingStock = useMemo(
+    () => identifyRollingStock(observation?.materialNumber),
+    [observation?.materialNumber],
+  );
   const roadEvents = useMemo(() => Object.values(roadEventsById), [roadEventsById]);
   const selectedRoadEvent = selectedRoadEventId ? roadEventsById[selectedRoadEventId] ?? null : null;
   const roadCounts = useMemo(() => Object.fromEntries(roadLayerDefinitions.map(({ key }) => [
@@ -497,7 +542,7 @@ export function MobilityDashboard() {
     if (focusMap && map.current) {
       map.current.easeTo({
         center: [selected.position.longitude, selected.position.latitude],
-        zoom: Math.max(map.current.getZoom(), 9),
+        zoom: Math.max(map.current.getZoom(), 10),
         duration: 700,
       });
     }
@@ -879,7 +924,9 @@ export function MobilityDashboard() {
                 : 0);
               // Op landelijk niveau blijft de kaart rustig; vanaf regionaal
               // niveau verschijnt het volledige, realistische treinmodel.
-              const sprite = zoom >= 9.3 ? spriteForVehicle(vehicleId, trainSpritesRef.current) : null;
+              const sprite = zoom >= 9.3
+                ? spriteForVehicle(vehicleId, sample.current.materialNumber, trainSpritesRef.current)
+                : null;
               drawTrainIcon(
                 context,
                 projected.x,
@@ -1314,17 +1361,20 @@ export function MobilityDashboard() {
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek trein of materieel" />
         </label>
         {query.trim() && <div className="trainResults">
-          {searchResults.map((vehicle) => (
-            <button
-              className={vehicle.vehicleId === selectedVehicleId ? "selected" : ""}
-              key={vehicle.vehicleId}
-              type="button"
-              onClick={() => selectVehicle(vehicle.vehicleId)}
-            >
-              <strong>Trein {vehicle.trainNumber}</strong>
-              <span>materieel {vehicle.materialNumber ?? "onbekend"}</span>
-            </button>
-          ))}
+          {searchResults.map((vehicle) => {
+            const rollingStock = identifyRollingStock(vehicle.materialNumber);
+            return (
+              <button
+                className={vehicle.vehicleId === selectedVehicleId ? "selected" : ""}
+                key={vehicle.vehicleId}
+                type="button"
+                onClick={() => selectVehicle(vehicle.vehicleId)}
+              >
+                <strong>Trein {vehicle.trainNumber}</strong>
+                <span>{rollingStock.label} · materieel {vehicle.materialNumber ?? "onbekend"}</span>
+              </button>
+            );
+          })}
         </div>}
       </section>
 
@@ -1356,7 +1406,7 @@ export function MobilityDashboard() {
         {observation && <aside className="observationPanel" aria-live="polite">
           <div className="selectedTrainHeader">
             <div>
-              <p className="panelKicker">Trein {observation.trainNumber}</p>
+              <p className="panelKicker">Trein {observation.trainNumber} · {selectedRollingStock.label}</p>
               <h2>{journey?.destination.actual ?? journey?.destination.planned ?? `Materieel ${observation.materialNumber ?? "onbekend"}`}</h2>
             </div>
             <button type="button" onClick={clearVehicleSelection} aria-label="Sluit treininformatie">×</button>
@@ -1375,6 +1425,7 @@ export function MobilityDashboard() {
             <span>Ontvangsttijd</span><strong>{formatTime(observation?.time.receivedAt ?? null)}</strong>
             <span>Bronleeftijd</span><strong>{measuredAge}</strong>
             <span>Snelheid</span><strong>{observation?.speed ? `${observation.speed.valueKmh} km/h · GPS` : "Onbekend"}</strong>
+            <span>Materieeltype</span><strong>{selectedRollingStock.label} · {selectedRollingStock.confidence}</strong>
             <span>Status</span><strong className={computedState === "FRESH_SOURCE" ? "freshText" : "staleText"}>{computedState}</strong>
             <span>Rendering</span><strong>{acceptedSelectedMatch ? "MAP_MATCHED · bronhold" : motionLabel}</strong>
             <span>Renderconfidence</span><strong>{confidencePercent === null ? "Onbekend" : `${confidencePercent}% · ${selectedMotion?.confidence.band}`}</strong>
