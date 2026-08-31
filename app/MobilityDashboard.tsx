@@ -817,7 +817,7 @@ export function MobilityDashboard() {
           <span className="brandMark" aria-hidden="true">MR</span>
           <span>MobilityRadar <b>NL</b></span>
         </a>
-        <div className={`sourcePill ${connection}`}><span /> NDOV + NDW · {connection}</div>
+        <div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live" : connection}</div>
       </header>
 
       <section className="hero" id="top">
@@ -886,12 +886,12 @@ export function MobilityDashboard() {
       </section>
 
       <section className="fleetTools" aria-label="Treinselectie">
-        <div><strong>{vehicles.length}</strong><span>actuele materieeldelen in het 5-minutenvenster</span></div>
+        <div><strong>{vehicles.length}</strong><span>treinen live</span></div>
         <label>
           <span>Zoek treinnummer of materieel</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Bijvoorbeeld 5879 of 2769" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek trein of materieel" />
         </label>
-        <div className="trainResults">
+        {query.trim() && <div className="trainResults">
           {searchResults.map((vehicle) => (
             <button
               className={vehicle.vehicleId === selectedVehicleId ? "selected" : ""}
@@ -903,7 +903,7 @@ export function MobilityDashboard() {
               <span>materieel {vehicle.materialNumber ?? "onbekend"}</span>
             </button>
           ))}
-        </div>
+        </div>}
       </section>
 
       <section className="workspace" id="map" aria-label="Landelijk realtime treindashboard">
@@ -920,7 +920,7 @@ export function MobilityDashboard() {
             <span><i className="renderedDot" /> Gerenderde positie</span>
             <span><i className="sourceRing" /> Laatste bronpositie</span>
           </div>
-          <div className="mapLabel">{roadEvents.length} wegmeldingen · {vehicles.length} treinen · {acceptedTrackMatches.length} spoor-gematcht · {regionalFallbackMatches.length} fallback</div>
+          <div className="mapLabel">{vehicles.length} treinen · {roadEvents.length} wegmeldingen</div>
           <div className="mapAttribution">© OpenStreetMap-bijdragers · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
         </div>
         <aside className="observationPanel" aria-live="polite">
@@ -929,7 +929,15 @@ export function MobilityDashboard() {
           <p>{observation
             ? `Materieel ${observation.materialNumber ?? "onbekend"}. Dit is exact het ontvangen WGS84-punt.`
             : "Kies een marker of zoek op treinnummer. Iedere browser houdt zijn eigen selectie bij."}</p>
-          <div className="timestampGrid">
+          <div className="trainQuickFacts">
+            <div><span>Snelheid</span><strong>{observation?.speed ? `${observation.speed.valueKmh} km/h` : "—"}</strong></div>
+            <div><span>Leeftijd</span><strong>{measuredAge}</strong></div>
+            <div><span>Status</span><strong className={computedState === "FRESH_SOURCE" ? "freshText" : "staleText"}>{observation ? (computedState === "FRESH_SOURCE" ? "Actueel" : "Verouderd") : "—"}</strong></div>
+          </div>
+          <details className="observationDetails">
+            <summary>Meer treindetails</summary>
+            <div className="observationDetailsBody">
+            <div className="timestampGrid">
             <span>Brontijd</span><strong>{formatTime(observation?.time.sourceMeasuredAt ?? null)}</strong>
             <span>Ontvangsttijd</span><strong>{formatTime(observation?.time.receivedAt ?? null)}</strong>
             <span>Bronleeftijd</span><strong>{measuredAge}</strong>
@@ -978,6 +986,8 @@ export function MobilityDashboard() {
             <div><span>Rendermethode</span><strong>{Math.round(selectedMotion.confidence.renderMethod * 100)}%</strong></div>
           </details>}
           <div className="provenance">SOURCE + CLIENT RENDER{selectedTrackMatch ? " + DERIVED MATCH" : ""} · WS · seq {sequence}</div>
+            </div>
+          </details>
         </aside>
       </section>
 
