@@ -107,6 +107,7 @@ function toRecord(observations: RailObservation[]): Record<string, RailObservati
 
 export function MobilityDashboard() {
   const mapElement = useRef<HTMLDivElement>(null);
+  const trainOverlayElement = useRef<HTMLCanvasElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const selectFromMapRef = useRef<(vehicleId: string) => void>(() => undefined);
@@ -219,30 +220,19 @@ export function MobilityDashboard() {
           type: "circle",
           source: "rail-fleet",
           paint: {
-            "circle-radius": ["case", ["boolean", ["get", "selected"], false], 8, 4.5],
-            "circle-color": [
-              "case",
-              ["boolean", ["get", "selected"], false], "#f17845",
-              ["boolean", ["get", "matched"], false], "#a7dfc5",
-              "#184f43",
-            ],
+            "circle-radius": 6,
+            "circle-color": "#f17845",
             "circle-stroke-color": "#fffdf7",
-            "circle-stroke-width": ["case", ["boolean", ["get", "selected"], false], 3, 1.5],
-            "circle-opacity": ["case", ["==", ["get", "fresh"], true], 0.95, 0.5],
+            "circle-stroke-width": 2,
+            "circle-opacity": 0.95,
           },
         });
         instance.addLayer({
-          id: "rail-fleet-labels",
-          type: "symbol",
+          id: "rail-fleet-selected",
+          type: "circle",
           source: "rail-fleet",
-          minzoom: 8.5,
-          layout: {
-            "text-field": ["get", "trainNumber"],
-            "text-size": 10,
-            "text-offset": [0, 1.35],
-            "text-allow-overlap": false,
-          },
-          paint: { "text-color": "#162528", "text-halo-color": "#fffdf7", "text-halo-width": 1.5 },
+          filter: ["==", ["get", "selected"], true],
+          paint: { "circle-radius": 11, "circle-color": "#fff1a8", "circle-stroke-color": "#162528", "circle-stroke-width": 4 },
         });
         instance.addSource("pdok-rail-geometry", {
           type: "geojson",
@@ -436,12 +426,41 @@ export function MobilityDashboard() {
           filter: ["==", ["get", "kind"], "MATCH"],
           paint: { "circle-radius": 7, "circle-color": "#a7dfc5", "circle-stroke-color": "#163e35", "circle-stroke-width": 3 },
         });
+        // Wegmeldingen worden na de vloot opgebouwd. Zet de treinlagen daarna
+        // bewust terug bovenaan, zodat de primaire live-objecten zichtbaar en
+        // aanklikbaar blijven op ieder zoomniveau.
+        for (const layerId of [
+          "rail-fleet-points",
+          "rail-fleet-selected",
+          "selected-rail-source-point",
+          "selected-track-match-link",
+          "selected-track-match-point",
+          "selected-road-event-line",
+          "selected-road-event-point",
+          "rail-replay-trail",
+          "rail-replay-source",
+          "rail-replay-match",
+        ]) instance.moveLayer(layerId);
         instance.on("click", "rail-fleet-points", (event) => {
           const vehicleId = event.features?.[0]?.properties?.vehicleId;
           if (typeof vehicleId === "string") selectFromMapRef.current(vehicleId);
         });
         instance.on("mouseenter", "rail-fleet-points", () => { instance.getCanvas().style.cursor = "pointer"; });
         instance.on("mouseleave", "rail-fleet-points", () => { instance.getCanvas().style.cursor = ""; });
+        instance.on("click", (event) => {
+          let nearest: { vehicleId: string; distance: number } | null = null;
+          for (const [vehicleId, sample] of motionSamplesRef.current) {
+            const motion = renderMotion(sample, Date.now(), renderDelayMs);
+            const trackMatch = trackMatchesRef.current.get(vehicleId);
+            const position = trackMatch?.snappedPosition && trackMatch.status.startsWith("MATCHED")
+              ? trackMatch.snappedPosition
+              : motion;
+            const projected = instance.project([position.longitude, position.latitude]);
+            const distance = Math.hypot(projected.x - event.point.x, projected.y - event.point.y);
+            if (distance <= 18 && (!nearest || distance < nearest.distance)) nearest = { vehicleId, distance };
+          }
+          if (nearest) selectFromMapRef.current(nearest.vehicleId);
+        });
         setMapReady(true);
       });
     });
@@ -461,40 +480,47 @@ export function MobilityDashboard() {
     const renderFrame = (frameTime: number) => {
       const instance = map.current;
       if (!instance) return;
-      if (frameTime - lastMapFrame >= 33) {
+      // Alleen de geselecteerde trein krijgt een vloeiende clientweergave. De
+      // landelijke bronlaag wordt uitsluitend bij een echte bronbatch ververst.
+      if (frameTime - lastMapFrame >= 250) {
         lastMapFrame = frameTime;
-        const renderNow = Date.now();
         const selectedId = selectedVehicleIdRef.current;
-        const features = [];
-        let selected: RenderedMotion | null = null;
-        let selectedSample: MotionSample | null = null;
-
-        for (const [vehicleId, sample] of motionSamplesRef.current) {
-          const motion = renderMotion(sample, renderNow, renderDelayMs);
-          if (vehicleId === selectedId) {
-            selected = motion;
-            selectedSample = sample;
+        const selectedSample = selectedId ? motionSamplesRef.current.get(selectedId) ?? null : null;
+        const selected = selectedSample ? renderMotion(selectedSample, Date.now(), renderDelayMs) : null;
+        const overlay = trainOverlayElement.current;
+        const mapContainer = mapElement.current;
+        if (overlay && mapContainer) {
+          const width = mapContainer.clientWidth;
+          const height = mapContainer.clientHeight;
+          const pixelRatio = Math.min(2, window.devicePixelRatio || 1);
+          if (overlay.width !== Math.round(width * pixelRatio) || overlay.height !== Math.round(height * pixelRatio)) {
+            overlay.width = Math.round(width * pixelRatio);
+            overlay.height = Math.round(height * pixelRatio);
+            overlay.style.width = `${width}px`;
+            overlay.style.height = `${height}px`;
           }
-          const trackMatch = trackMatchesRef.current.get(vehicleId);
-          const matched = Boolean(trackMatch?.snappedPosition && trackMatch.status.startsWith("MATCHED"));
-          const displayPosition = matched ? trackMatch!.snappedPosition! : motion;
-          features.push({
-            type: "Feature" as const,
-            geometry: { type: "Point" as const, coordinates: [displayPosition.longitude, displayPosition.latitude] },
-            properties: {
-              vehicleId,
-              trainNumber: sample.current.trainNumber,
-              selected: vehicleId === selectedId,
-              fresh: !motion.stale,
-              renderMode: matched ? "MAP_MATCHED_SOURCE_HOLD" : motion.mode,
-              trackMatchStatus: trackMatch?.status ?? "OUTSIDE_NATIONAL_SCOPE",
-              matched,
-            },
-          });
+          const context = overlay.getContext("2d");
+          if (context) {
+            context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+            context.clearRect(0, 0, width, height);
+            for (const [vehicleId, sample] of motionSamplesRef.current) {
+              const motion = renderMotion(sample, Date.now(), renderDelayMs);
+              const trackMatch = trackMatchesRef.current.get(vehicleId);
+              const matched = Boolean(trackMatch?.snappedPosition && trackMatch.status.startsWith("MATCHED"));
+              const position = matched ? trackMatch!.snappedPosition! : motion;
+              const projected = instance.project([position.longitude, position.latitude]);
+              if (projected.x < -16 || projected.x > width + 16 || projected.y < -16 || projected.y > height + 16) continue;
+              const isSelected = vehicleId === selectedId;
+              context.beginPath();
+              context.arc(projected.x, projected.y, isSelected ? 10 : 5.5, 0, Math.PI * 2);
+              context.fillStyle = isSelected ? "#fff1a8" : matched ? "#a7dfc5" : "#f17845";
+              context.fill();
+              context.lineWidth = isSelected ? 3.5 : 1.75;
+              context.strokeStyle = isSelected ? "#162528" : "#fffdf7";
+              context.stroke();
+            }
+          }
         }
-
-        const fleetSource = instance.getSource("rail-fleet") as GeoJSONSource | undefined;
-        fleetSource?.setData({ type: "FeatureCollection", features });
         const sourcePoint = instance.getSource("selected-rail-source") as GeoJSONSource | undefined;
         sourcePoint?.setData({
           type: "FeatureCollection",
@@ -909,6 +935,7 @@ export function MobilityDashboard() {
       <section className="workspace" id="map" aria-label="Landelijk realtime treindashboard">
         <div className="mapWrap">
           <div ref={mapElement} className="liveMap" aria-label="Kaart van Nederland met actuele bronposities" />
+          <canvas ref={trainOverlayElement} className="trainOverlay" aria-hidden="true" />
           {!vehicles.length && <div className="waitingMarker"><span /> Wachten op eerste vlootbatch</div>}
           <div className="mapLegend" aria-label="Kaartlegenda">
             <span><i className="replayLine" /> Replay · niet live</span>
