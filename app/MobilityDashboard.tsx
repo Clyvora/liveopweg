@@ -813,7 +813,7 @@ export function MobilityDashboard() {
   return (
     <main className="shell">
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="MobilityRadar Nederland">
+        <a className="brand" href="#map" aria-label="MobilityRadar Nederland">
           <span className="brandMark" aria-hidden="true">MR</span>
           <span>MobilityRadar <b>NL</b></span>
         </a>
@@ -906,7 +906,7 @@ export function MobilityDashboard() {
         </div>
       </section>
 
-      <section className="workspace" aria-label="Landelijk realtime treindashboard">
+      <section className="workspace" id="map" aria-label="Landelijk realtime treindashboard">
         <div className="mapWrap">
           <div ref={mapElement} className="liveMap" aria-label="Kaart van Nederland met actuele bronposities" />
           {!vehicles.length && <div className="waitingMarker"><span /> Wachten op eerste vlootbatch</div>}
