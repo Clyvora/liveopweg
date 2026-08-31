@@ -28,6 +28,7 @@ import {
 } from "../packages/protocol/road";
 import { Utrecht3DView } from "./Utrecht3DView";
 import { ReplayPanel, type ReplayCursor } from "./ReplayPanel";
+import { realtimeHttpUrl, realtimeWebSocketUrl } from "./realtime-url";
 
 type ConnectionState = "verbinden" | "live" | "herstellen" | "offline";
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
@@ -205,15 +206,7 @@ export function MobilityDashboard() {
       map.current = instance;
       instance.on("load", () => {
         if (disposed) return;
-        const realtimeProtocol = window.location.protocol === "https:" ? "https:" : "http:";
-        const realtimeHttpUrl = new URL(process.env.NEXT_PUBLIC_REALTIME_URL
-          ?? `${realtimeProtocol}//${window.location.hostname}:8081/v1/realtime`);
-        realtimeHttpUrl.protocol = realtimeHttpUrl.protocol === "wss:" ? "https:" : "http:";
-        realtimeHttpUrl.pathname = "";
-        realtimeHttpUrl.search = "";
-        realtimeHttpUrl.hash = "";
-        const realtimeBase = realtimeHttpUrl.toString().replace(/\/$/, "");
-        void fetch(`${realtimeBase}/v1/geometry/rail/audit`)
+        void fetch(realtimeHttpUrl("/v1/geometry/rail/audit"))
           .then((response) => response.ok ? response.json() : Promise.reject(new Error("Graph-audit niet beschikbaar")))
           .then((value) => { if (!disposed) setGraphAudit(value as RailGraphAudit); })
           .catch(() => { if (!disposed) setGraphAudit(null); });
@@ -253,7 +246,7 @@ export function MobilityDashboard() {
         });
         instance.addSource("pdok-rail-geometry", {
           type: "geojson",
-          data: `${realtimeBase}/v1/geometry/rail`,
+          data: realtimeHttpUrl("/v1/geometry/rail"),
         });
         instance.addLayer({
           id: "pdok-rail-geometry-lines",
@@ -652,9 +645,7 @@ export function MobilityDashboard() {
 
     const connect = () => {
       setConnection(latestSequence ? "herstellen" : "verbinden");
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const url = process.env.NEXT_PUBLIC_REALTIME_URL ?? `${protocol}//${window.location.hostname}:8081/v1/realtime`;
-      socket = new WebSocket(url);
+      socket = new WebSocket(realtimeWebSocketUrl());
       socketRef.current = socket;
       socket.onopen = () => setConnection("live");
       socket.onmessage = (event) => {

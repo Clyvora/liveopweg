@@ -23,6 +23,8 @@ import { decodeRoadPublication } from "../road-ingestion/decode.js";
 import { RoadLiveState } from "../road-ingestion/live-state.js";
 import { RawRoadStore } from "../road-ingestion/raw-store.js";
 import { RedisRoadLiveState } from "../road-ingestion/redis-live-state.js";
+import { RuntimeMetrics } from "../observability/metrics.js";
+import { PostgresHistoryStore, type PersistenceHealth } from "../persistence/postgres-history.js";
 import { ReplayArchive } from "../replay/archive.js";
 import type { GraphAudit } from "../rail-geometry/audit.js";
 import type { TrackGraph } from "../rail-geometry/graph.js";
@@ -41,6 +43,10 @@ const ndwRoadUrl = process.env.NDW_ROAD_URL ?? "https://opendata.ndw.nu/actueel_
 const configuredRoadPollSeconds = Number(process.env.NDW_ROAD_POLL_SECONDS ?? 60);
 const roadPollSeconds = Number.isFinite(configuredRoadPollSeconds) ? Math.max(30, configuredRoadPollSeconds) : 60;
 const port = Number(process.env.REALTIME_PORT ?? 8081);
+const host = process.env.REALTIME_HOST ?? "127.0.0.1";
+const corsAllowedOrigin = process.env.CORS_ALLOWED_ORIGIN ?? "http://localhost:3000";
+const databaseUrl = process.env.DATABASE_URL;
+const requirePersistence = process.env.REQUIRE_PERSISTENCE === "true";
 const freshnessThresholdSeconds = Number(process.env.FRESHNESS_THRESHOLD_SECONDS ?? 30);
 const fleetRetentionSeconds = Number(process.env.FLEET_RETENTION_SECONDS ?? 300);
 const dataRoot = resolve(process.env.MOBILITYRADAR_DATA_DIR ?? "var");
@@ -70,6 +76,29 @@ const redisJourneyState = process.env.REDIS_URL
 const redisRoadState = process.env.REDIS_URL
   ? await RedisRoadLiveState.connect(process.env.REDIS_URL)
   : null;
+const runtimeMetrics = new RuntimeMetrics();
+let persistenceStartupHealth: PersistenceHealth = PostgresHistoryStore.disabled();
+let postgresHistory: PostgresHistoryStore | null = null;
+if (databaseUrl) {
+  try {
+    postgresHistory = await PostgresHistoryStore.connect(databaseUrl);
+    persistenceStartupHealth = postgresHistory.health();
+  } catch (error) {
+    persistenceStartupHealth = {
+      status: "DEGRADED",
+      successfulWrites: 0,
+      failedWrites: 1,
+      lastSuccessfulWriteAt: null,
+      lastError: error instanceof Error ? error.message : "unknown",
+    };
+    console.error(JSON.stringify({
+      event: "postgis.connect.failed",
+      reason: persistenceStartupHealth.lastError,
+      required: requirePersistence,
+    }));
+    if (requirePersistence) throw error;
+  }
+}
 
 let trackMatcher: NationalTrackMatcher | null = null;
 let trackGraph: TrackGraph | null = null;
@@ -171,7 +200,10 @@ function roadSnapshot(): RoadRealtimeMessage {
   };
 }
 
-function updateMatches(observations: RailObservation[], removedVehicleIds: string[]): RailMatchRealtimeMessage {
+function updateMatches(
+  observations: RailObservation[],
+  removedVehicleIds: string[],
+): Extract<RailMatchRealtimeMessage, { type: "rail.match.batch" }> {
   const upserts: RailTrackMatch[] = [];
   const removed = new Set(removedVehicleIds);
   for (const vehicleId of removedVehicleIds) {
@@ -235,10 +267,27 @@ function journeySnapshot(vehicleId = defaultVehicleId()): JourneyRealtimeMessage
 function writeJson(response: import("node:http").ServerResponse, status: number, value: unknown) {
   response.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
-    "access-control-allow-origin": "http://localhost:3000",
+    "access-control-allow-origin": corsAllowedOrigin,
     "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "no-referrer",
   });
   response.end(JSON.stringify(value));
+}
+
+async function persist(label: string, operation: (store: PostgresHistoryStore) => Promise<void>): Promise<void> {
+  if (!postgresHistory) return;
+  try {
+    await operation(postgresHistory);
+    runtimeMetrics.recordPersistenceWrite();
+  } catch (error) {
+    runtimeMetrics.recordPersistenceFailure();
+    console.error(JSON.stringify({
+      event: "postgis.write.failed",
+      operation: label,
+      reason: error instanceof Error ? error.message : "unknown",
+    }));
+  }
 }
 
 async function writeGeometryFile(
@@ -339,6 +388,7 @@ const server = createServer((request, response) => {
         maximumWindowSeconds: 7_200,
         matchOrigin: trackGraph ? "RECOMPUTED_WITH_PINNED_GRAPH" : "GRAPH_UNAVAILABLE",
       },
+      persistence: postgresHistory?.health() ?? persistenceStartupHealth,
       nsApi: { status: nsApiStatus() },
       railGeometry: {
         status: existsSync(railGeometryPath) && existsSync(railGeometryManifestPath) ? "READY" : "NOT_IMPORTED",
@@ -363,6 +413,15 @@ const server = createServer((request, response) => {
     fleet: { vehicles: fleetState.snapshot().length, retentionSeconds: fleetRetentionSeconds },
     trackedObservation: snapshot().data?.observationId ?? null,
   });
+  if (path === "/metrics") {
+    response.writeHead(200, {
+      "content-type": "text/plain; version=0.0.4; charset=utf-8",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+    });
+    response.end(runtimeMetrics.render());
+    return;
+  }
   return writeJson(response, 404, { error: "not_found" });
 });
 
@@ -382,6 +441,7 @@ function sendSelectedContext(socket: WebSocket) {
 }
 
 sockets.on("connection", (socket) => {
+  runtimeMetrics.setWebsocketClients(sockets.clients.size);
   clientSelections.set(socket, defaultVehicleId());
   send(socket, fleetSnapshot());
   send(socket, matchSnapshot());
@@ -403,6 +463,7 @@ sockets.on("connection", (socket) => {
     clientSelections.set(socket, parsed.data.vehicleId);
     sendSelectedContext(socket);
   });
+  socket.on("close", () => runtimeMetrics.setWebsocketClients(sockets.clients.size));
 });
 
 function broadcastFleet(message: RailFleetRealtimeMessage) {
@@ -459,6 +520,7 @@ async function consume(): Promise<void> {
         if (fleetResult.accepted.length || fleetResult.removedVehicleIds.length) {
           sequence += 1;
           const matches = updateMatches(fleetResult.accepted, fleetResult.removedVehicleIds);
+          await persist("rail_batch", (store) => store.writeRailBatch(fleetResult.accepted, matches.upserts));
           broadcastFleet({
             protocolVersion: 2,
             type: "rail.fleet.batch",
@@ -470,6 +532,12 @@ async function consume(): Promise<void> {
           broadcastMatches(matches);
           broadcastSelectedContexts();
         }
+        runtimeMetrics.recordRailBatch({
+          observations: observations.length,
+          duplicates: fleetResult.duplicates,
+          outOfOrder: fleetResult.outOfOrder,
+          newestSourceMeasuredAt: observations.map((item) => item.time.sourceMeasuredAt).filter((value): value is string => Boolean(value)).sort().at(-1) ?? null,
+        });
         console.log(JSON.stringify({
           event: "rail.fleet.batch.accepted",
           received: observations.length,
@@ -513,6 +581,8 @@ async function consumeJourneys(): Promise<void> {
         journeySourceHealth = "HEALTHY";
         if (result !== "accepted") continue;
         await redisJourneyState?.write(journey);
+        await persist("journey", (store) => store.writeJourney(journey));
+        runtimeMetrics.recordJourney();
         for (const client of sockets.clients) {
           const vehicleId = clientSelections.get(client) ?? defaultVehicleId();
           const linked = linkedJourney(vehicleId);
@@ -574,10 +644,12 @@ async function pollRoadOnce(): Promise<void> {
     });
     const applied = await roadState.applySnapshot(publication.events, publication.publicationTime, new Date(receivedAt));
     await redisRoadState?.writeSnapshot(applied.upserts, applied.removedEventIds, publication.publicationTime);
+    await persist("road_events", (store) => store.writeRoadEvents(applied.upserts));
     roadEtag = response.headers.get("etag");
     lastRoadReceivedAt = receivedAt;
     lastRoadRejectedRecords = publication.rejected.length;
     roadSourceHealth = "HEALTHY";
+    runtimeMetrics.recordRoadPoll(roadState.snapshot(new Date(receivedAt)).length);
     roadSequence += 1;
     broadcastRoad({
       protocolVersion: 1,
@@ -629,8 +701,8 @@ for (const match of await trackMatchStore.restore()) {
   if (activeVehicleIds.has(match.vehicleId)) trackMatches.set(match.vehicleId, match);
 }
 if (trackMatcher) updateMatches(restoredFleet, []);
-server.listen(port, "127.0.0.1", () => {
-  console.log(JSON.stringify({ event: "realtime.listening", url: `http://127.0.0.1:${port}` }));
+server.listen(port, host, () => {
+  console.log(JSON.stringify({ event: "realtime.listening", url: `http://${host}:${port}` }));
 });
 
 consume().catch((error) => {
@@ -647,6 +719,6 @@ void pollRoad();
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
-    void Promise.all([redisState?.close(), redisJourneyState?.close(), redisRoadState?.close()]).finally(() => server.close());
+    void Promise.all([redisState?.close(), redisJourneyState?.close(), redisRoadState?.close(), postgresHistory?.close()]).finally(() => server.close());
   });
 }

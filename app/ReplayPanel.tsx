@@ -6,6 +6,7 @@ import {
   railReplayResponseSchema,
   type RailReplayFrame,
 } from "../packages/protocol/replay";
+import { realtimeHttpUrl } from "./realtime-url";
 
 export interface ReplayCursor {
   frames: RailReplayFrame[];
@@ -17,17 +18,6 @@ interface ReplayPanelProps {
   vehicleId: string | null;
   trainNumber: string | null;
   onCursorChange: (cursor: ReplayCursor | null) => void;
-}
-
-function realtimeBase(): string {
-  const protocol = window.location.protocol === "https:" ? "https:" : "http:";
-  const url = new URL(process.env.NEXT_PUBLIC_REALTIME_URL
-    ?? `${protocol}//${window.location.hostname}:8081/v1/realtime`);
-  url.protocol = url.protocol === "wss:" ? "https:" : "http:";
-  url.pathname = "";
-  url.search = "";
-  url.hash = "";
-  return url.toString().replace(/\/$/, "");
 }
 
 function clockLabel(value: number | null): string {
@@ -47,7 +37,7 @@ export function ReplayPanel({ vehicleId, trainNumber, onCursorChange }: ReplayPa
 
   useEffect(() => {
     let disposed = false;
-    void fetch(`${realtimeBase()}/v1/replay/catalog`)
+    void fetch(realtimeHttpUrl("/v1/replay/catalog"))
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("catalog")))
       .then((value) => railReplayCatalogSchema.parse(value))
       .then((value) => {
@@ -84,7 +74,9 @@ export function ReplayPanel({ vehicleId, trainNumber, onCursorChange }: ReplayPa
       setState("LOADING");
       setPlaying(false);
     });
-    void fetch(`${realtimeBase()}/v1/replay/rail?${query}`)
+    const replayUrl = new URL(realtimeHttpUrl("/v1/replay/rail"));
+    replayUrl.search = query.toString();
+    void fetch(replayUrl)
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("sequence")))
       .then((value) => railReplayResponseSchema.parse(value))
       .then((value) => {

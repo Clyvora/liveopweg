@@ -1,6 +1,6 @@
 # MobilityRadar NL - doelarchitectuur
 
-Status: **doelarchitectuur, bijgewerkt na Fase 2 tot en met 9 op 21 augustus 2026**. Naast de railketen bestaat nu de eerste road vertical slice: officiële NDW Actueel Beeld-snapshots, raw opslag, DATEX II-normalisatie, dedupe/geldigheid, aparte live-state, REST/WS en schakelbare kaartlagen. Niet-NS-posities, routeprediction, wegmeetwaarden en latere domeinen blijven doelarchitectuur.
+Status: **doelarchitectuur, bijgewerkt na Fase 11 op 31 augustus 2026**. Rail, road, replay en drie 3D-stations hebben nu één deploybaar fundament met PostGIS-historie, Redis-live-state, metrics, containers en reverse proxy. Niet-NS-posities, routeprediction en wegmeetwaarden blijven doelarchitectuur.
 
 ## 1. Architectuurdoelen
 
@@ -718,6 +718,16 @@ Gate: 24-uurs feedmeting, schema validation, data quality UI, tests en documenta
 - één lokale 3D-bundelketen voor Utrecht, Amsterdam en Rotterdam Centraal;
 - begrensde replayvensters en eventloop-yields voor voorspelbare gatewaybelasting;
 - geen materieeltype of niet-NS-operator zonder bewezen bron.
+
+### Fase 11 - productierijp fundament
+
+- PostGIS-versiehistorie voor railobservaties, afgeleide matches, InfoPlus-ritten en NDW-events;
+- Redis blijft aparte kortlevende live-state en pub/sub;
+- Prometheus-metrics en persistence-health op de realtime gateway;
+- productiecontainers voor migratie, bronbootstrap, gateway, web, PostGIS en Redis;
+- Nginx als same-origin REST/WebSocket-proxy met begrenzing en securityheaders;
+- CI voor typecheck, lint, tests, build, server-rendering en productie-audit;
+- fail-fast persistence in productie, file-backed fallback in ontwikkeling.
 
 Iedere fase is pas klaar na tests, typecheck, lint, build, relevante integration test, performancecheck, documentatie en bekende beperkingen.
 

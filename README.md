@@ -2,6 +2,8 @@
 
 MobilityRadar NL maakt Nederlandse mobiliteitsdata realtime zichtbaar met een expliciet onderscheid tussen bronfeit, afleiding en onbekende informatie.
 
+Fase 11 voegt het productierijpe fundament toe: echte PostGIS-historie, persistence-health, Prometheus-metrics, een beveiligde reverse-proxyroute, productiecontainers en continue kwaliteitscontrole. De file-backed ontwikkelmodus blijft beschikbaar.
+
 Fase 10 voegt deterministische treinreplay en herbruikbare 3D-stations toe. Historische GPS-punten worden opnieuw uit de exact opgeslagen NDOV-payloads opgebouwd; spoorposities worden zichtbaar opnieuw berekend met de vastgepinde graph. De 3D-keten werkt nu voor Utrecht, Amsterdam en Rotterdam Centraal.
 
 Fase 9 blijft het officiële NDW Actueel Beeld leveren: files, ongevallen, werkzaamheden, afsluitingen en veiligheidsmeldingen met brongeometrie, bronupdate en geldigheidsstatus. De rail- en wegdomeinen blijven functioneel gescheiden.
@@ -21,14 +23,14 @@ npm install
 npm run rail:import-geometry
 npm run rail:audit-graph
 npm run station3d:build
-npm run dev:phase10
+npm run dev:phase11
 ```
 
 Open daarna `http://localhost:3000`. De realtime gateway draait op `http://127.0.0.1:8081`.
 
 De eerste verbinding kan enkele seconden wachten op de volgende NDOV-publicatie. Er wordt geen mockdata getoond als de bron niet bereikbaar is.
 
-## Wat Fase 2 tot en met 10 doen
+## Wat Fase 2 tot en met 11 doen
 
 ```text
 NDOV NS-treinposities
@@ -105,6 +107,14 @@ Deterministische treinreplay
   → spoorpositie opnieuw berekend met graph-hash en matchermethode in de response
   → bronspoor, bronpunt en herberekend matchpunt afzonderlijk zichtbaar
   → afspeelsnelheid 0,5×/1×/2×/4× en een expliciet niet-live label
+
+Productierijp fundament
+  → idempotente PostGIS-historie voor observaties, matches, ritversies en NDW-events
+  → Redis voor live-state en pub/sub; file-backed fallback blijft beschikbaar
+  → Prometheus-metrics voor bronkwaliteit, WebSockets en persistence
+  → productiecompose met migratie, bronbootstrap, gateway, web en Nginx
+  → same-origin WebSocket/REST in productie met rate limits en securityheaders
+  → continue typecheck, lint, tests, build en productie-audit
 ```
 
 Ruwe positieberichten komen lokaal in `var/raw/rail/`, ruwe ritberichten in `var/raw/rail-journey/`, NDW-snapshots in `var/raw/road/` en exacte PDOK-pagina's in `var/raw/rail-geometry/`; deze mappen staan in `.gitignore`. De actuele rail- en wegstate staat in `var/live/`. Zet voor Redis bijvoorbeeld `REDIS_URL=redis://127.0.0.1:6379`.
@@ -113,7 +123,7 @@ De huidige positie-envelope is specifiek de NS-interface. Andere railvervoerders
 
 De NS Reisinformatie API-adapter is server-only en optioneel. Zonder `NS_API_KEY` blijft hij expliciet `DISABLED_CONFIG`; InfoPlus levert dan nog steeds de actuele stations en ritcontext. Er wordt nooit een fictief NS API-antwoord gebruikt.
 
-De meegeleverde lokale PostGIS/Redis-infrastructuur staat in `infra/docker/compose.yml`. Docker is optioneel voor de file-backed ontwikkelmodus. Op deze ontwikkelmachine is Docker Desktop wel geïnstalleerd, maar de engine kan niet starten zolang virtualisatie in Windows/firmware niet beschikbaar is.
+De meegeleverde lokale PostGIS/Redis-infrastructuur staat in `infra/docker/compose.yml`. Docker is optioneel voor de file-backed ontwikkelmodus. Op deze ontwikkelmachine is Docker Desktop wel geïnstalleerd, maar de engine stopt momenteel door een ontoegankelijke achtergebleven runtime-socket. Zie `docs/phase-11.md` voor de veilige herstelroute.
 
 ## Controles
 
@@ -131,4 +141,4 @@ npm run benchmark:replay
 npm run station3d:validate-source
 ```
 
-Meer details en aantoonbare evidence staan in [docs/phase-10.md](docs/phase-10.md) en de eerdere fasedocumenten. De broninventarisatie en bekende voorwaarden staan in [docs/data-sources.md](docs/data-sources.md).
+Meer details en aantoonbare evidence staan in [docs/phase-11.md](docs/phase-11.md), [docs/phase-10.md](docs/phase-10.md) en de eerdere fasedocumenten. De broninventarisatie en bekende voorwaarden staan in [docs/data-sources.md](docs/data-sources.md).

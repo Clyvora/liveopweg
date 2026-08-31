@@ -1,0 +1,116 @@
+name: mobilityradar
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mobilityradar
+      POSTGRES_USER: mobilityradar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mobilityradar -d mobilityradar"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+      target: realtime
+    command: ["npm", "run", "db:migrate-postgis"]
+    environment:
+      DATABASE_URL: postgres://mobilityradar:${POSTGRES_PASSWORD}@postgres:5432/mobilityradar
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+    networks: [backend]
+
+  bootstrap:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+      target: realtime
+    command: ["sh", "-c", "npm run rail:import-geometry && npm run rail:audit-graph && npm run station3d:build"]
+    environment:
+      MOBILITYRADAR_DATA_DIR: /app/var
+    volumes:
+      - mobility_data:/app/var
+    restart: "no"
+    networks: [backend]
+
+  realtime:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+      target: realtime
+    restart: unless-stopped
+    environment:
+      REALTIME_HOST: 0.0.0.0
+      REALTIME_PORT: 8081
+      CORS_ALLOWED_ORIGIN: ${PUBLIC_ORIGIN:?PUBLIC_ORIGIN is required}
+      DATABASE_URL: postgres://mobilityradar:${POSTGRES_PASSWORD}@postgres:5432/mobilityradar
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REQUIRE_PERSISTENCE: "true"
+      MOBILITYRADAR_DATA_DIR: /app/var
+      NDOV_ENDPOINT: ${NDOV_ENDPOINT:-tcp://pubsub.besteffort.ndovloket.nl:7664}
+      NDW_ROAD_URL: ${NDW_ROAD_URL:-https://opendata.ndw.nu/actueel_beeld.xml.gz}
+      NS_API_KEY: ${NS_API_KEY:-}
+    volumes:
+      - mobility_data:/app/var
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+      bootstrap: { condition: service_completed_successfully }
+    networks: [backend]
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+      target: web
+    restart: unless-stopped
+    depends_on:
+      realtime: { condition: service_healthy }
+    networks: [backend]
+
+  proxy:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    ports:
+      - "${PUBLIC_PORT:-8080}:8080"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      web: { condition: service_healthy }
+      realtime: { condition: service_healthy }
+    networks: [backend]
+
+volumes:
+  postgres_data:
+  redis_data:
+  mobility_data:
+
+networks:
+  backend:
+    internal: false

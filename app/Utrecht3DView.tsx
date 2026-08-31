@@ -5,6 +5,7 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 import type { StationBundle } from "../packages/domain-rail/station-bundle";
 import type { RailObservation, RailTrackMatch } from "../packages/protocol/rail";
 import type { TilesLayerState } from "./pdok-3d-tiles-layer";
+import { realtimeHttpUrl } from "./realtime-url";
 import type { StationLayerStats, StationTrain3d, UtrechtStationLayer } from "./utrecht-station-layer";
 
 interface Utrecht3DViewProps {
@@ -73,13 +74,7 @@ export function Utrecht3DView({ vehicles, matchesByVehicle, selectedVehicleId }:
         import("./pdok-3d-tiles-layer"),
       ]);
       if (disposed || !mapElement.current) return;
-      const realtimeProtocol = window.location.protocol === "https:" ? "https:" : "http:";
-      const realtimeHttpUrl = new URL(process.env.NEXT_PUBLIC_REALTIME_URL
-        ?? `${realtimeProtocol}//${window.location.hostname}:8081/v1/realtime`);
-      realtimeHttpUrl.protocol = realtimeHttpUrl.protocol === "wss:" ? "https:" : "http:";
-      realtimeHttpUrl.pathname = `/v1/stations/${stationId}/3d`;
-      realtimeHttpUrl.search = "";
-      const response = await fetch(realtimeHttpUrl);
+      const response = await fetch(realtimeHttpUrl(`/v1/stations/${stationId}/3d`));
       if (!response.ok) throw new Error("Stationbundel is niet beschikbaar");
       const stationBundle = await response.json() as StationBundle;
       if (stationBundle.schemaVersion !== 1 || stationBundle.station.id !== stationId) {
