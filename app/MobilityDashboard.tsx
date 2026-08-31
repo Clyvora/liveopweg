@@ -105,6 +105,38 @@ function toRecord(observations: RailObservation[]): Record<string, RailObservati
   return Object.fromEntries(observations.map((observation) => [observation.vehicleId, observation]));
 }
 
+type TrackMotionSample = {
+  previous: RailTrackMatch | null;
+  current: RailTrackMatch;
+};
+
+function matchedPosition(match: RailTrackMatch | null | undefined): { longitude: number; latitude: number } | null {
+  return match?.snappedPosition && match.status.startsWith("MATCHED") ? match.snappedPosition : null;
+}
+
+function trackMotionPosition(
+  sample: TrackMotionSample | null,
+  nowMs: number,
+  renderDelayMs: number,
+): { longitude: number; latitude: number } | null {
+  const currentPosition = matchedPosition(sample?.current);
+  if (!sample || !currentPosition) return null;
+  const previousPosition = matchedPosition(sample.previous);
+  if (!previousPosition) return currentPosition;
+
+  const previousTime = Date.parse(sample.previous?.sourceMeasuredAt ?? sample.previous?.matchedAt ?? "");
+  const currentTime = Date.parse(sample.current.sourceMeasuredAt ?? sample.current.matchedAt);
+  const targetTime = nowMs - renderDelayMs;
+  if (!Number.isFinite(previousTime) || !Number.isFinite(currentTime) || currentTime <= previousTime) return currentPosition;
+  if (targetTime <= previousTime) return previousPosition;
+  if (targetTime >= currentTime) return currentPosition;
+  const progress = (targetTime - previousTime) / (currentTime - previousTime);
+  return {
+    longitude: previousPosition.longitude + (currentPosition.longitude - previousPosition.longitude) * progress,
+    latitude: previousPosition.latitude + (currentPosition.latitude - previousPosition.latitude) * progress,
+  };
+}
+
 export function MobilityDashboard() {
   const mapElement = useRef<HTMLDivElement>(null);
   const trainOverlayElement = useRef<HTMLCanvasElement>(null);
@@ -113,6 +145,7 @@ export function MobilityDashboard() {
   const selectFromMapRef = useRef<(vehicleId: string) => void>(() => undefined);
   const motionSamplesRef = useRef(new Map<string, MotionSample>());
   const trackMatchesRef = useRef(new Map<string, RailTrackMatch>());
+  const trackMotionSamplesRef = useRef(new Map<string, TrackMotionSample>());
   const selectedVehicleIdRef = useRef<string | null>(null);
   const selectRoadFromMapRef = useRef<(eventId: string) => void>(() => undefined);
   const [vehiclesById, setVehiclesById] = useState<Record<string, RailObservation>>({});
@@ -451,10 +484,7 @@ export function MobilityDashboard() {
           let nearest: { vehicleId: string; distance: number } | null = null;
           for (const [vehicleId, sample] of motionSamplesRef.current) {
             const motion = renderMotion(sample, Date.now(), renderDelayMs);
-            const trackMatch = trackMatchesRef.current.get(vehicleId);
-            const position = trackMatch?.snappedPosition && trackMatch.status.startsWith("MATCHED")
-              ? trackMatch.snappedPosition
-              : motion;
+            const position = trackMotionPosition(trackMotionSamplesRef.current.get(vehicleId) ?? null, Date.now(), renderDelayMs) ?? motion;
             const projected = instance.project([position.longitude, position.latitude]);
             const distance = Math.hypot(projected.x - event.point.x, projected.y - event.point.y);
             if (distance <= 18 && (!nearest || distance < nearest.distance)) nearest = { vehicleId, distance };
@@ -480,13 +510,14 @@ export function MobilityDashboard() {
     const renderFrame = (frameTime: number) => {
       const instance = map.current;
       if (!instance) return;
-      // Alleen de geselecteerde trein krijgt een vloeiende clientweergave. De
-      // landelijke bronlaag wordt uitsluitend bij een echte bronbatch ververst.
-      if (frameTime - lastMapFrame >= 250) {
+      // Teken de volledige vloot vloeiend tussen feed-updates door. De punten
+      // blijven daardoor stabiel bewegen in plaats van per batch te springen.
+      if (frameTime - lastMapFrame >= 16) {
         lastMapFrame = frameTime;
+        const nowMs = Date.now();
         const selectedId = selectedVehicleIdRef.current;
         const selectedSample = selectedId ? motionSamplesRef.current.get(selectedId) ?? null : null;
-        const selected = selectedSample ? renderMotion(selectedSample, Date.now(), renderDelayMs) : null;
+            const selected = selectedSample ? renderMotion(selectedSample, nowMs, renderDelayMs) : null;
         const overlay = trainOverlayElement.current;
         const mapContainer = mapElement.current;
         if (overlay && mapContainer) {
@@ -504,11 +535,11 @@ export function MobilityDashboard() {
             context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
             context.clearRect(0, 0, width, height);
             for (const [vehicleId, sample] of motionSamplesRef.current) {
-              const motion = renderMotion(sample, Date.now(), renderDelayMs);
-              const trackMatch = trackMatchesRef.current.get(vehicleId);
-              const matched = Boolean(trackMatch?.snappedPosition && trackMatch.status.startsWith("MATCHED"));
-              const position = matched ? trackMatch!.snappedPosition! : motion;
-              const projected = instance.project([position.longitude, position.latitude]);
+              const motion = renderMotion(sample, nowMs, renderDelayMs);
+              const position = trackMotionPosition(trackMotionSamplesRef.current.get(vehicleId) ?? null, nowMs, renderDelayMs);
+              const matched = Boolean(position);
+              const renderedPosition = position ?? motion;
+              const projected = instance.project([renderedPosition.longitude, renderedPosition.latitude]);
               if (projected.x < -16 || projected.x > width + 16 || projected.y < -16 || projected.y > height + 16) continue;
               const isSelected = vehicleId === selectedId;
               context.beginPath();
@@ -710,7 +741,10 @@ export function MobilityDashboard() {
             for (const vehicle of fleetBatch.data.upserts) next[vehicle.vehicleId] = vehicle;
             return next;
           });
-          for (const vehicleId of fleetBatch.data.removedVehicleIds) motionSamplesRef.current.delete(vehicleId);
+          for (const vehicleId of fleetBatch.data.removedVehicleIds) {
+            motionSamplesRef.current.delete(vehicleId);
+            trackMotionSamplesRef.current.delete(vehicleId);
+          }
           for (const vehicle of fleetBatch.data.upserts) {
             const currentSample = motionSamplesRef.current.get(vehicle.vehicleId);
             if (currentSample?.current.observationId === vehicle.observationId) continue;
@@ -725,6 +759,14 @@ export function MobilityDashboard() {
         const matchSnapshot = railMatchSnapshotMessageSchema.safeParse(decoded);
         if (matchSnapshot.success) {
           const matches = new Map(matchSnapshot.data.data.map((match) => [match.vehicleId, match]));
+          const trackMotionSamples = new Map<string, TrackMotionSample>();
+          for (const match of matchSnapshot.data.data) {
+            const previous = trackMotionSamplesRef.current.get(match.vehicleId)?.current
+              ?? trackMatchesRef.current.get(match.vehicleId)
+              ?? null;
+            trackMotionSamples.set(match.vehicleId, { previous, current: match });
+          }
+          trackMotionSamplesRef.current = trackMotionSamples;
           trackMatchesRef.current = matches;
           setTrackMatchesByVehicle(Object.fromEntries(matches));
           return;
@@ -732,8 +774,17 @@ export function MobilityDashboard() {
         const matchBatch = railMatchBatchMessageSchema.safeParse(decoded);
         if (matchBatch.success) {
           const matches = new Map(trackMatchesRef.current);
-          for (const vehicleId of matchBatch.data.removedVehicleIds) matches.delete(vehicleId);
-          for (const match of matchBatch.data.upserts) matches.set(match.vehicleId, match);
+          const trackMotionSamples = new Map(trackMotionSamplesRef.current);
+          for (const vehicleId of matchBatch.data.removedVehicleIds) {
+            matches.delete(vehicleId);
+            trackMotionSamples.delete(vehicleId);
+          }
+          for (const match of matchBatch.data.upserts) {
+            const previous = trackMotionSamples.get(match.vehicleId)?.current ?? matches.get(match.vehicleId) ?? null;
+            matches.set(match.vehicleId, match);
+            trackMotionSamples.set(match.vehicleId, { previous, current: match });
+          }
+          trackMotionSamplesRef.current = trackMotionSamples;
           trackMatchesRef.current = matches;
           setTrackMatchesByVehicle(Object.fromEntries(matches));
           return;
