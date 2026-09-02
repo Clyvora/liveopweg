@@ -1,0 +1,2787 @@
+{
+  "source": "https://www.rijdendetreinen.nl/open-data/stations",
+  "download": "https://opendata.rijdendetreinen.nl/public/stations/stations-2023-09-nl.csv",
+  "version": "2023-09",
+  "license": "CC0-1.0",
+  "stations": [
+    {
+      "code": "HT",
+      "name": "'s-Hertogenbosch",
+      "latitude": 51.69048,
+      "longitude": 5.29362,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "HTO",
+      "name": "'s-Hertogenbosch Oost",
+      "latitude": 51.700553894043,
+      "longitude": 5.3183331489563,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HDE",
+      "name": "'t Harde",
+      "latitude": 52.4091682,
+      "longitude": 5.893611,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ATN",
+      "name": "Aalten",
+      "latitude": 51.921326524551,
+      "longitude": 6.5786272287369,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "AC",
+      "name": "Abcoude",
+      "latitude": 52.2785,
+      "longitude": 4.977,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "AKM",
+      "name": "Akkrum",
+      "latitude": 53.046390533447,
+      "longitude": 5.843611240387,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "AMR",
+      "name": "Alkmaar",
+      "latitude": 52.63777923584,
+      "longitude": 4.7397222518921,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "AMRN",
+      "name": "Alkmaar Noord",
+      "latitude": 52.643890380859,
+      "longitude": 4.7641668319702,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "AML",
+      "name": "Almelo",
+      "latitude": 52.358055114746,
+      "longitude": 6.6538887023926,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "AMRI",
+      "name": "Almelo de Riet",
+      "latitude": 52.341945648193,
+      "longitude": 6.6666665077209,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ALMB",
+      "name": "Almere Buiten",
+      "latitude": 52.394165039062,
+      "longitude": 5.2780556678772,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ALM",
+      "name": "Almere Centrum",
+      "latitude": 52.37503,
+      "longitude": 5.21764,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "ALMM",
+      "name": "Almere Muziekwijk",
+      "latitude": 52.367500305176,
+      "longitude": 5.1902775764465,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ALMO",
+      "name": "Almere Oostvaarders",
+      "latitude": 52.403331756592,
+      "longitude": 5.3005557060242,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ALMP",
+      "name": "Almere Parkwijk",
+      "latitude": 52.376667022705,
+      "longitude": 5.244722366333,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "AMPO",
+      "name": "Almere Poort",
+      "latitude": 52.342778,
+      "longitude": 5.151944,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "APN",
+      "name": "Alphen a/d Rijn",
+      "latitude": 52.124443054199,
+      "longitude": 4.6577777862549,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "AMF",
+      "name": "Amersfoort Centraal",
+      "latitude": 52.153888702393,
+      "longitude": 5.3705554008484,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "AMFS",
+      "name": "Amersfoort Schothorst",
+      "latitude": 52.174822137451,
+      "longitude": 5.4038887023926,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "AVAT",
+      "name": "Amersfoort Vathorst",
+      "latitude": 52.192779541016,
+      "longitude": 5.4338889122009,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ASA",
+      "name": "Amsterdam Amstel",
+      "latitude": 52.346668243408,
+      "longitude": 4.9177780151367,
+      "category": "intercitystation"
+    },
+    {
+      "code": "ASB",
+      "name": "Amsterdam Bijlmer ArenA",
+      "latitude": 52.3122215271,
+      "longitude": 4.9469442367554,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "ASD",
+      "name": "Amsterdam Centraal",
+      "latitude": 52.378887176514,
+      "longitude": 4.9002776145935,
+      "category": "megastation"
+    },
+    {
+      "code": "ASHD",
+      "name": "Amsterdam Holendrecht",
+      "latitude": 52.29844,
+      "longitude": 4.95972,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ASDL",
+      "name": "Amsterdam Lelylaan",
+      "latitude": 52.357776641846,
+      "longitude": 4.8338890075684,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ASDM",
+      "name": "Amsterdam Muiderpoort",
+      "latitude": 52.360553741455,
+      "longitude": 4.9311113357544,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RAI",
+      "name": "Amsterdam RAI",
+      "latitude": 52.337223052979,
+      "longitude": 4.8902778625488,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ASSP",
+      "name": "Amsterdam Science Park",
+      "latitude": 52.35526,
+      "longitude": 4.94651,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ASS",
+      "name": "Amsterdam Sloterdijk",
+      "latitude": 52.388889312744,
+      "longitude": 4.8377776145935,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "ASDZ",
+      "name": "Amsterdam Zuid",
+      "latitude": 52.338889,
+      "longitude": 4.872356,
+      "category": "intercitystation"
+    },
+    {
+      "code": "ANA",
+      "name": "Anna Paulowna",
+      "latitude": 52.867221832275,
+      "longitude": 4.8111109733581,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "APD",
+      "name": "Apeldoorn",
+      "latitude": 52.209167480469,
+      "longitude": 5.9702777862549,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "APDM",
+      "name": "Apeldoorn De Maten",
+      "latitude": 52.205276489258,
+      "longitude": 6.0005555152893,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "APDO",
+      "name": "Apeldoorn Osseveld",
+      "latitude": 52.215278625488,
+      "longitude": 6.0044445991516,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "APG",
+      "name": "Appingedam",
+      "latitude": 53.3258135,
+      "longitude": 6.8619577,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "AKL",
+      "name": "Arkel",
+      "latitude": 51.87194442749,
+      "longitude": 4.9927778244019,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ARN",
+      "name": "Arnemuiden",
+      "latitude": 51.501667022705,
+      "longitude": 3.6691665649414,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "AH",
+      "name": "Arnhem Centraal",
+      "latitude": 51.985000610352,
+      "longitude": 5.8991665840149,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "AHPR",
+      "name": "Arnhem Presikhaaf",
+      "latitude": 51.988056182861,
+      "longitude": 5.9438886642456,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "AHP",
+      "name": "Arnhem Velperpoort",
+      "latitude": 51.985279083252,
+      "longitude": 5.9194445610046,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "AHZ",
+      "name": "Arnhem Zuid",
+      "latitude": 51.955001831055,
+      "longitude": 5.8519444465637,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ASN",
+      "name": "Assen",
+      "latitude": 52.991664886475,
+      "longitude": 6.5708332061768,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "BRN",
+      "name": "Baarn",
+      "latitude": 52.208332061768,
+      "longitude": 5.2808332443237,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "NSCH",
+      "name": "Bad Nieuweschans",
+      "latitude": 53.1844,
+      "longitude": 7.19937,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "BF",
+      "name": "Baflo",
+      "latitude": 53.3608969,
+      "longitude": 6.5185581,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BRD",
+      "name": "Barendrecht",
+      "latitude": 51.854721069336,
+      "longitude": 4.5533332824707,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BNC",
+      "name": "Barneveld Centrum",
+      "latitude": 52.139999389648,
+      "longitude": 5.590277671814,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BNN",
+      "name": "Barneveld Noord",
+      "latitude": 52.161388397217,
+      "longitude": 5.5980553627014,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BNZ",
+      "name": "Barneveld Zuid",
+      "latitude": 52.128853,
+      "longitude": 5.60246,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BDM",
+      "name": "Bedum",
+      "latitude": 53.3068857,
+      "longitude": 6.593054,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BK",
+      "name": "Beek-Elsloo",
+      "latitude": 50.947498321533,
+      "longitude": 5.7866668701172,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BSD",
+      "name": "Beesd",
+      "latitude": 51.899444580078,
+      "longitude": 5.1944446563721,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BL",
+      "name": "Beilen",
+      "latitude": 52.854721069336,
+      "longitude": 6.5211110115051,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BGN",
+      "name": "Bergen op Zoom",
+      "latitude": 51.49388885498,
+      "longitude": 4.2961111068726,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BET",
+      "name": "Best",
+      "latitude": 51.509998321533,
+      "longitude": 5.3891668319702,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BV",
+      "name": "Beverwijk",
+      "latitude": 52.478332519531,
+      "longitude": 4.6566667556763,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BHV",
+      "name": "Bilthoven",
+      "latitude": 52.130001068115,
+      "longitude": 5.2038888931274,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BR",
+      "name": "Blerick",
+      "latitude": 51.372501373291,
+      "longitude": 6.1550002098083,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BLL",
+      "name": "Bloemendaal",
+      "latitude": 52.404167175293,
+      "longitude": 4.6275000572205,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BDG",
+      "name": "Bodegraven",
+      "latitude": 52.081390380859,
+      "longitude": 4.7461109161377,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BN",
+      "name": "Borne",
+      "latitude": 52.298889160156,
+      "longitude": 6.7480554580689,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BSK",
+      "name": "Boskoop",
+      "latitude": 52.077777862549,
+      "longitude": 4.6469445228577,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BSKS",
+      "name": "Boskoop Snijdelwijk",
+      "latitude": 52.067658,
+      "longitude": 4.646186,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BHDV",
+      "name": "Boven-Hardinxveld",
+      "latitude": 51.832222,
+      "longitude": 4.878056,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BKF",
+      "name": "Bovenkarspel Flora",
+      "latitude": 52.696109771729,
+      "longitude": 5.2527775764465,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BKG",
+      "name": "Bovenkarspel-Grootebroek",
+      "latitude": 52.694999694824,
+      "longitude": 5.2377777099609,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BMR",
+      "name": "Boxmeer",
+      "latitude": 51.644521767653,
+      "longitude": 5.9390330314636,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "BTL",
+      "name": "Boxtel",
+      "latitude": 51.58433,
+      "longitude": 5.31912,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "BD",
+      "name": "Breda",
+      "latitude": 51.595554351807,
+      "longitude": 4.7800002098083,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "BDPB",
+      "name": "Breda-Prinsenbeek",
+      "latitude": 51.606388092041,
+      "longitude": 4.7208333015442,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BKL",
+      "name": "Breukelen",
+      "latitude": 52.17149,
+      "longitude": 4.9906,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "BMN",
+      "name": "Brummen",
+      "latitude": 52.091110229492,
+      "longitude": 6.1469445228577,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BP",
+      "name": "Buitenpost",
+      "latitude": 53.2564547,
+      "longitude": 6.1446496,
+      "category": "knooppuntSneltreinstation"
+    },
+    {
+      "code": "BDE",
+      "name": "Bunde",
+      "latitude": 50.896945953369,
+      "longitude": 5.7366666793823,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BNK",
+      "name": "Bunnik",
+      "latitude": 52.063056945801,
+      "longitude": 5.1944446563721,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BSMZ",
+      "name": "Bussum Zuid",
+      "latitude": 52.26583480835,
+      "longitude": 5.1630554199219,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "CPS",
+      "name": "Capelle Schollevaar",
+      "latitude": 51.954166412354,
+      "longitude": 4.5841665267944,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "CAS",
+      "name": "Castricum",
+      "latitude": 52.545833587646,
+      "longitude": 4.6586112976074,
+      "category": "intercitystation"
+    },
+    {
+      "code": "CVM",
+      "name": "Chevremont",
+      "latitude": 50.876110076904,
+      "longitude": 6.0597224235535,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "CO",
+      "name": "Coevorden",
+      "latitude": 52.663612365723,
+      "longitude": 6.7355556488037,
+      "category": "knooppuntSneltreinstation"
+    },
+    {
+      "code": "CK",
+      "name": "Cuijk",
+      "latitude": 51.726682587905,
+      "longitude": 5.8742952346802,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "CL",
+      "name": "Culemborg",
+      "latitude": 51.946666717529,
+      "longitude": 5.2269444465637,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DA",
+      "name": "Daarlerveen",
+      "latitude": 52.4407702,
+      "longitude": 6.5759947,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DLN",
+      "name": "Dalen",
+      "latitude": 52.69416809082,
+      "longitude": 6.7580556869507,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DL",
+      "name": "Dalfsen",
+      "latitude": 52.498332977295,
+      "longitude": 6.25861120224,
+      "category": "sneltreinstation"
+    },
+    {
+      "code": "DVNK",
+      "name": "De Vink",
+      "latitude": 52.147220611572,
+      "longitude": 4.4563889503479,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DWE",
+      "name": "De Westereen",
+      "latitude": 53.24817,
+      "longitude": 6.03463,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DEI",
+      "name": "Deinum",
+      "latitude": 53.1888115,
+      "longitude": 5.7281572,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DDN",
+      "name": "Delden",
+      "latitude": 52.259998321533,
+      "longitude": 6.7161111831665,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DT",
+      "name": "Delft",
+      "latitude": 52.00666809082,
+      "longitude": 4.3563890457153,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "DTCP",
+      "name": "Delft Campus",
+      "latitude": 51.990833282471,
+      "longitude": 4.3647222518921,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DZ",
+      "name": "Delfzijl",
+      "latitude": 53.3336625,
+      "longitude": 6.9240797,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DZW",
+      "name": "Delfzijl West",
+      "latitude": 53.3320834,
+      "longitude": 6.9069092,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DLD",
+      "name": "Den Dolder",
+      "latitude": 52.140277862549,
+      "longitude": 5.2427778244019,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "GVC",
+      "name": "Den Haag Centraal",
+      "latitude": 52.080276489258,
+      "longitude": 4.3249998092651,
+      "category": "megastation"
+    },
+    {
+      "code": "GV",
+      "name": "Den Haag HS",
+      "latitude": 52.069721221924,
+      "longitude": 4.3225002288818,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "LAA",
+      "name": "Den Haag Laan v NOI",
+      "latitude": 52.078609466553,
+      "longitude": 4.3427777290344,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "GVM",
+      "name": "Den Haag Mariahoeve",
+      "latitude": 52.090557098389,
+      "longitude": 4.3694443702698,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GVMW",
+      "name": "Den Haag Moerwijk",
+      "latitude": 52.053890228271,
+      "longitude": 4.3086109161377,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "YPB",
+      "name": "Den Haag Ypenburg",
+      "latitude": 52.055278778076,
+      "longitude": 4.39222240448,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HDR",
+      "name": "Den Helder",
+      "latitude": 52.955276489258,
+      "longitude": 4.7611112594605,
+      "category": "intercitystation"
+    },
+    {
+      "code": "HDRZ",
+      "name": "Den Helder Zuid",
+      "latitude": 52.932498931885,
+      "longitude": 4.7641668319702,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DN",
+      "name": "Deurne",
+      "latitude": 51.455833435059,
+      "longitude": 5.7888889312744,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DV",
+      "name": "Deventer",
+      "latitude": 52.257499694824,
+      "longitude": 6.1605553627014,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "DVC",
+      "name": "Deventer Colmschate",
+      "latitude": 52.2502784729,
+      "longitude": 6.2144446372986,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DID",
+      "name": "Didam",
+      "latitude": 51.933502,
+      "longitude": 6.1324106,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DMN",
+      "name": "Diemen",
+      "latitude": 52.34515,
+      "longitude": 4.967566,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DMNZ",
+      "name": "Diemen Zuid",
+      "latitude": 52.330276489258,
+      "longitude": 4.9558334350586,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DR",
+      "name": "Dieren",
+      "latitude": 52.044998168945,
+      "longitude": 6.1030554771423,
+      "category": "intercitystation"
+    },
+    {
+      "code": "DTC",
+      "name": "Doetinchem",
+      "latitude": 51.9585962,
+      "longitude": 6.2962148,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "DTCH",
+      "name": "Doetinchem De Huet",
+      "latitude": 51.9591413,
+      "longitude": 6.2598521,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DDR",
+      "name": "Dordrecht",
+      "latitude": 51.807220458984,
+      "longitude": 4.668333530426,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "DDRS",
+      "name": "Dordrecht Stadspolders",
+      "latitude": 51.801944732666,
+      "longitude": 4.7166666984558,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DDZD",
+      "name": "Dordrecht Zuid",
+      "latitude": 51.790000915527,
+      "longitude": 4.6713891029358,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DB",
+      "name": "Driebergen-Zeist",
+      "latitude": 52.065277099609,
+      "longitude": 5.25861120224,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "DRH",
+      "name": "Driehuis",
+      "latitude": 52.442501068115,
+      "longitude": 4.6380553245544,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DRP",
+      "name": "Dronryp",
+      "latitude": 53.1778086,
+      "longitude": 5.6347411,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DRON",
+      "name": "Dronten",
+      "latitude": 52.5344,
+      "longitude": 5.72089,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DVN",
+      "name": "Duiven",
+      "latitude": 51.943332672119,
+      "longitude": 6.0147223472595,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "DVD",
+      "name": "Duivendrecht",
+      "latitude": 52.323333740234,
+      "longitude": 4.9363889694214,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "EC",
+      "name": "Echt",
+      "latitude": 51.100555419922,
+      "longitude": 5.8788890838623,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "EDC",
+      "name": "Ede Centrum",
+      "latitude": 52.043609619141,
+      "longitude": 5.668333530426,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ED",
+      "name": "Ede-Wageningen",
+      "latitude": 52.027778625488,
+      "longitude": 5.6730556488037,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "EEM",
+      "name": "Eemshaven",
+      "latitude": 53.458419,
+      "longitude": 6.832,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "EDN",
+      "name": "Eijsden",
+      "latitude": 50.771945953369,
+      "longitude": 5.710000038147,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "EHV",
+      "name": "Eindhoven Centraal",
+      "latitude": 51.443332672119,
+      "longitude": 5.4813890457153,
+      "category": "megastation"
+    },
+    {
+      "code": "EHS",
+      "name": "Eindhoven Strijp-S",
+      "latitude": 51.451110839844,
+      "longitude": 5.4558334350586,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "EST",
+      "name": "Elst",
+      "latitude": 51.916942596435,
+      "longitude": 5.8550000190735,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "EMN",
+      "name": "Emmen",
+      "latitude": 52.790000915527,
+      "longitude": 6.8994445800781,
+      "category": "sneltreinstation"
+    },
+    {
+      "code": "EMNZ",
+      "name": "Emmen Zuid",
+      "latitude": 52.748866374691,
+      "longitude": 6.8747806549072,
+      "category": "sneltreinstation"
+    },
+    {
+      "code": "EKZ",
+      "name": "Enkhuizen",
+      "latitude": 52.699165344238,
+      "longitude": 5.286388874054,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ES",
+      "name": "Enschede",
+      "latitude": 52.222499847412,
+      "longitude": 6.8899998664856,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "ESE",
+      "name": "Enschede De Eschmarke",
+      "latitude": 52.221389770508,
+      "longitude": 6.9511113166809,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ESK",
+      "name": "Enschede Kennispark",
+      "latitude": 52.23749923706,
+      "longitude": 6.8388891220093,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "EML",
+      "name": "Ermelo",
+      "latitude": 52.301666259766,
+      "longitude": 5.6147222518921,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ETN",
+      "name": "Etten-Leur",
+      "latitude": 51.57500076294,
+      "longitude": 4.6358332633972,
+      "category": "intercitystation"
+    },
+    {
+      "code": "EGH",
+      "name": "Eygelshoven",
+      "latitude": 50.890556335449,
+      "longitude": 6.0450000762939,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "EGHM",
+      "name": "Eygelshoven Markt",
+      "latitude": 50.896049819644,
+      "longitude": 6.0602474212646,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "FWD",
+      "name": "Feanwâlden",
+      "latitude": 53.2351834,
+      "longitude": 5.9886615,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "FN",
+      "name": "Franeker",
+      "latitude": 53.1824488,
+      "longitude": 5.5483094,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GDR",
+      "name": "Gaanderen",
+      "latitude": 51.93074,
+      "longitude": 6.3486,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GDM",
+      "name": "Geldermalsen",
+      "latitude": 51.88301,
+      "longitude": 5.27127,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "GP",
+      "name": "Geldrop",
+      "latitude": 51.419723510742,
+      "longitude": 5.5505557060242,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "GLN",
+      "name": "Geleen Oost",
+      "latitude": 50.966945648193,
+      "longitude": 5.8430557250977,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "LUT",
+      "name": "Geleen-Lutterade",
+      "latitude": 50.975555419922,
+      "longitude": 5.8247222900391,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GZ",
+      "name": "Gilze-Rijen",
+      "latitude": 51.583610534668,
+      "longitude": 4.9261112213135,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GBR",
+      "name": "Glanerbrug",
+      "latitude": 52.218612670898,
+      "longitude": 6.9744443893433,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GS",
+      "name": "Goes",
+      "latitude": 51.498054504395,
+      "longitude": 3.8905556201935,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GO",
+      "name": "Goor",
+      "latitude": 52.230278015137,
+      "longitude": 6.5844445228577,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GR",
+      "name": "Gorinchem",
+      "latitude": 51.833889007568,
+      "longitude": 4.9683332443237,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "GD",
+      "name": "Gouda",
+      "latitude": 52.017501831055,
+      "longitude": 4.7044444084167,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "GDG",
+      "name": "Gouda Goverwelle",
+      "latitude": 52.014999389648,
+      "longitude": 4.7408332824707,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GBG",
+      "name": "Gramsbergen",
+      "latitude": 52.60916519165,
+      "longitude": 6.6758332252502,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GK",
+      "name": "Grijpskerk",
+      "latitude": 53.255740325573,
+      "longitude": 6.3097786903381,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GN",
+      "name": "Groningen",
+      "latitude": 53.210556030273,
+      "longitude": 6.5647220611572,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "GERP",
+      "name": "Groningen Europapark",
+      "latitude": 53.20480027,
+      "longitude": 6.5854178,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GNN",
+      "name": "Groningen Noord",
+      "latitude": 53.2301469,
+      "longitude": 6.5563172,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GW",
+      "name": "Grou-Jirnsum",
+      "latitude": 53.088890075684,
+      "longitude": 5.8225002288818,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HLM",
+      "name": "Haarlem",
+      "latitude": 52.38777923584,
+      "longitude": 4.6383333206177,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "HLMS",
+      "name": "Haarlem Spaarnwoude",
+      "latitude": 52.382778167725,
+      "longitude": 4.6730556488037,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HWZB",
+      "name": "Halfweg-Zwanenburg",
+      "latitude": 52.385935,
+      "longitude": 4.747165,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HDB",
+      "name": "Hardenberg",
+      "latitude": 52.572776794434,
+      "longitude": 6.6286110877991,
+      "category": "sneltreinstation"
+    },
+    {
+      "code": "HD",
+      "name": "Harderwijk",
+      "latitude": 52.337501525879,
+      "longitude": 5.619722366333,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "HBZM",
+      "name": "Hardinxveld Blauwe Zoom",
+      "latitude": 51.82944,
+      "longitude": 4.81556,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "GND",
+      "name": "Hardinxveld-Giessendam",
+      "latitude": 51.830554962158,
+      "longitude": 4.8358335494995,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HRN",
+      "name": "Haren",
+      "latitude": 53.176109313965,
+      "longitude": 6.6172223091125,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HLG",
+      "name": "Harlingen",
+      "latitude": 53.1704205,
+      "longitude": 5.4251932,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HLGH",
+      "name": "Harlingen Haven",
+      "latitude": 53.174917,
+      "longitude": 5.4112885,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HK",
+      "name": "Heemskerk",
+      "latitude": 52.495277404785,
+      "longitude": 4.6869444847107,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HAD",
+      "name": "Heemstede-Aerdenhout",
+      "latitude": 52.35916519165,
+      "longitude": 4.6066665649414,
+      "category": "intercitystation"
+    },
+    {
+      "code": "HR",
+      "name": "Heerenveen",
+      "latitude": 52.961387634277,
+      "longitude": 5.9141664505005,
+      "category": "intercitystation"
+    },
+    {
+      "code": "HRY",
+      "name": "Heerenveen IJsstadion",
+      "latitude": 52.935276031494,
+      "longitude": 5.9438886642456,
+      "category": "facultatiefStation"
+    },
+    {
+      "code": "HWD",
+      "name": "Heerhugowaard",
+      "latitude": 52.669723510742,
+      "longitude": 4.8227777481079,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "HRL",
+      "name": "Heerlen",
+      "latitude": 50.89083480835,
+      "longitude": 5.9749999046326,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "HRLW",
+      "name": "Heerlen Woonboulevard",
+      "latitude": 50.896667,
+      "longitude": 5.952222,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HZE",
+      "name": "Heeze",
+      "latitude": 51.384998321533,
+      "longitude": 5.5694446563721,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HLO",
+      "name": "Heiloo",
+      "latitude": 52.599445343018,
+      "longitude": 4.7005553245544,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HNO",
+      "name": "Heino",
+      "latitude": 52.427223205566,
+      "longitude": 6.2211112976074,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HM",
+      "name": "Helmond",
+      "latitude": 51.475555419922,
+      "longitude": 5.6619443893433,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "HMH",
+      "name": "Helmond 't Hout",
+      "latitude": 51.46794,
+      "longitude": 5.63085,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HMBV",
+      "name": "Helmond Brandevoort",
+      "latitude": 51.462223052979,
+      "longitude": 5.6072220802307,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HMBH",
+      "name": "Helmond Brouwhuis",
+      "latitude": 51.47068,
+      "longitude": 5.70177,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HMN",
+      "name": "Hemmen-Dodewaard",
+      "latitude": 51.9222129,
+      "longitude": 5.6737254,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HGL",
+      "name": "Hengelo",
+      "latitude": 52.261665344238,
+      "longitude": 6.7938890457153,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "HGLG",
+      "name": "Hengelo Gezondheidspark",
+      "latitude": 52.261667,
+      "longitude": 6.767778,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HGLO",
+      "name": "Hengelo Oost",
+      "latitude": 52.268890380859,
+      "longitude": 6.8194446563721,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HIL",
+      "name": "Hillegom",
+      "latitude": 52.302501678467,
+      "longitude": 4.5655555725098,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HVS",
+      "name": "Hilversum",
+      "latitude": 52.225833892822,
+      "longitude": 5.1819443702698,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "HVSM",
+      "name": "Hilversum Media Park",
+      "latitude": 52.238056182861,
+      "longitude": 5.1738886833191,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HVSP",
+      "name": "Hilversum Sportpark",
+      "latitude": 52.216110229492,
+      "longitude": 5.1872220039368,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HNP",
+      "name": "Hindeloopen",
+      "latitude": 52.9464903,
+      "longitude": 5.423063,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HB",
+      "name": "Hoensbroek",
+      "latitude": 50.905555725098,
+      "longitude": 5.9305553436279,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HVL",
+      "name": "Hoevelaken",
+      "latitude": 52.16652,
+      "longitude": 5.45718,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HOR",
+      "name": "Hollandsche Rading",
+      "latitude": 52.17777633667,
+      "longitude": 5.1791667938232,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HON",
+      "name": "Holten",
+      "latitude": 52.283889770508,
+      "longitude": 6.42027759552,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HFD",
+      "name": "Hoofddorp",
+      "latitude": 52.293334960938,
+      "longitude": 4.7005553245544,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HGV",
+      "name": "Hoogeveen",
+      "latitude": 52.733890533447,
+      "longitude": 6.4736108779907,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HGZ",
+      "name": "Hoogezand-Sappemeer",
+      "latitude": 53.159818131676,
+      "longitude": 6.7707538604736,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "HKS",
+      "name": "Hoogkarspel",
+      "latitude": 52.69055557251,
+      "longitude": 5.1838889122009,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HN",
+      "name": "Hoorn",
+      "latitude": 52.644721984863,
+      "longitude": 5.0555553436279,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "HNK",
+      "name": "Hoorn Kersenboogerd",
+      "latitude": 52.653610229492,
+      "longitude": 5.0855555534363,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HRT",
+      "name": "Horst-Sevenum",
+      "latitude": 51.426387786865,
+      "longitude": 6.0422220230103,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HTN",
+      "name": "Houten",
+      "latitude": 52.03402,
+      "longitude": 5.16821,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "HTNC",
+      "name": "Houten Castellum",
+      "latitude": 52.01701,
+      "longitude": 5.17949,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SGL",
+      "name": "Houthem-St. Gerlach",
+      "latitude": 50.873332977295,
+      "longitude": 5.7972221374512,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "HDG",
+      "name": "Hurdegaryp",
+      "latitude": 53.2187783,
+      "longitude": 5.934543,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "IJT",
+      "name": "IJlst",
+      "latitude": 53.0146614,
+      "longitude": 5.6160801,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "KPN",
+      "name": "Kampen",
+      "latitude": 52.559722900391,
+      "longitude": 5.9216666221619,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "KPNZ",
+      "name": "Kampen Zuid",
+      "latitude": 52.5331,
+      "longitude": 5.91309,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "BZL",
+      "name": "Kapelle-Biezelinge",
+      "latitude": 51.480834960938,
+      "longitude": 3.9561111927033,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "KRD",
+      "name": "Kerkrade Centrum",
+      "latitude": 50.861667633057,
+      "longitude": 6.0574998855591,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "KTR",
+      "name": "Kesteren",
+      "latitude": 51.9313869,
+      "longitude": 5.5833465,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "KBK",
+      "name": "Klarenbeek",
+      "latitude": 52.17805480957,
+      "longitude": 6.0836110115051,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "KMR",
+      "name": "Klimmen-Ransdaal",
+      "latitude": 50.866390228271,
+      "longitude": 5.8905553817749,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "KZ",
+      "name": "Koog aan de Zaan",
+      "latitude": 52.458610534668,
+      "longitude": 4.8055553436279,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "KMW",
+      "name": "Koudum-Molkwerum",
+      "latitude": 52.9028197,
+      "longitude": 5.4106913,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "KBD",
+      "name": "Krabbendijke",
+      "latitude": 51.433334350586,
+      "longitude": 4.1169443130493,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "KMA",
+      "name": "Krommenie-Assendelft",
+      "latitude": 52.49511,
+      "longitude": 4.75417,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "KW",
+      "name": "Kropswolde",
+      "latitude": 53.1617362,
+      "longitude": 6.7220882,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "KRG",
+      "name": "Kruiningen-Yerseke",
+      "latitude": 51.465000152588,
+      "longitude": 4.0372223854065,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ZLW",
+      "name": "Lage Zwaluwe",
+      "latitude": 51.69111251831,
+      "longitude": 4.6630554199219,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "LG",
+      "name": "Landgraaf",
+      "latitude": 50.896389007568,
+      "longitude": 6.019166469574,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "LLZM",
+      "name": "Lansingerland-Zoetermeer",
+      "latitude": 52.042222,
+      "longitude": 4.517222,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "LDM",
+      "name": "Leerdam",
+      "latitude": 51.894721984863,
+      "longitude": 5.0913887023926,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "LW",
+      "name": "Leeuwarden",
+      "latitude": 53.195835113525,
+      "longitude": 5.7922220230103,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "LWC",
+      "name": "Leeuwarden Camminghaburen",
+      "latitude": 53.2021808,
+      "longitude": 5.8422968,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "LEDN",
+      "name": "Leiden Centraal",
+      "latitude": 52.166110992432,
+      "longitude": 4.4816665649414,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "LDL",
+      "name": "Leiden Lammenschans",
+      "latitude": 52.146945953369,
+      "longitude": 4.4924998283386,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "LLS",
+      "name": "Lelystad Centrum",
+      "latitude": 52.507778167725,
+      "longitude": 5.4727778434753,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "LTV",
+      "name": "Lichtenvoorde-Groenlo",
+      "latitude": 52.01188,
+      "longitude": 6.59641,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "LC",
+      "name": "Lochem",
+      "latitude": 52.166667938232,
+      "longitude": 6.4263887405395,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "LP",
+      "name": "Loppersum",
+      "latitude": 53.3347145,
+      "longitude": 6.7472625,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "LTN",
+      "name": "Lunteren",
+      "latitude": 52.085277557373,
+      "longitude": 5.6244444847107,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "MZ",
+      "name": "Maarheeze",
+      "latitude": 51.304986,
+      "longitude": 5.629796,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "MRN",
+      "name": "Maarn",
+      "latitude": 52.064167022705,
+      "longitude": 5.3699998855591,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "MAS",
+      "name": "Maarssen",
+      "latitude": 52.135276794434,
+      "longitude": 5.0336112976074,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "MT",
+      "name": "Maastricht",
+      "latitude": 50.850276947021,
+      "longitude": 5.7055554389954,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "MTN",
+      "name": "Maastricht Noord",
+      "latitude": 50.87087,
+      "longitude": 5.71774,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "MTR",
+      "name": "Maastricht Randwyck",
+      "latitude": 50.838611602783,
+      "longitude": 5.7172222137451,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "MG",
+      "name": "Mantgum",
+      "latitude": 53.1296368,
+      "longitude": 5.7131996,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "MRB",
+      "name": "Mariënberg",
+      "latitude": 52.50944519043,
+      "longitude": 6.5752778053284,
+      "category": "knooppuntSneltreinstation"
+    },
+    {
+      "code": "MTH",
+      "name": "Martenshoek",
+      "latitude": 53.1607232,
+      "longitude": 6.7402989,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "MES",
+      "name": "Meerssen",
+      "latitude": 50.882879392551,
+      "longitude": 5.7509994506836,
+      "category": "sneltreinstation"
+    },
+    {
+      "code": "MP",
+      "name": "Meppel",
+      "latitude": 52.69083404541,
+      "longitude": 6.1975002288818,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "MDB",
+      "name": "Middelburg",
+      "latitude": 51.494720458984,
+      "longitude": 3.6172223091126,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "MMLH",
+      "name": "Mook-Molenhoek",
+      "latitude": 51.766262,
+      "longitude": 5.879133,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "NDB",
+      "name": "Naarden-Bussum",
+      "latitude": 52.280277252197,
+      "longitude": 5.1569442749023,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "NA",
+      "name": "Nieuw Amsterdam",
+      "latitude": 52.718612670898,
+      "longitude": 6.8486108779907,
+      "category": "sneltreinstation"
+    },
+    {
+      "code": "NVP",
+      "name": "Nieuw Vennep",
+      "latitude": 52.258888244629,
+      "longitude": 4.6455554962158,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "NWK",
+      "name": "Nieuwerkerk a/d IJssel",
+      "latitude": 51.965278625488,
+      "longitude": 4.6169443130493,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "NKK",
+      "name": "Nijkerk",
+      "latitude": 52.222221374512,
+      "longitude": 5.4938888549805,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "NM",
+      "name": "Nijmegen",
+      "latitude": 51.843612670898,
+      "longitude": 5.8522224426269,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "NMD",
+      "name": "Nijmegen Dukenburg",
+      "latitude": 51.824165344238,
+      "longitude": 5.7955555915833,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "NMGO",
+      "name": "Nijmegen Goffert",
+      "latitude": 51.8273,
+      "longitude": 5.822722,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "NMH",
+      "name": "Nijmegen Heyendaal",
+      "latitude": 51.826946258545,
+      "longitude": 5.8674998283386,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "NML",
+      "name": "Nijmegen Lent",
+      "latitude": 51.863154,
+      "longitude": 5.859625,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "NVD",
+      "name": "Nijverdal",
+      "latitude": 52.366111,
+      "longitude": 6.462,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "NS",
+      "name": "Nunspeet",
+      "latitude": 52.370834350586,
+      "longitude": 5.7852778434753,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "NH",
+      "name": "Nuth",
+      "latitude": 50.919445037842,
+      "longitude": 5.8927779197693,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "OBD",
+      "name": "Obdam",
+      "latitude": 52.67805480957,
+      "longitude": 4.9072222709656,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "OT",
+      "name": "Oisterwijk",
+      "latitude": 51.582221984863,
+      "longitude": 5.1941666603088,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ODZ",
+      "name": "Oldenzaal",
+      "latitude": 52.30638885498,
+      "longitude": 6.9347224235535,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "OST",
+      "name": "Olst",
+      "latitude": 52.334720611572,
+      "longitude": 6.1130557060242,
+      "category": "intercitystation"
+    },
+    {
+      "code": "OMN",
+      "name": "Ommen",
+      "latitude": 52.50944519043,
+      "longitude": 6.4158334732056,
+      "category": "knooppuntSneltreinstation"
+    },
+    {
+      "code": "OTB",
+      "name": "Oosterbeek",
+      "latitude": 51.994998931885,
+      "longitude": 5.8400001525879,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "OP",
+      "name": "Opheusden",
+      "latitude": 51.9261615,
+      "longitude": 5.6371145,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "O",
+      "name": "Oss",
+      "latitude": 51.765556335449,
+      "longitude": 5.5322222709656,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "OW",
+      "name": "Oss West",
+      "latitude": 51.758056640625,
+      "longitude": 5.5055556297302,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ODB",
+      "name": "Oudenbosch",
+      "latitude": 51.587776184082,
+      "longitude": 4.5333333015442,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "OVN",
+      "name": "Overveen",
+      "latitude": 52.391109466553,
+      "longitude": 4.6061110496521,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "PMR",
+      "name": "Purmerend",
+      "latitude": 52.50305557251,
+      "longitude": 4.9536108970642,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "PMO",
+      "name": "Purmerend Overwhere",
+      "latitude": 52.511390686035,
+      "longitude": 4.9683332443237,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "PMW",
+      "name": "Purmerend Weidevenne",
+      "latitude": 52.496590632542,
+      "longitude": 4.9356293678284,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "PT",
+      "name": "Putten",
+      "latitude": 52.264999389648,
+      "longitude": 5.5752778053284,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RAT",
+      "name": "Raalte",
+      "latitude": 52.391666412354,
+      "longitude": 6.2775001525879,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RVS",
+      "name": "Ravenstein",
+      "latitude": 51.794166564941,
+      "longitude": 5.6358332633972,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RV",
+      "name": "Reuver",
+      "latitude": 51.28321916653,
+      "longitude": 6.0789585113525,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RH",
+      "name": "Rheden",
+      "latitude": 52.0101,
+      "longitude": 6.0314,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RHN",
+      "name": "Rhenen",
+      "latitude": 51.958610534668,
+      "longitude": 5.5783333778381,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "RSN",
+      "name": "Rijssen",
+      "latitude": 52.3122215271,
+      "longitude": 6.5202779769897,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RSW",
+      "name": "Rijswijk",
+      "latitude": 52.039722442627,
+      "longitude": 4.3191666603088,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RB",
+      "name": "Rilland-Bath",
+      "latitude": 51.422779083252,
+      "longitude": 4.1611108779907,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RM",
+      "name": "Roermond",
+      "latitude": 51.193054199219,
+      "longitude": 5.9941668510437,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "RD",
+      "name": "Roodeschool",
+      "latitude": 53.421262,
+      "longitude": 6.7587,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RSD",
+      "name": "Roosendaal",
+      "latitude": 51.540279388428,
+      "longitude": 4.4583334922791,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "RS",
+      "name": "Rosmalen",
+      "latitude": 51.714721679688,
+      "longitude": 5.3680553436279,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RTA",
+      "name": "Rotterdam Alexander",
+      "latitude": 51.951946258545,
+      "longitude": 4.5536112785339,
+      "category": "intercitystation"
+    },
+    {
+      "code": "RTB",
+      "name": "Rotterdam Blaak",
+      "latitude": 51.920276641846,
+      "longitude": 4.4888887405395,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RTD",
+      "name": "Rotterdam Centraal",
+      "latitude": 51.92499923706,
+      "longitude": 4.468888759613,
+      "category": "megastation"
+    },
+    {
+      "code": "RLB",
+      "name": "Rotterdam Lombardijen",
+      "latitude": 51.880001068115,
+      "longitude": 4.531388759613,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RTN",
+      "name": "Rotterdam Noord",
+      "latitude": 51.942222595215,
+      "longitude": 4.4816665649414,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RTST",
+      "name": "Rotterdam Stadion",
+      "latitude": 51.893890380859,
+      "longitude": 4.5197219848633,
+      "category": "facultatiefStation"
+    },
+    {
+      "code": "RTZ",
+      "name": "Rotterdam Zuid",
+      "latitude": 51.904445648193,
+      "longitude": 4.5102777481079,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "RL",
+      "name": "Ruurlo",
+      "latitude": 52.0810888,
+      "longitude": 6.4492656,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SPTN",
+      "name": "Santpoort Noord",
+      "latitude": 52.43388748169,
+      "longitude": 4.6325001716614,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SPTZ",
+      "name": "Santpoort Zuid",
+      "latitude": 52.419723510742,
+      "longitude": 4.6313886642456,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SSH",
+      "name": "Sassenheim",
+      "latitude": 52.215278,
+      "longitude": 4.517222,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SWD",
+      "name": "Sauwerd",
+      "latitude": 53.29113,
+      "longitude": 6.5404,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SGN",
+      "name": "Schagen",
+      "latitude": 52.784442901611,
+      "longitude": 4.8052778244019,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SDA",
+      "name": "Scheemda",
+      "latitude": 53.1655362,
+      "longitude": 6.9777775,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SDM",
+      "name": "Schiedam Centrum",
+      "latitude": 51.921243812803,
+      "longitude": 4.4089937210083,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SOG",
+      "name": "Schin op Geul",
+      "latitude": 50.856388092041,
+      "longitude": 5.8722224235535,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SN",
+      "name": "Schinnen",
+      "latitude": 50.939167022705,
+      "longitude": 5.8744444847107,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SHL",
+      "name": "Schiphol Airport",
+      "latitude": 52.30944442749,
+      "longitude": 4.7619442939758,
+      "category": "megastation"
+    },
+    {
+      "code": "STD",
+      "name": "Sittard",
+      "latitude": 51.001667022705,
+      "longitude": 5.8586111068726,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "SDT",
+      "name": "Sliedrecht",
+      "latitude": 51.829723358154,
+      "longitude": 4.7783331871033,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SDTB",
+      "name": "Sliedrecht Baanhoek",
+      "latitude": 51.829722,
+      "longitude": 4.743333,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SK",
+      "name": "Sneek",
+      "latitude": 53.0328688,
+      "longitude": 5.6523969,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "SKND",
+      "name": "Sneek Noord",
+      "latitude": 53.0409319,
+      "longitude": 5.6631808,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ST",
+      "name": "Soest",
+      "latitude": 52.173332214355,
+      "longitude": 5.3099999427795,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "STZ",
+      "name": "Soest Zuid",
+      "latitude": 52.165279388428,
+      "longitude": 5.3030557632446,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SD",
+      "name": "Soestdijk",
+      "latitude": 52.183612823486,
+      "longitude": 5.3000001907349,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SBK",
+      "name": "Spaubeek",
+      "latitude": 50.94327,
+      "longitude": 5.850529,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "STV",
+      "name": "Stavoren",
+      "latitude": 52.8865535,
+      "longitude": 5.3600212,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "STM",
+      "name": "Stedum",
+      "latitude": 53.3262092,
+      "longitude": 6.6875551,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SWK",
+      "name": "Steenwijk",
+      "latitude": 52.791510992432,
+      "longitude": 6.1145557632446,
+      "category": "intercitystation"
+    },
+    {
+      "code": "SRN",
+      "name": "Susteren",
+      "latitude": 51.061389923096,
+      "longitude": 5.8630557060242,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "SM",
+      "name": "Swalmen",
+      "latitude": 51.23582,
+      "longitude": 6.03228,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "TG",
+      "name": "Tegelen",
+      "latitude": 51.33894,
+      "longitude": 6.14253,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "TBG",
+      "name": "Terborg",
+      "latitude": 51.9224549,
+      "longitude": 6.3642466,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "TL",
+      "name": "Tiel",
+      "latitude": 51.889446258545,
+      "longitude": 5.4222221374512,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "TPSW",
+      "name": "Tiel Passewaaij",
+      "latitude": 51.873889923096,
+      "longitude": 5.39222240448,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "TB",
+      "name": "Tilburg",
+      "latitude": 51.560554504395,
+      "longitude": 5.0836110115051,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "TBR",
+      "name": "Tilburg Reeshof",
+      "latitude": 51.573612213135,
+      "longitude": 4.9944443702698,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "TBU",
+      "name": "Tilburg Universiteit",
+      "latitude": 51.564985,
+      "longitude": 5.051778,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "TWL",
+      "name": "Twello",
+      "latitude": 52.237777709961,
+      "longitude": 6.0986108779907,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "UTG",
+      "name": "Uitgeest",
+      "latitude": 52.521667480469,
+      "longitude": 4.7016668319702,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "UHZ",
+      "name": "Uithuizen",
+      "latitude": 53.4099568,
+      "longitude": 6.6748869,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "UHM",
+      "name": "Uithuizermeeden",
+      "latitude": 53.4145845,
+      "longitude": 6.7202975,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "UST",
+      "name": "Usquert",
+      "latitude": 53.4014742,
+      "longitude": 6.6093776,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "UT",
+      "name": "Utrecht Centraal",
+      "latitude": 52.088890075684,
+      "longitude": 5.1102776527405,
+      "category": "megastation"
+    },
+    {
+      "code": "UTLR",
+      "name": "Utrecht Leidsche Rijn",
+      "latitude": 52.09896,
+      "longitude": 5.06523,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "UTLN",
+      "name": "Utrecht Lunetten",
+      "latitude": 52.06555557251,
+      "longitude": 5.144166469574,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "UTM",
+      "name": "Utrecht Maliebaan",
+      "latitude": 52.087776184082,
+      "longitude": 5.1313886642456,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "UTO",
+      "name": "Utrecht Overvecht",
+      "latitude": 52.110000610352,
+      "longitude": 5.1247220039368,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "UTT",
+      "name": "Utrecht Terwijde",
+      "latitude": 52.1000753,
+      "longitude": 5.0439547,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "UTVR",
+      "name": "Utrecht Vaartsche Rijn",
+      "latitude": 52.078889,
+      "longitude": 5.121667,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "UTZL",
+      "name": "Utrecht Zuilen",
+      "latitude": 52.103055,
+      "longitude": 5.09,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VK",
+      "name": "Valkenburg",
+      "latitude": 50.869720458984,
+      "longitude": 5.8322219848633,
+      "category": "knooppuntSneltreinstation"
+    },
+    {
+      "code": "VSV",
+      "name": "Varsseveld",
+      "latitude": 51.937257,
+      "longitude": 6.458839,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VDM",
+      "name": "Veendam",
+      "latitude": 53.10324,
+      "longitude": 6.88475,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "VNDC",
+      "name": "Veenendaal Centrum",
+      "latitude": 52.020000457764,
+      "longitude": 5.548611164093,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "VNDW",
+      "name": "Veenendaal West",
+      "latitude": 52.028057098389,
+      "longitude": 5.531388759613,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "KLP",
+      "name": "Veenendaal-De Klomp",
+      "latitude": 52.045833587646,
+      "longitude": 5.5738887786865,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VP",
+      "name": "Velp",
+      "latitude": 51.994720458984,
+      "longitude": 5.9802780151367,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VL",
+      "name": "Venlo",
+      "latitude": 51.363609313965,
+      "longitude": 6.1727776527405,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "VRY",
+      "name": "Venray",
+      "latitude": 51.526568099007,
+      "longitude": 6.0141777992248,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "VLB",
+      "name": "Vierlingsbeek",
+      "latitude": 51.59193,
+      "longitude": 5.99714,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VTN",
+      "name": "Vleuten",
+      "latitude": 52.103056,
+      "longitude": 5.007404,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VS",
+      "name": "Vlissingen",
+      "latitude": 51.445835113525,
+      "longitude": 3.5952777862549,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "VSS",
+      "name": "Vlissingen Souburg",
+      "latitude": 51.464721679688,
+      "longitude": 3.5952777862549,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VDL",
+      "name": "Voerendaal",
+      "latitude": 50.887222290039,
+      "longitude": 5.9302778244019,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VB",
+      "name": "Voorburg",
+      "latitude": 52.066665649414,
+      "longitude": 4.3594446182251,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VH",
+      "name": "Voorhout",
+      "latitude": 52.224445343018,
+      "longitude": 4.4844446182251,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VST",
+      "name": "Voorschoten",
+      "latitude": 52.1252784729,
+      "longitude": 4.4324998855591,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VEM",
+      "name": "Voorst-Empe",
+      "latitude": 52.157501220703,
+      "longitude": 6.1436109542847,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VD",
+      "name": "Vorden",
+      "latitude": 52.1071949,
+      "longitude": 6.3170457,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VZ",
+      "name": "Vriezenveen",
+      "latitude": 52.40203,
+      "longitude": 6.60041,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VHP",
+      "name": "Vroomshoop",
+      "latitude": 52.4571921,
+      "longitude": 6.5696679,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "VG",
+      "name": "Vught",
+      "latitude": 51.655555725098,
+      "longitude": 5.2919445037842,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WAD",
+      "name": "Waddinxveen",
+      "latitude": 52.044166564941,
+      "longitude": 4.6497220993042,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WADN",
+      "name": "Waddinxveen Noord",
+      "latitude": 52.055000305176,
+      "longitude": 4.6483335494995,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WADT",
+      "name": "Waddinxveen Triangel",
+      "latitude": 52.02725,
+      "longitude": 4.6491,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WFM",
+      "name": "Warffum",
+      "latitude": 53.3908431,
+      "longitude": 6.5671364,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WT",
+      "name": "Weert",
+      "latitude": 51.248611450195,
+      "longitude": 5.7036108970642,
+      "category": "intercitystation"
+    },
+    {
+      "code": "WP",
+      "name": "Weesp",
+      "latitude": 52.3127784729,
+      "longitude": 5.0430555343628,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "WL",
+      "name": "Wehl",
+      "latitude": 51.9578065,
+      "longitude": 6.213844,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WTV",
+      "name": "Westervoort",
+      "latitude": 51.96286,
+      "longitude": 5.9695,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WZ",
+      "name": "Wezep",
+      "latitude": 52.454166412354,
+      "longitude": 6.0025000572205,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WDN",
+      "name": "Wierden",
+      "latitude": 52.361389160156,
+      "longitude": 6.5916666984558,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "WC",
+      "name": "Wijchen",
+      "latitude": 51.811668395996,
+      "longitude": 5.730833530426,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WH",
+      "name": "Wijhe",
+      "latitude": 52.390277862549,
+      "longitude": 6.1405553817749,
+      "category": "intercitystation"
+    },
+    {
+      "code": "WS",
+      "name": "Winschoten",
+      "latitude": 53.1392377,
+      "longitude": 7.035101,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "WSM",
+      "name": "Winsum",
+      "latitude": 53.3300994,
+      "longitude": 6.5202905,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WW",
+      "name": "Winterswijk",
+      "latitude": 51.9677307,
+      "longitude": 6.7155181,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "WWW",
+      "name": "Winterswijk West",
+      "latitude": 51.97453,
+      "longitude": 6.70417,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WD",
+      "name": "Woerden",
+      "latitude": 52.084999084473,
+      "longitude": 4.8936109542847,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "WF",
+      "name": "Wolfheze",
+      "latitude": 52.005554199219,
+      "longitude": 5.7936110496521,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WV",
+      "name": "Wolvega",
+      "latitude": 52.880832672119,
+      "longitude": 6.0036110877991,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WK",
+      "name": "Workum",
+      "latitude": 52.9724864,
+      "longitude": 5.4564285,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "WM",
+      "name": "Wormerveer",
+      "latitude": 52.489166259766,
+      "longitude": 4.7922220230103,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ZD",
+      "name": "Zaandam",
+      "latitude": 52.438888549805,
+      "longitude": 4.8136110305786,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "ZDK",
+      "name": "Zaandam Kogerveld",
+      "latitude": 52.456665039062,
+      "longitude": 4.8202776908875,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ZZS",
+      "name": "Zaandijk Zaanse Schans",
+      "latitude": 52.469165802002,
+      "longitude": 4.8049998283386,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "ZBM",
+      "name": "Zaltbommel",
+      "latitude": 51.80888748169,
+      "longitude": 5.2633333206177,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ZVT",
+      "name": "Zandvoort aan Zee",
+      "latitude": 52.3752784729,
+      "longitude": 4.5327777862549,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ZA",
+      "name": "Zetten-Andelst",
+      "latitude": 51.920056,
+      "longitude": 5.7228408,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ZV",
+      "name": "Zevenaar",
+      "latitude": 51.923053741455,
+      "longitude": 6.0719442367554,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "ZVB",
+      "name": "Zevenbergen",
+      "latitude": 51.64042,
+      "longitude": 4.60904,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ZTM",
+      "name": "Zoetermeer",
+      "latitude": 52.047500610352,
+      "longitude": 4.4772224426269,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "ZTMO",
+      "name": "Zoetermeer Oost",
+      "latitude": 52.046390533447,
+      "longitude": 4.4927778244019,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ZB",
+      "name": "Zuidbroek",
+      "latitude": 53.159612280006,
+      "longitude": 6.8679141998291,
+      "category": "knooppuntStoptreinstation"
+    },
+    {
+      "code": "ZH",
+      "name": "Zuidhorn",
+      "latitude": 53.2486292,
+      "longitude": 6.4062361,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ZP",
+      "name": "Zutphen",
+      "latitude": 52.145278930664,
+      "longitude": 6.1941666603088,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "ZWD",
+      "name": "Zwijndrecht",
+      "latitude": 51.814998626709,
+      "longitude": 4.6416668891907,
+      "category": "stoptreinstation"
+    },
+    {
+      "code": "ZL",
+      "name": "Zwolle",
+      "latitude": 52.504722595215,
+      "longitude": 6.0919442176819,
+      "category": "knooppuntIntercitystation"
+    },
+    {
+      "code": "ZLSH",
+      "name": "Zwolle Stadshagen",
+      "latitude": 52.52764,
+      "longitude": 6.05146,
+      "category": "stoptreinstation"
+    }
+  ]
+}

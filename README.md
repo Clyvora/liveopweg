@@ -2,6 +2,18 @@
 
 Liveopweg maakt Nederlandse mobiliteitsdata realtime zichtbaar met een expliciet onderscheid tussen bronfeit, afleiding en onbekende informatie.
 
+## Stationweergave
+
+De huidige interface is een fullscreen kaart met compacte trein- en stationpanelen. Klik op een blauw omrand stationspunt of zoek op stationsnaam/code. Grote stations verschijnen op landelijk zoomniveau; lokale stations vanaf zoom 10. De oude 3D- en replayonderdelen staan niet meer in deze interface.
+
+Het stationbord wisselt tussen aankomst en vertrek en ververst elke 15 seconden zolang het paneel open is. `GET /v1/stations/{code}/board` geeft ontvangen ritten voor de komende 60 minuten, geordend op actuele tijd (of geplande tijd wanneer onbekend). Verlopen ritproducten en doorrijdende treinen zonder stop worden uitgesloten. Een vervallen geplande stop blijft als ‘Vervalt’ zichtbaar. Onbekende vertraging wordt nooit als ‘Op tijd’ gepresenteerd.
+
+Het bord is **geen volledige dienstregeling**: alleen de ontvangen NDOV InfoPlus-ritberichten zijn beschikbaar. Lege, verouderde en niet-bereikbare borden hebben verschillende meldingen. Doorklikken naar een trein vereist hetzelfde treinnummer én Nederlandse dienstdatum en een GPS-bronpositie van maximaal twee minuten oud; anders is de rij niet interactief.
+
+De gebundelde 397 stations komen uit [Rijden de Treinen / NS](https://www.rijdendetreinen.nl/open-data/stations), CC0, de gepubliceerde Nederlandse stationslijst van september 2023. Bron, downloadadres en versie staan in `packages/domain-rail/stations.json`; nieuwere stations of naamswijzigingen vereisen een catalogusupdate. Er worden geen perrons of voorzieningen verondersteld op basis van deze puntlocaties.
+
+## Eerdere bouwfases
+
 Fase 11 voegt het productierijpe fundament toe: echte PostGIS-historie, persistence-health, Prometheus-metrics, een beveiligde reverse-proxyroute, productiecontainers en continue kwaliteitscontrole. De file-backed ontwikkelmodus blijft beschikbaar.
 
 Fase 10 voegt deterministische treinreplay en herbruikbare 3D-stations toe. Historische GPS-punten worden opnieuw uit de exact opgeslagen NDOV-payloads opgebouwd; spoorposities worden zichtbaar opnieuw berekend met de vastgepinde graph. De 3D-keten werkt nu voor Utrecht, Amsterdam en Rotterdam Centraal.

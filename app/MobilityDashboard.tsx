@@ -28,6 +28,8 @@ import {
   type RoadEvent,
 } from "../packages/protocol/road";
 import { realtimeHttpUrl, realtimeWebSocketUrl } from "./realtime-url";
+import { railStations, searchStations, stationMinZoom, stationsByCode, type RailStation } from "../packages/domain-rail/stations";
+import { StationPanel } from "./StationPanel";
 
 type ConnectionState = "verbinden" | "live" | "herstellen" | "offline";
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
@@ -403,6 +405,9 @@ export function MobilityDashboard() {
   const trackGeometryRequestsRef = useRef(new Set<string>());
   const selectedVehicleIdRef = useRef<string | null>(null);
   const selectRoadFromMapRef = useRef<(eventId: string) => void>(() => undefined);
+  const selectStationFromMapRef = useRef<(stationCode: string) => void>(() => undefined);
+  const [selectedStation, setSelectedStation] = useState<RailStation | null>(null);
+  const selectedStationRef = useRef<RailStation | null>(null);
   const [vehiclesById, setVehiclesById] = useState<Record<string, RailObservation>>({});
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [observation, setObservation] = useState<RailObservation | null>(null);
@@ -509,6 +514,8 @@ export function MobilityDashboard() {
     () => identifyRollingStock(observation?.materialNumber),
     [observation?.materialNumber],
   );
+  const stationResults = useMemo(() => searchStations(query), [query]);
+  const availableVehicleIds = useMemo(() => new Set(vehicles.map((vehicle) => vehicle.vehicleId)), [vehicles]);
   const roadEvents = useMemo(() => Object.values(roadEventsById), [roadEventsById]);
   const selectedRoadEvent = selectedRoadEventId ? roadEventsById[selectedRoadEventId] ?? null : null;
   const roadCounts = useMemo(() => Object.fromEntries(roadLayerDefinitions.map(({ key }) => [
@@ -518,12 +525,13 @@ export function MobilityDashboard() {
   const selectVehicle = useCallback((vehicleId: string, focusMap = true) => {
     const selected = vehiclesById[vehicleId];
     if (!selected) return;
+    setSelectedStation(null);
     setSelectedVehicleId(vehicleId);
     selectedVehicleIdRef.current = vehicleId;
     setObservation(selected);
     setJourney(null);
     setQuery("");
-    socketRef.current?.send(JSON.stringify({ protocolVersion: 2, type: "select", vehicleId }));
+    if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ protocolVersion: 2, type: "select", vehicleId }));
     if (focusMap && map.current) {
       map.current.easeTo({
         center: [selected.position.longitude, selected.position.latitude],
@@ -537,12 +545,47 @@ export function MobilityDashboard() {
   }, [vehiclesById]);
 
   const clearVehicleSelection = useCallback(() => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ protocolVersion: 2, type: "deselect" }));
     setSelectedVehicleId(null);
     selectedVehicleIdRef.current = null;
     setObservation(null);
     setJourney(null);
     setQuery("");
   }, []);
+
+  const selectStation = useCallback((station: RailStation) => {
+    clearVehicleSelection();
+    setSelectedStation(station);
+    setShowLayers(false);
+    map.current?.easeTo({
+      center: [station.longitude, station.latitude],
+      zoom: Math.max(map.current.getZoom(), 11),
+      offset: window.innerWidth <= 760 ? [0, -Math.min(140, window.innerHeight * 0.2)] : [-195, 0],
+      duration: 700,
+    });
+  }, [clearVehicleSelection]);
+
+  useEffect(() => {
+    selectStationFromMapRef.current = (code) => {
+      const station = stationsByCode.get(code);
+      if (station) selectStation(station);
+    };
+  }, [selectStation]);
+
+  useEffect(() => {
+    selectedStationRef.current = selectedStation;
+  }, [selectedStation]);
+
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setSelectedStation(null);
+      setShowLayers(false);
+      clearVehicleSelection();
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [clearVehicleSelection]);
 
   useEffect(() => {
     selectFromMapRef.current = (vehicleId) => selectVehicle(vehicleId);
@@ -562,7 +605,7 @@ export function MobilityDashboard() {
 
   useEffect(() => {
     let disposed = false;
-    void import("maplibre-gl").then(({ Map }) => {
+    void import("maplibre-gl").then(({ Map, Popup }) => {
       if (disposed || !mapElement.current || map.current) return;
       const instance = new Map({
         container: mapElement.current,
@@ -589,6 +632,28 @@ export function MobilityDashboard() {
       map.current = instance;
       instance.on("load", () => {
         if (disposed) return;
+        const stationPopup = new Popup({ closeButton: false, closeOnClick: true, offset: 12, className: "stationTooltip" });
+        const stationAtPoint = (point: { x: number; y: number }) => {
+          let nearest: { station: RailStation; distance: number } | null = null;
+          for (const station of railStations) {
+            if (instance.getZoom() < stationMinZoom(station)) continue;
+            const projected = instance.project([station.longitude, station.latitude]);
+            const distance = Math.hypot(projected.x - point.x, projected.y - point.y);
+            if (distance <= 12 && (!nearest || distance < nearest.distance)) nearest = { station, distance };
+          }
+          return nearest?.station;
+        };
+        let hoveredStationCode: string | null = null;
+        instance.on("mousemove", (event) => {
+          const station = stationAtPoint(event.point);
+          if ((station?.code ?? null) === hoveredStationCode) return;
+          hoveredStationCode = station?.code ?? null;
+          if (station) {
+            instance.getCanvas().style.cursor = "pointer";
+            stationPopup.setLngLat([station.longitude, station.latitude]).setText(station.name).addTo(instance);
+          } else { instance.getCanvas().style.cursor = ""; stationPopup.remove(); }
+        });
+        instance.getCanvas().addEventListener("mouseleave", () => { hoveredStationCode = null; stationPopup.remove(); });
         instance.addSource("rail-fleet", {
           type: "geojson",
           data: { type: "FeatureCollection", features: [] },
@@ -811,7 +876,9 @@ export function MobilityDashboard() {
             const distance = Math.hypot(projected.x - event.point.x, projected.y - event.point.y);
             if (distance <= 18 && (!nearest || distance < nearest.distance)) nearest = { vehicleId, distance };
           }
-          if (nearest) selectFromMapRef.current(nearest.vehicleId);
+          if (nearest) { selectFromMapRef.current(nearest.vehicleId); return; }
+          const stationHit = stationAtPoint(event.point);
+          if (stationHit) { stationPopup.remove(); selectStationFromMapRef.current(stationHit.code); }
         });
         setMapReady(true);
       });
@@ -858,6 +925,30 @@ export function MobilityDashboard() {
             context.clearRect(0, 0, width, height);
             const zoom = instance.getZoom();
             const markerScale = zoom < 7 ? 0.48 : zoom < 8.5 ? 0.68 : zoom < 10.5 ? 0.86 : 1;
+            // Stationpunten gebruiken dezelfde lichte canvaslaag als de treinen.
+            // Tekenen vóór de treinen houdt de vloot zichtbaar en aanklikbaar.
+            context.save();
+            for (const station of railStations) {
+              if (zoom < stationMinZoom(station)) continue;
+              const point = instance.project([station.longitude, station.latitude]);
+              if (point.x < -15 || point.x > width + 15 || point.y < -15 || point.y > height + 15) continue;
+              const active = station.code === selectedStationRef.current?.code;
+              if (active) {
+                context.beginPath(); context.arc(point.x, point.y, 12, 0, Math.PI * 2);
+                context.fillStyle = "rgba(40,119,212,.2)"; context.fill();
+                context.strokeStyle = "#2877d4"; context.lineWidth = 2; context.stroke();
+              }
+              context.beginPath(); context.arc(point.x, point.y, zoom < 8 ? 4 : 5, 0, Math.PI * 2);
+              context.fillStyle = "#ffffff"; context.fill();
+              context.strokeStyle = "#2877d4"; context.lineWidth = 2; context.stroke();
+              if (active) {
+                context.font = "bold 11px Arial"; context.textAlign = "left"; context.textBaseline = "middle";
+                context.strokeStyle = "#ffffff"; context.lineWidth = 4;
+                context.strokeText(station.name, point.x + 17, point.y - 12);
+                context.fillStyle = "#1c5c9e"; context.fillText(station.name, point.x + 17, point.y - 12);
+              }
+            }
+            context.restore();
             for (const [vehicleId, sample] of motionSamplesRef.current) {
               const motion = renderMotion(sample, nowMs, renderDelayMs);
               const position = trackMotionPosition(
@@ -1104,6 +1195,7 @@ export function MobilityDashboard() {
         }
         const selection = railSelectionSnapshotMessageSchema.safeParse(decoded);
         if (selection.success) {
+          if (selection.data.vehicleId !== selectedVehicleIdRef.current) return;
           setSelectedVehicleId(selection.data.vehicleId);
           selectedVehicleIdRef.current = selection.data.vehicleId;
           setObservation(selection.data.data);
@@ -1111,6 +1203,7 @@ export function MobilityDashboard() {
         }
         const journeySnapshot = journeySnapshotMessageSchema.safeParse(decoded);
         if (journeySnapshot.success) {
+          if (!selectedVehicleIdRef.current) return;
           setJourney(journeySnapshot.data.data);
           return;
         }
@@ -1258,10 +1351,15 @@ export function MobilityDashboard() {
       <section className="fleetTools" aria-label="Treinselectie">
         <div><strong>{vehicles.length}</strong><span>treinen live</span></div>
         <label>
-          <span>Zoek treinnummer of materieel</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek trein of materieel" />
+          <span>Zoek trein, station of materieel</span>
+          <input aria-label="Zoek trein, station of materieel" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek trein of station" />
         </label>
         {query.trim() && <div className="trainResults">
+          {stationResults.length > 0 && <p className="searchGroupLabel">Stations</p>}
+          {stationResults.map((station) => <button type="button" className="stationSearchResult" key={station.code} onClick={() => selectStation(station)}>
+            <strong>{station.name}</strong><span>Station · {station.code}</span>
+          </button>)}
+          {searchResults.length > 0 && <p className="searchGroupLabel">Treinen</p>}
           {searchResults.map((vehicle) => {
             const rollingStock = identifyRollingStock(vehicle.materialNumber);
             return (
@@ -1276,6 +1374,7 @@ export function MobilityDashboard() {
               </button>
             );
           })}
+          {!stationResults.length && !searchResults.length && <p className="searchGroupLabel">Geen trein of station gevonden.</p>}
         </div>}
       </section>
 
@@ -1293,7 +1392,8 @@ export function MobilityDashboard() {
           </div>
           <div className="mapAttribution">© OpenStreetMap-bijdragers · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
         </div>
-        {observation && <aside className="observationPanel" aria-live="polite">
+        {selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} onClose={() => setSelectedStation(null)} onSelectVehicle={selectVehicle} />}
+        {observation && !selectedStation && <aside className="observationPanel" aria-live="polite">
           <div className="selectedTrainHeader">
             <div className="selectedTrainIdentity">
               <p className="selectedTrainEyebrow"><i className={computedState === "FRESH_SOURCE" ? "fresh" : "stale"} /> Trein {observation.trainNumber} · {computedState === "FRESH_SOURCE" ? "live" : "verouderd"}</p>

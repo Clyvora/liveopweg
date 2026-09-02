@@ -17,6 +17,8 @@ import {
 import { decodeJourney } from "../journey-ingestion/decode.js";
 import { JourneyLiveState, localServiceDate } from "../journey-ingestion/live-state.js";
 import { nsApiStatus } from "../journey-ingestion/ns-api.js";
+import { buildStationBoard } from "../journey-ingestion/station-board.js";
+import { stationsByCode } from "../../packages/domain-rail/stations.js";
 import { RawJourneyStore } from "../journey-ingestion/raw-store.js";
 import { RedisJourneyLiveState } from "../journey-ingestion/redis-live-state.js";
 import { decodeRoadPublication } from "../road-ingestion/decode.js";
@@ -324,6 +326,14 @@ const server = createServer((request, response) => {
   if (path === "/v1/snapshot") return writeJson(response, 200, snapshot());
   if (path === "/v1/fleet") return writeJson(response, 200, fleetSnapshot());
   if (path === "/v1/journey") return writeJson(response, 200, journeySnapshot());
+  const boardMatch = path.match(/^\/v1\/stations\/([a-zA-Z0-9]{1,8})\/board$/);
+  if (boardMatch) {
+    const code = boardMatch[1].toUpperCase();
+    if (!stationsByCode.has(code)) return writeJson(response, 404, { error: "station_not_found" });
+    return writeJson(response, 200, buildStationBoard(code, journeyState.forStation(code), fleetState.snapshot(), new Date(), {
+      healthy: journeySourceHealth === "HEALTHY", lastReceivedAt: lastJourneyEnvelopeReceivedAt,
+    }));
+  }
   if (path === "/v1/road/events") return writeJson(response, 200, roadSnapshot());
   if (path === "/v1/replay/catalog") {
     void replayArchive.catalog()
@@ -478,6 +488,11 @@ sockets.on("connection", (socket) => {
       send(socket, fleetSnapshot());
       send(socket, matchSnapshot());
       send(socket, roadSnapshot());
+      sendSelectedContext(socket);
+      return;
+    }
+    if (parsed.data.type === "deselect") {
+      clientSelections.set(socket, null);
       sendSelectedContext(socket);
       return;
     }

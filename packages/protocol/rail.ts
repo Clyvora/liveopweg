@@ -96,6 +96,7 @@ export const railSelectionSnapshotMessageSchema = z.object({
 
 export const railClientMessageSchema = z.discriminatedUnion("type", [
   z.object({ protocolVersion: z.literal(2), type: z.literal("resync") }),
+  z.object({ protocolVersion: z.literal(2), type: z.literal("deselect") }),
   z.object({ protocolVersion: z.literal(2), type: z.literal("select"), vehicleId: z.string().min(1) }),
 ]);
 

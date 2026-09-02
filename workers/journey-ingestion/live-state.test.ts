@@ -25,4 +25,23 @@ describe("JourneyLiveState", () => {
   it("bepaalt de Nederlandse dienstdatum rond UTC-middernacht", () => {
     expect(localServiceDate("2026-08-20T22:30:00Z")).toBe("2026-08-21");
   });
+
+  it("indexeert stations, vervangt een gewijzigde route en herstelt de index", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mobilityradar-station-index-"));
+    directories.push(directory);
+    const state = new JourneyLiveState(directory);
+    const first = decodeJourney(journeyPayload(), { receivedAt: "2026-08-20T18:51:00Z" });
+    await state.apply(first);
+    expect(state.forStation("gda")).toHaveLength(1);
+    expect(state.forStation("RTD")).toHaveLength(1);
+    const updated = decodeJourney(journeyPayload("2026-08-20T18:55:00Z"), { receivedAt: "2026-08-20T18:55:01Z" });
+    updated.stops = [updated.stops[1]];
+    await state.apply(updated);
+    expect(state.forStation("GDA")).toEqual([]);
+    expect(state.forStation("RTD")).toHaveLength(1);
+    const restored = new JourneyLiveState(directory);
+    await restored.restore();
+    expect(restored.forStation("RTD")).toHaveLength(1);
+    expect(restored.forStation("GDA")).toEqual([]);
+  });
 });

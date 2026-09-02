@@ -28,7 +28,8 @@ test("server-renders uitsluitend de fullscreen livekaart met contextuele lagen",
   assert.match(html, /Kies een melding op de kaart/);
   assert.match(html, /Kaartbediening/);
   assert.match(html, /Sluit kaartlagen/);
-  assert.match(html, /Zoek treinnummer of materieel/);
+  assert.match(html, /Zoek trein, station of materieel/);
+  assert.match(html, /aria-label="Zoek trein, station of materieel"/);
   assert.doesNotMatch(html, /Open 3D-station/);
   assert.doesNotMatch(html, /Stations in meters/);
   assert.doesNotMatch(html, /REPLAY/);
