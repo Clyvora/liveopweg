@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
+import type { GeoJSONSource, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 import {
   DEFAULT_RENDER_DELAY_MS,
   renderMotion,
@@ -44,6 +44,55 @@ const configuredRenderDelayMs = Number(process.env.NEXT_PUBLIC_RENDER_DELAY_MS ?
 const renderDelayMs = Number.isFinite(configuredRenderDelayMs) && configuredRenderDelayMs >= 0 && configuredRenderDelayMs <= 30_000
   ? configuredRenderDelayMs
   : DEFAULT_RENDER_DELAY_MS;
+
+const fallbackMapStyle: StyleSpecification = {
+  version: 8,
+  sources: {
+    osm: {
+      type: "raster",
+      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      tileSize: 256,
+      attribution: "© OpenStreetMap-bijdragers",
+    },
+  },
+  layers: [{ id: "osm", type: "raster", source: "osm", paint: { "raster-saturation": -0.72, "raster-contrast": 0.12 } }],
+};
+
+async function loadPublicMapStyle(): Promise<StyleSpecification> {
+  const abortController = new AbortController();
+  const timeout = window.setTimeout(() => abortController.abort(), 6_000);
+  try {
+    const [styleResponse, tileJsonResponse] = await Promise.all([
+      fetch("https://tiles.openfreemap.org/styles/positron", { signal: abortController.signal }),
+      fetch("https://tiles.openfreemap.org/planet", { signal: abortController.signal }),
+    ]);
+    if (!styleResponse.ok || !tileJsonResponse.ok) throw new Error("OpenFreeMap is niet bereikbaar");
+
+    const style = await styleResponse.json() as StyleSpecification;
+    const tileJson = await tileJsonResponse.json() as {
+      tiles?: string[];
+      minzoom?: number;
+      maxzoom?: number;
+      bounds?: [number, number, number, number];
+      attribution?: string;
+    };
+    if (!tileJson.tiles?.length) throw new Error("OpenFreeMap heeft geen tegels teruggegeven");
+
+    style.sources.openmaptiles = {
+      type: "vector",
+      tiles: tileJson.tiles,
+      minzoom: tileJson.minzoom,
+      maxzoom: tileJson.maxzoom,
+      bounds: tileJson.bounds,
+      attribution: tileJson.attribution,
+    };
+    return style;
+  } catch {
+    return fallbackMapStyle;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
 
 const roadLayerDefinitions: { key: RoadLayerKey; label: string; color: string }[] = [
   { key: "congestion", label: "Files", color: "#c94f3d" },
@@ -651,7 +700,7 @@ export function MobilityDashboard() {
 
   useEffect(() => {
     let disposed = false;
-    void import("maplibre-gl").then(({ Map, Popup }) => {
+    void Promise.all([import("maplibre-gl"), loadPublicMapStyle()]).then(([{ Map, Popup }, mapStyle]) => {
       if (disposed || !mapElement.current || map.current) return;
       const instance = new Map({
         container: mapElement.current,
@@ -662,18 +711,7 @@ export function MobilityDashboard() {
             : { top: 60, right: 60, bottom: 60, left: 60 },
         },
         attributionControl: false,
-        style: {
-          version: 8,
-          sources: {
-            osm: {
-              type: "raster",
-              tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-              tileSize: 256,
-              attribution: "© OpenStreetMap-bijdragers",
-            },
-          },
-          layers: [{ id: "osm", type: "raster", source: "osm", paint: { "raster-saturation": -0.72, "raster-contrast": 0.12 } }],
-        },
+        style: mapStyle,
       });
       map.current = instance;
       instance.on("load", () => {
@@ -1492,7 +1530,7 @@ export function MobilityDashboard() {
               <strong>{roadEvents.length}</strong>
             </button>
           </div>
-          <div className="mapAttribution">© OpenStreetMap-bijdragers · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
+          <div className="mapAttribution">© OpenFreeMap · © OpenMapTiles · © OpenStreetMap-bijdragers · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
         </div>
         {selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
         {observation && !selectedStation && <aside className="observationPanel" aria-live="polite">

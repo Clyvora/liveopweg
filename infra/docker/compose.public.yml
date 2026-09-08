@@ -1,0 +1,28 @@
+# Public edge for a single Linux host. Apply after compose.production.yml and
+# compose.clyvora-api.yml. Caddy provisions and renews Let's Encrypt TLS.
+services:
+  proxy:
+    ports: !override []
+    profiles: [internal-proxy]
+
+  edge:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:-liveopweg.nl}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web: { condition: service_healthy }
+      realtime: { condition: service_healthy }
+    networks: [backend]
+
+volumes:
+  caddy_data:
+  caddy_config:

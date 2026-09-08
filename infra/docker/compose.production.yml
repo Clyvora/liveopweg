@@ -89,6 +89,8 @@ services:
       context: ../..
       dockerfile: infra/docker/Dockerfile
       target: web
+      args:
+        NEXT_PUBLIC_SITE_URL: ${PUBLIC_ORIGIN:?PUBLIC_ORIGIN is required}
     restart: unless-stopped
     depends_on:
       realtime: { condition: service_healthy }

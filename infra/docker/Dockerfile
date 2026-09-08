@@ -8,6 +8,8 @@ FROM dependencies AS source
 COPY . .
 
 FROM source AS web-build
+ARG NEXT_PUBLIC_SITE_URL=https://liveopweg.nl
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 RUN npm run build
 
 FROM node:24-bookworm-slim AS runtime

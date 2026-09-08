@@ -1,0 +1,27 @@
+{$PUBLIC_DOMAIN:liveopweg.nl}, www.{$PUBLIC_DOMAIN:liveopweg.nl} {
+  @www host www.{$PUBLIC_DOMAIN:liveopweg.nl}
+  redir @www https://{$PUBLIC_DOMAIN:liveopweg.nl}{uri} permanent
+
+  encode zstd gzip
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    X-Frame-Options "DENY"
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    -Server
+  }
+
+  handle /v1/* {
+    reverse_proxy realtime:8081
+  }
+
+  handle /health {
+    reverse_proxy realtime:8081
+  }
+
+  handle {
+    reverse_proxy web:3000
+  }
+}

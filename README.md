@@ -41,6 +41,34 @@ Validate with `npm test`, `npm run typecheck`, `npm run lint` here and
 `npm --prefix ../ClyvoraAPI/services/liveopweg test` plus
 `npm --prefix ../ClyvoraAPI/services/liveopweg run typecheck`.
 
+## Publieke deployment op liveopweg.nl
+
+De publieke stack is bedoeld voor één permanente Linux-server met Docker
+Engine, Compose v2, minimaal 4 GB RAM en voldoende schijfruimte voor PostGIS en
+de landelijke spoordata. Plaats `liveopweg` en `ClyvoraAPI` als naastliggende
+checkouts, bijvoorbeeld onder `/opt/liveopweg/`.
+
+Kopieer `infra/docker/production.env.example` naar de genegeerde
+`infra/docker/production.env`, vervang beide databasewachtwoorden door unieke
+lange waarden en laat `PUBLIC_ORIGIN=https://liveopweg.nl` en
+`PUBLIC_DOMAIN=liveopweg.nl` staan. Start of update daarna vanaf de
+`liveopweg`-checkout met:
+
+```text
+sh infra/docker/deploy-public.sh
+```
+
+`compose.public.yml` publiceert poorten 80 en 443. Caddy haalt automatisch het
+TLS-certificaat op, stuurt `www.liveopweg.nl` door naar het hoofddomein en
+proxyt website, HTTP-API en WebSocket via dezelfde HTTPS-origin. In STRATO DNS
+moeten het A-record en, als de server IPv6 heeft, het AAAA-record naar de
+publieke server wijzen. Verwijder een oud AAAA-record wanneer de server geen
+IPv6 gebruikt; anders bereikt een deel van de bezoekers de verkeerde host.
+
+De basiskaart gebruikt de publieke OpenFreeMap Positron-stijl met zichtbare
+OpenFreeMap, OpenMapTiles en OpenStreetMap-attributie. Hiervoor is geen API-key
+nodig.
+
 Liveopweg maakt Nederlandse mobiliteitsdata realtime zichtbaar met een expliciet onderscheid tussen bronfeit, afleiding en onbekende informatie.
 
 ## Stationweergave
