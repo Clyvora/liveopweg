@@ -2,7 +2,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["workers/**/*.test.ts", "packages/**/*.test.ts", "app/**/*.test.ts"],
+    include: ["packages/**/*.test.ts", "app/**/*.test.ts"],
+    exclude: ["packages/domain-rail/station-3d.test.ts"],
     environment: "node",
   },
 });

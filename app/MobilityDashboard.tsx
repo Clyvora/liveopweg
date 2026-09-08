@@ -33,6 +33,13 @@ import { StationPanel } from "./StationPanel";
 
 type ConnectionState = "verbinden" | "live" | "herstellen" | "offline";
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
+type ExpectedRoute = {
+  method: "EXPECTED_SHORTEST_TRACK_PATH";
+  exactSwitchPathKnown: false;
+  geometry: { type: "MultiLineString"; coordinates: [number, number][][] };
+  stops: Array<{ code: string; name: string; arrivalAt: string | null; departureAt: string | null; delaySeconds: number | null }>;
+  routedStops: number;
+};
 const configuredRenderDelayMs = Number(process.env.NEXT_PUBLIC_RENDER_DELAY_MS ?? DEFAULT_RENDER_DELAY_MS);
 const renderDelayMs = Number.isFinite(configuredRenderDelayMs) && configuredRenderDelayMs >= 0 && configuredRenderDelayMs <= 30_000
   ? configuredRenderDelayMs
@@ -91,6 +98,14 @@ function formatDelay(seconds: number | null): string {
   if (seconds === 0) return "Op tijd";
   const minutes = Math.round(Math.abs(seconds) / 60);
   return seconds > 0 ? `+${minutes} min` : `−${minutes} min`;
+}
+
+function replaceSelectionUrl(selection: { train?: string; station?: string } = {}) {
+  const url = new URL(window.location.href);
+  url.search = "";
+  if (selection.train) url.searchParams.set("train", selection.train);
+  if (selection.station) url.searchParams.set("station", selection.station);
+  window.history.replaceState(null, "", url);
 }
 
 function toRecord(observations: RailObservation[]): Record<string, RailObservation> {
@@ -404,6 +419,8 @@ export function MobilityDashboard() {
   const trackGeometriesRef = useRef(new Map<string, TrackGeometry>());
   const trackGeometryRequestsRef = useRef(new Set<string>());
   const selectedVehicleIdRef = useRef<string | null>(null);
+  const pendingTrainNumberRef = useRef<string | null>(null);
+  const deepLinkHandledRef = useRef(false);
   const selectRoadFromMapRef = useRef<(eventId: string) => void>(() => undefined);
   const selectStationFromMapRef = useRef<(stationCode: string) => void>(() => undefined);
   const [selectedStation, setSelectedStation] = useState<RailStation | null>(null);
@@ -412,6 +429,9 @@ export function MobilityDashboard() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [observation, setObservation] = useState<RailObservation | null>(null);
   const [journey, setJourney] = useState<RailJourney | null>(null);
+  const [expectedRoute, setExpectedRoute] = useState<ExpectedRoute | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [trainShared, setTrainShared] = useState(false);
   const [selectedMotion, setSelectedMotion] = useState<RenderedMotion | null>(null);
   const [trackMatchesByVehicle, setTrackMatchesByVehicle] = useState<Record<string, RailTrackMatch>>({});
   const [connection, setConnection] = useState<ConnectionState>("verbinden");
@@ -530,7 +550,10 @@ export function MobilityDashboard() {
     selectedVehicleIdRef.current = vehicleId;
     setObservation(selected);
     setJourney(null);
+    setExpectedRoute(null);
+    setRouteLoading(true);
     setQuery("");
+    replaceSelectionUrl({ train: selected.trainNumber });
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ protocolVersion: 2, type: "select", vehicleId }));
     if (focusMap && map.current) {
       map.current.easeTo({
@@ -550,12 +573,16 @@ export function MobilityDashboard() {
     selectedVehicleIdRef.current = null;
     setObservation(null);
     setJourney(null);
+    setExpectedRoute(null);
+    setRouteLoading(false);
     setQuery("");
+    replaceSelectionUrl();
   }, []);
 
   const selectStation = useCallback((station: RailStation) => {
     clearVehicleSelection();
     setSelectedStation(station);
+    replaceSelectionUrl({ station: station.code });
     setShowLayers(false);
     map.current?.easeTo({
       center: [station.longitude, station.latitude],
@@ -564,6 +591,25 @@ export function MobilityDashboard() {
       duration: 700,
     });
   }, [clearVehicleSelection]);
+
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return;
+    deepLinkHandledRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const stationCode = params.get("station")?.toUpperCase();
+    const trainNumber = params.get("train");
+    if (stationCode && stationsByCode.has(stationCode)) queueMicrotask(() => selectStation(stationsByCode.get(stationCode)!));
+    else if (trainNumber) pendingTrainNumberRef.current = trainNumber;
+  }, [selectStation]);
+
+  useEffect(() => {
+    const trainNumber = pendingTrainNumberRef.current;
+    if (!trainNumber) return;
+    const vehicle = vehicles.find((candidate) => candidate.trainNumber === trainNumber);
+    if (!vehicle) return;
+    pendingTrainNumberRef.current = null;
+    selectVehicle(vehicle.vehicleId);
+  }, [selectVehicle, vehicles]);
 
   useEffect(() => {
     selectStationFromMapRef.current = (code) => {
@@ -729,6 +775,24 @@ export function MobilityDashboard() {
         instance.addSource("selected-track-match", {
           type: "geojson",
           data: { type: "FeatureCollection", features: [] },
+        });
+        instance.addSource("expected-rail-route", {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+        instance.addLayer({
+          id: "expected-rail-route-line",
+          type: "line",
+          source: "expected-rail-route",
+          filter: ["==", ["geometry-type"], "LineString"],
+          paint: { "line-color": "#1672d4", "line-width": ["interpolate", ["linear"], ["zoom"], 6, 3, 12, 6], "line-opacity": 0.78 },
+        }, "rail-fleet-points");
+        instance.addLayer({
+          id: "expected-rail-route-stops",
+          type: "circle",
+          source: "expected-rail-route",
+          filter: ["==", ["geometry-type"], "Point"],
+          paint: { "circle-radius": 5, "circle-color": "#fff", "circle-stroke-color": "#1672d4", "circle-stroke-width": 2 },
         });
         instance.addLayer({
           id: "selected-track-match-link",
@@ -1245,6 +1309,34 @@ export function MobilityDashboard() {
     };
   }, [requestTrackGeometries]);
 
+  useEffect(() => {
+    const instance = map.current;
+    const source = instance?.getSource("expected-rail-route") as GeoJSONSource | undefined;
+    if (!source) return;
+    const features: Array<Record<string, unknown>> = [];
+    if (expectedRoute?.geometry.coordinates.length) features.push({ type: "Feature", properties: { kind: "route" }, geometry: expectedRoute.geometry });
+    for (const stop of expectedRoute?.stops ?? []) {
+      const station = stationsByCode.get(stop.code);
+      if (station) features.push({ type: "Feature", properties: { kind: "stop", code: stop.code }, geometry: { type: "Point", coordinates: [station.longitude, station.latitude] } });
+    }
+    source.setData({ type: "FeatureCollection", features } as Parameters<GeoJSONSource["setData"]>[0]);
+  }, [expectedRoute, mapReady]);
+
+  useEffect(() => {
+    if (!selectedVehicleId || !journey) return;
+    const controller = new AbortController();
+    fetch(realtimeHttpUrl(`/v1/trains/${encodeURIComponent(selectedVehicleId)}/route`), { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Route unavailable");
+        const value = await response.json() as ExpectedRoute;
+        if (value.method !== "EXPECTED_SHORTEST_TRACK_PATH" || value.geometry?.type !== "MultiLineString" || !Array.isArray(value.stops)) throw new Error("Invalid route");
+        setExpectedRoute(value);
+      })
+      .catch(() => { if (!controller.signal.aborted) setExpectedRoute(null); })
+      .finally(() => { if (!controller.signal.aborted) setRouteLoading(false); });
+    return () => controller.abort();
+  }, [journey, selectedVehicleId]);
+
   const measuredAge = selectedMotion
     ? `${Math.round(selectedMotion.sourceAgeSeconds)} s`
     : formatAge(observation?.time.sourceMeasuredAt ?? null, now);
@@ -1290,6 +1382,16 @@ export function MobilityDashboard() {
     ? { longitude: selectedMotion.longitude, latitude: selectedMotion.latitude }
     : null);
   const staleRoadEvents = roadEvents.filter((event) => event.status === "STALE").length;
+  async function shareTrain() {
+    if (!observation) return;
+    const url = new URL(window.location.href);
+    url.search = `?train=${encodeURIComponent(observation.trainNumber)}`;
+    const data = { title: `Trein ${observation.trainNumber} · Liveopweg`, text: `Volg trein ${observation.trainNumber} live op Liveopweg`, url: url.toString() };
+    try {
+      if (navigator.share) await navigator.share(data); else await navigator.clipboard.writeText(data.url);
+      setTrainShared(true); window.setTimeout(() => setTrainShared(false), 1800);
+    } catch { /* Delen geannuleerd. */ }
+  }
 
   return (
     <main className="shell">
@@ -1392,7 +1494,7 @@ export function MobilityDashboard() {
           </div>
           <div className="mapAttribution">© OpenStreetMap-bijdragers · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
         </div>
-        {selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} onClose={() => setSelectedStation(null)} onSelectVehicle={selectVehicle} />}
+        {selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
         {observation && !selectedStation && <aside className="observationPanel" aria-live="polite">
           <div className="selectedTrainHeader">
             <div className="selectedTrainIdentity">
@@ -1400,8 +1502,15 @@ export function MobilityDashboard() {
               <h2>{journey?.destination.actual ?? journey?.destination.planned ?? `Materieel ${observation.materialNumber ?? "onbekend"}`}</h2>
               <p className="selectedTrainMeta"><span>{selectedRollingStock.label}</span><span>{operatorName}</span></p>
             </div>
-            <button type="button" onClick={clearVehicleSelection} aria-label="Sluit treininformatie">×</button>
+            <div className="panelHeaderActions"><button type="button" className="panelShare" onClick={() => void shareTrain()}>{trainShared ? "Gekopieerd" : "Delen"}</button><button type="button" onClick={clearVehicleSelection} aria-label="Sluit treininformatie">×</button></div>
           </div>
+          <section className="routeTimeline" aria-label="Verwachte route">
+            <div className="routeTimelineHeading"><strong>Verwachte route</strong><span>{routeLoading ? "Laden…" : expectedRoute ? `${expectedRoute.routedStops}/${expectedRoute.stops.length} op kaart` : "Nog niet beschikbaar"}</span></div>
+            {expectedRoute?.stops.slice(0, 5).map((stop, index) => <div className={`routeStop ${index === 0 ? "next" : ""}`} key={`${stop.code}-${index}`}>
+              <i /><span>{stop.name}</span><time dateTime={stop.arrivalAt ?? stop.departureAt ?? undefined}>{formatJourneyClock(stop.arrivalAt ?? stop.departureAt)}</time>
+            </div>)}
+            {expectedRoute && <small>Route volgt ProRail-spoorcurves; aansluitingen tot 25 meter worden afgeleid. De actuele wisselkeuze is niet bekend.</small>}
+          </section>
           <div className="nextStopCard">
             <div className="nextStopName">
               <span>Volgende halte</span>

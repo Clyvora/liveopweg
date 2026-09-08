@@ -53,6 +53,23 @@ Het bord is **geen volledige dienstregeling**: alleen de ontvangen NDOV InfoPlus
 
 De gebundelde 397 stations komen uit [Rijden de Treinen / NS](https://www.rijdendetreinen.nl/open-data/stations), CC0, de gepubliceerde Nederlandse stationslijst van september 2023. Bron, downloadadres en versie staan in `packages/domain-rail/stations.json`; nieuwere stations of naamswijzigingen vereisen een catalogusupdate. Er worden geen perrons of voorzieningen verondersteld op basis van deze puntlocaties.
 
+Het stationspaneel vat de ontvangen aankomsten en vertrekken ook samen als
+treinactiviteit per kwartier. Dit gaat uitsluitend over treinbewegingen en doet
+geen uitspraak over reizigersdrukte.
+
+## Verwachte route en deelbare links
+
+Bij een geselecteerde trein toont het paneel maximaal vijf komende haltes. De
+blauwe kaartlijn wordt als kortste verbonden route over de geïmporteerde
+ProRail/PDOK-spoorassen berekend. Topologische gaten van maximaal 25 meter
+tussen nabijgelegen spooreindpunten worden als aansluiting afgeleid. De actuele
+wisselstand en de exact door de verkeersleiding gekozen spoorroute zitten niet
+in de bron en worden dus niet als feit gepresenteerd.
+
+Stations en treinen hebben een deelknop. De URL gebruikt de stationscode of het
+treinnummer en opent direct dezelfde selectie. Een treinlink werkt zolang dat
+treinnummer in de actuele vloot aanwezig is.
+
 ## Eerdere bouwfases
 
 Fase 11 voegt het productierijpe fundament toe: echte PostGIS-historie, persistence-health, Prometheus-metrics, een beveiligde reverse-proxyroute, productiecontainers en continue kwaliteitscontrole. De file-backed ontwikkelmodus blijft beschikbaar.

@@ -28,6 +28,7 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
   const [error, setError] = useState(false);
   const [tab, setTab] = useState<"departures" | "arrivals">("departures");
   const [expanded, setExpanded] = useState(false);
+  const [shared, setShared] = useState(false);
 
   useEffect(() => {
     let disposed = false;
@@ -55,6 +56,28 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
   const stale = !board?.sourceHealthy || error || now - Date.parse(board.generatedAt) > 45_000;
   const entries = (board?.[tab] ?? []).filter((entry) => Date.parse(entry.expectedAt) >= now);
   const delayed = entries.filter((entry) => !entry.cancelled && (entry.delaySeconds ?? 0) >= 60).length;
+  const activity = Array.from({ length: 4 }, (_, index) => {
+    const from = now + index * 15 * 60_000;
+    const until = from + 15 * 60_000;
+    const events = [...(board?.arrivals ?? []), ...(board?.departures ?? [])];
+    return new Set(events.filter((entry) => {
+      const time = Date.parse(entry.expectedAt);
+      return !entry.cancelled && time >= from && time < until;
+    }).map((entry) => `${entry.trainNumber}:${entry.expectedAt}`)).size;
+  });
+  const maxActivity = Math.max(1, ...activity);
+  const totalActivity = activity.reduce((sum, value) => sum + value, 0);
+  const activityLabel = totalActivity >= 24 ? "Veel treinbewegingen" : totalActivity >= 10 ? "Regelmatig treinverkeer" : "Rustig treinverkeer";
+  async function shareStation() {
+    const url = new URL(window.location.href);
+    url.search = `?station=${encodeURIComponent(station.code)}`;
+    const data = { title: `${station.name} · Liveopweg`, text: `Bekijk ${station.name} live op Liveopweg`, url: url.toString() };
+    try {
+      if (navigator.share) await navigator.share(data);
+      else await navigator.clipboard.writeText(data.url);
+      setShared(true); window.setTimeout(() => setShared(false), 1800);
+    } catch { /* Delen geannuleerd. */ }
+  }
 
   return <aside className={`stationPanel ${expanded ? "expanded" : ""}`} aria-label={`Station ${station.name}`}>
     <header className="stationPanelHeader">
@@ -65,7 +88,7 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
           <i />{error ? "Verbinding onderbroken · opnieuw proberen…" : !board ? "Ritten ophalen…" : stale ? "Ritbron nog niet actueel" : "Live ritinformatie"}
         </p>
       </div>
-      <button className="stationClose" onClick={onClose} aria-label="Sluit stationinformatie">×</button>
+      <div className="panelHeaderActions"><button className="panelShare" onClick={() => void shareStation()} aria-label={`Deel ${station.name}`}>{shared ? "Gekopieerd" : "Delen"}</button><button className="stationClose" onClick={onClose} aria-label="Sluit stationinformatie">×</button></div>
     </header>
     <div className="stationTabs" role="tablist" aria-label="Stationbord">
       <button id="station-departures-tab" role="tab" aria-selected={tab === "departures"} aria-controls="station-board" onClick={() => { setTab("departures"); setExpanded(false); }}>Vertrek</button>
@@ -76,6 +99,11 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
       <span>{board ? `${entries.length} ontvangen ritten` : "Verbinding maken"}</span>
       {delayed > 0 && <span className="stationDelayCount">{delayed} vertraagd</span>}
     </div>
+    {board && <section className="stationActivity" aria-label={`Stationsactiviteit: ${activityLabel}`}>
+      <div><strong>Treinactiviteit</strong><span>{activityLabel} · komende uur</span></div>
+      <div className="activityBars" aria-hidden="true">{activity.map((value, index) => <i key={index} style={{ height: `${Math.max(12, value / maxActivity * 100)}%` }} />)}</div>
+      <b>{totalActivity}</b>
+    </section>}
     <div className="stationBoardColumns" aria-hidden="true"><span>Tijd</span><span>{tab === "departures" ? "Richting" : "Vanuit"}</span><span>Spoor</span></div>
     <div id="station-board" role="tabpanel" aria-labelledby={`station-${tab}-tab`} className="stationBoardList" tabIndex={0}>
       {!board && !error && <p className="stationBoardEmpty">Actuele {tab === "departures" ? "vertrekken" : "aankomsten"} worden opgehaald.</p>}

@@ -550,6 +550,18 @@ body { background:#eef2f3; }
   backdrop-filter:blur(10px);
 }
 .selectedTrainHeader { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
+.panelHeaderActions { display:flex; align-items:center; gap:7px; }
+.panelShare {
+  width:auto !important;
+  height:28px;
+  padding:0 10px;
+  border:1px solid #d7e2e8 !important;
+  border-radius:999px !important;
+  background:#fff !important;
+  color:#286da9 !important;
+  font:700 9px/1 Arial,sans-serif !important;
+  cursor:pointer;
+}
 .selectedTrainHeader .panelKicker { margin:0; color:#687c88; font-size:9px; letter-spacing:.1em; }
 .selectedTrainHeader h2 { margin:5px 0 0; color:var(--ui-navy); font-size:22px; line-height:1.05; }
 .selectedTrainHeader button,.drawerClose {
@@ -582,6 +594,18 @@ body { background:#eef2f3; }
 .trainQuickFacts strong { margin-top:5px; color:var(--ui-navy); font-size:9px; }
 .observationDetails { margin-top:9px; padding-top:9px; }
 .observationDetails>summary { color:#315e7d; font-size:10px; }
+.routeTimeline { margin:11px 14px 0; padding:11px 12px; border:1px solid #dfe8ed; border-radius:11px; background:#f8fafb; }
+.routeTimelineHeading { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.routeTimelineHeading strong { color:var(--ui-navy); font-size:11px; }
+.routeTimelineHeading span { color:#748995; font-size:8px; }
+.routeStop { position:relative; display:grid; grid-template-columns:12px minmax(0,1fr) auto; align-items:center; gap:7px; min-height:23px; color:#526b79; font-size:9px; }
+.routeStop:before { content:""; position:absolute; left:4px; top:-7px; bottom:13px; width:2px; background:#bdd4e9; }
+.routeStop:first-of-type:before { top:10px; }
+.routeStop i { position:relative; z-index:1; width:9px; height:9px; border:2px solid #3480c9; border-radius:50%; background:white; }
+.routeStop.next { color:var(--ui-navy); font-weight:700; }
+.routeStop.next i { background:#3480c9; box-shadow:0 0 0 3px rgba(52,128,201,.13); }
+.routeStop time { font:700 9px/1 var(--font-geist-mono); }
+.routeTimeline>small { display:block; margin-top:7px; color:#8998a1; font-size:7px; line-height:1.4; }
 
 .mapDrawer {
   position:fixed;
@@ -881,6 +905,13 @@ body {
 .stationTabs button[aria-selected=true] { border-color:#2877d4; color:#216aba; }
 .stationTabs>span { margin-left:auto; color:#8a99a2; font-size:9px; }
 .stationBoardSummary { display:flex; justify-content:space-between; padding:8px 16px; font-size:10px; color:#758994; }
+.stationActivity { display:grid; grid-template-columns:minmax(0,1fr) 82px 28px; align-items:end; gap:10px; margin:0 16px 9px; padding:9px 10px; border:1px solid #e2e9ee; border-radius:9px; background:#f8fafb; }
+.stationActivity strong,.stationActivity span { display:block; }
+.stationActivity strong { color:#294a61; font-size:9px; }
+.stationActivity span { margin-top:3px; color:#7c8e99; font-size:7px; }
+.stationActivity>b { align-self:center; color:#2877d4; font:700 14px/1 var(--font-geist-mono); text-align:right; }
+.activityBars { height:27px; display:flex; align-items:flex-end; gap:3px; }
+.activityBars i { width:100%; min-height:3px; border-radius:2px 2px 0 0; background:#65a2dd; }
 .stationDelayCount { color:#b56632; }
 .stationBoardColumns,.stationBoardRow { display:grid; grid-template-columns:45px minmax(0,1fr) 49px; gap:11px; }
 .stationBoardColumns { padding:0 16px 8px; color:#81929c; font:700 8px/1.1 Arial,sans-serif; text-transform:uppercase; letter-spacing:.09em; }
@@ -911,7 +942,7 @@ body {
 .stationPanelFooter { padding:10px 16px 12px; border-top:1px solid #e3eaf0; background:#f8fafb; line-height:1.3; }
 .stationPanelFooter p { margin:0; color:#8798a2; font-size:9px; line-height:1.4; }
 .stationPanelFooter a { display:inline-block; margin-top:5px; color:#7e93a1; font-size:8px; text-decoration:none; }
-.stationPanelHeader,.stationTabs,.stationBoardSummary,.stationBoardColumns,.stationExpand,.stationPanelFooter { flex-shrink:0; }
+.stationPanelHeader,.stationTabs,.stationBoardSummary,.stationActivity,.stationBoardColumns,.stationExpand,.stationPanelFooter { flex-shrink:0; }
 
 @media (max-width:760px) {
   .stationPanel { right:10px; bottom:max(12px,env(safe-area-inset-bottom)); width:calc(100% - 20px); max-height:min(60dvh,calc(100dvh - 170px)); }

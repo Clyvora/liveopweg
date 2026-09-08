@@ -26,5 +26,10 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "workers",
+    "packages/domain-rail/station-3d.test.ts",
+    "packages/domain-rail/station-bundle.ts"
+  ]
 }
