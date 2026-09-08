@@ -1,6 +1,20 @@
 import { createHash } from "node:crypto";
-import type { TrackGraph } from "../../workers/rail-geometry/graph.js";
 import type { LocalPosition } from "./station-3d.js";
+
+export interface StationTrackGraph {
+  source: {
+    payloadSha256: string;
+    sourceUpdatedAt: string | null;
+  };
+  edges: Array<{
+    id: string;
+    bbox: [number, number, number, number];
+    sourceCollection: "spooras" | "wissel";
+    name: string | null;
+    geometry: { coordinates: Array<[number, number] | [number, number, number]> };
+    lengthMeters: number;
+  }>;
+}
 
 export interface StationDefinition {
   id: string;
@@ -152,7 +166,7 @@ function featurePolygons(feature: BgtPlatformFeature): number[][][][] {
 
 export function createStationBundle(
   station: StationDefinition,
-  graph: TrackGraph,
+  graph: StationTrackGraph,
   platformFeatures: BgtPlatformFeature[],
   platformPayloadSha256: string,
   generatedAt = new Date().toISOString(),
@@ -229,7 +243,7 @@ export function createStationBundle(
 }
 
 export function createUtrechtStationBundle(
-  graph: TrackGraph,
+  graph: StationTrackGraph,
   platformFeatures: BgtPlatformFeature[],
   platformPayloadSha256: string,
   generatedAt = new Date().toISOString(),
