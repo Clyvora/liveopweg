@@ -17,6 +17,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 FROM runtime AS web
+ENV WRANGLER_LOG_PATH=/app/.wrangler/wrangler.log
 COPY --from=web-build /app/dist /app/dist
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 CMD node -e "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"

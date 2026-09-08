@@ -1,0 +1,18 @@
+# Apply after compose.production.yml. Paths resolve relative to that base file.
+# Requires sibling liveopweg and ClyvoraAPI checkouts; no deployed domain change.
+services:
+  migrate:
+    build:
+      context: ../../../ClyvoraAPI/services/liveopweg
+      dockerfile: Dockerfile
+      target: realtime
+  bootstrap:
+    build:
+      context: ../../../ClyvoraAPI/services/liveopweg
+      dockerfile: Dockerfile
+      target: realtime
+  realtime:
+    build:
+      context: ../../../ClyvoraAPI/services/liveopweg
+      dockerfile: Dockerfile
+      target: realtime

@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { realtimeHttpUrl, realtimeWebSocketUrl } from "./realtime-url.js";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("realtime URLs", () => {
+  it("keeps the central gateway HTTP and WebSocket contracts on one configured host", () => {
+    vi.stubGlobal("window", { location: new URL("https://frontend.example/") });
+    vi.stubEnv("NEXT_PUBLIC_REALTIME_URL", "wss://gateway.example/v1/realtime");
+    expect(realtimeWebSocketUrl()).toBe("wss://gateway.example/v1/realtime");
+    expect(realtimeHttpUrl("/v1/fleet")).toBe("https://gateway.example/v1/fleet");
+  });
   it("gebruikt lokaal de afzonderlijke gatewaypoort", () => {
     vi.stubGlobal("window", { location: new URL("http://localhost:3000/") });
     expect(realtimeWebSocketUrl()).toBe("ws://localhost:8081/v1/realtime");

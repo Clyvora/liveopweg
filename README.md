@@ -1,5 +1,46 @@
 # Liveopweg
 
+## ClyvoraAPI migration (prepared locally, not deployed)
+
+The backend implementation now lives in the sibling checkout
+`../ClyvoraAPI/services/liveopweg`: ingestion, `/v1/*` HTTP/WebSocket gateway,
+geometry/station bundle generation, replay, persistence and PostGIS migrations.
+The old `workers/**/*.ts` paths are compatibility re-exports; browser protocol
+and domain packages remain here for the frontend. `worker/index.ts` serves the
+frontend SSR/image runtime and intentionally remains local to this website.
+
+Install both projects: `npm ci` here and
+`npm --prefix ../ClyvoraAPI/services/liveopweg ci`. Run `npm run dev:phase1`
+for the website and central backend, or run `npm run dev` and
+`npm --prefix ../ClyvoraAPI/services/liveopweg run dev` separately.
+Forwarded backend commands now run with the backend directory as cwd.
+Set `MOBILITYRADAR_DATA_DIR` to an absolute path to reuse existing data;
+otherwise a fresh backend `var/` is used. No existing data is deleted or moved.
+Supply server environment variables to the process; npm does not load `.env`.
+
+The frontend still accepts `NEXT_PUBLIC_REALTIME_URL` (WebSocket URL ending in
+`/v1/realtime`); all HTTP endpoints derive from that same host. The default
+production same-origin reverse proxy remains compatible. A separate reviewed
+API host can be configured at frontend build time without changing contracts.
+Set backend `CORS_ALLOWED_ORIGIN` to the exact frontend origin, and keep
+`NS_API_KEY`, `DATABASE_URL` and `REDIS_URL` server-only. The browser still
+loads map tiles, styles, glyphs and applicable 3D assets from their providers;
+this is not an offline or network-private application.
+
+For a reviewed production build with sibling checkouts, use
+`docker compose --env-file infra/docker/production.env -f infra/docker/compose.production.yml -f infra/docker/compose.clyvora-api.yml build`.
+Create that untracked env file from the example using real deployment values
+outside source control. The override builds migration/bootstrap/realtime from
+ClyvoraAPI; web/proxy and existing volumes retain their original roles. Keep
+both Compose files in all future commands. Original deployment definitions
+are retained for history; their legacy realtime target contains wrappers and
+must not be used alone after this migration. Do not bring this stack up until
+the data-volume backup and provider/domain configuration review is complete.
+
+Validate with `npm test`, `npm run typecheck`, `npm run lint` here and
+`npm --prefix ../ClyvoraAPI/services/liveopweg test` plus
+`npm --prefix ../ClyvoraAPI/services/liveopweg run typecheck`.
+
 Liveopweg maakt Nederlandse mobiliteitsdata realtime zichtbaar met een expliciet onderscheid tussen bronfeit, afleiding en onbekende informatie.
 
 ## Stationweergave
