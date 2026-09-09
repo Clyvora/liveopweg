@@ -34,6 +34,8 @@ import { StationPanel } from "./StationPanel";
 type ConnectionState = "verbinden" | "live" | "herstellen" | "offline";
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
 type MapLayerKey = "trains" | "stations" | "railways";
+type BaseMapKey = "standard" | "light" | "satellite";
+type UiIconName = "map" | "train" | "car" | "bell" | "sliders" | "queue" | "warning" | "works" | "closure" | "shield" | "chevron";
 type ExpectedRoute = {
   method: "EXPECTED_SHORTEST_TRACK_PATH";
   exactSwitchPathKnown: false;
@@ -49,15 +51,48 @@ const renderDelayMs = Number.isFinite(configuredRenderDelayMs) && configuredRend
 const fallbackMapStyle: StyleSpecification = {
   version: 8,
   sources: {
-    osm: {
+    "base-standard": {
       type: "raster",
       tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
       tileSize: 256,
       attribution: "© OpenStreetMap-bijdragers",
     },
+    "base-satellite": {
+      type: "raster",
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+      attribution: "Tiles © Esri",
+    },
   },
-  layers: [{ id: "osm", type: "raster", source: "osm", paint: { "raster-saturation": -0.72, "raster-contrast": 0.12 } }],
+  layers: [
+    { id: "base-standard", type: "raster", source: "base-standard", paint: { "raster-saturation": -0.72, "raster-contrast": 0.12 } },
+    { id: "base-light", type: "raster", source: "base-standard", layout: { visibility: "none" }, paint: { "raster-saturation": -1, "raster-contrast": -0.28, "raster-brightness-min": 0.18, "raster-brightness-max": 1 } },
+    { id: "base-satellite", type: "raster", source: "base-satellite", layout: { visibility: "none" }, paint: { "raster-saturation": -0.12, "raster-brightness-max": 0.92 } },
+  ],
 };
+
+const baseMapDefinitions: { key: BaseMapKey; label: string }[] = [
+  { key: "standard", label: "Standaard" },
+  { key: "light", label: "Licht" },
+  { key: "satellite", label: "Satelliet" },
+];
+
+function UiIcon({ name }: { name: UiIconName }) {
+  const paths: Record<UiIconName, React.ReactNode> = {
+    map: <><path d="m3.5 6 5-2.5 7 3 5-2.5v14l-5 2.5-7-3-5 2.5V6Z" /><path d="M8.5 3.5v14M15.5 6.5v14" /></>,
+    train: <><rect x="6" y="3" width="12" height="15" rx="4" /><path d="M8 21l2-3m6 0 2 3M9 7h6M8 13h8" /><circle cx="9" cy="16" r=".7" /><circle cx="15" cy="16" r=".7" /></>,
+    car: <><path d="m5 11 1.6-4h10.8l1.6 4 1.5 1.5V18h-2v-2H5v2H3v-5.5L5 11Z" /><path d="M5 11h14" /><circle cx="7" cy="14" r="1" /><circle cx="17" cy="14" r="1" /></>,
+    bell: <><path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7Z" /><path d="M10 20h4" /></>,
+    sliders: <><path d="M4 7h10M18 7h2M4 17h3M11 17h9" /><circle cx="16" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></>,
+    queue: <><path d="M5 7h14M5 12h14M5 17h14" /><circle cx="3" cy="7" r=".6" /><circle cx="3" cy="12" r=".6" /><circle cx="3" cy="17" r=".6" /></>,
+    warning: <><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5M12 17h.01" /></>,
+    works: <><path d="M4 20h16M7 20l2-9h6l2 9M8 11l4-7 4 7M9 15h6" /></>,
+    closure: <><circle cx="12" cy="12" r="9" /><path d="M7.5 12h9" /></>,
+    shield: <><path d="M12 3 5 6v5c0 4.5 2.8 7.5 7 10 4.2-2.5 7-5.5 7-10V6l-7-3Z" /><path d="m9 12 2 2 4-5" /></>,
+    chevron: <path d="m9 7 5 5-5 5" />,
+  };
+  return <svg className="uiIcon" viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
+}
 
 function loadPublicMapStyle(): StyleSpecification {
   // Een kleine rasterstijl start betrouwbaar in alle browsers en houdt de
@@ -93,6 +128,14 @@ function roadLayerFor(event: RoadEvent): RoadLayerKey {
   if (event.type === "roadworks" || event.type === "speedRestriction") return "roadworks";
   if (event.type === "closure") return "closures";
   return "safety";
+}
+
+function roadLayerIcon(layer: RoadLayerKey): UiIconName {
+  if (layer === "congestion") return "queue";
+  if (layer === "roadworks") return "works";
+  if (layer === "closures") return "closure";
+  if (layer === "safety") return "shield";
+  return "warning";
 }
 
 function roadEventLabel(event: RoadEvent): string {
@@ -490,6 +533,8 @@ export function MobilityDashboard() {
   const [roadEventsById, setRoadEventsById] = useState<Record<string, RoadEvent>>({});
   const [selectedRoadEventId, setSelectedRoadEventId] = useState<string | null>(null);
   const [showLayers, setShowLayers] = useState(false);
+  const [baseMap, setBaseMap] = useState<BaseMapKey>("standard");
+  const [showMapStyles, setShowMapStyles] = useState(false);
   const [mapLayers, setMapLayers] = useState<Record<MapLayerKey, boolean>>({
     trains: true, stations: true, railways: true,
   });
@@ -1199,6 +1244,15 @@ export function MobilityDashboard() {
   useEffect(() => {
     const instance = map.current;
     if (!mapReady || !instance) return;
+    for (const definition of baseMapDefinitions) {
+      const layerId = `base-${definition.key}`;
+      if (instance.getLayer(layerId)) instance.setLayoutProperty(layerId, "visibility", definition.key === baseMap ? "visible" : "none");
+    }
+  }, [baseMap, mapReady]);
+
+  useEffect(() => {
+    const instance = map.current;
+    if (!mapReady || !instance) return;
     for (const layer of roadLayerDefinitions) {
       const matching = roadEvents.filter((event) => roadLayerFor(event) === layer.key);
       const features = matching.map((event) => ({
@@ -1478,10 +1532,10 @@ export function MobilityDashboard() {
           <p>Nederland beweegt. Live.</p>
         </div>
         <nav className="sideNav" aria-label="Hoofdnavigatie">
-          <button className="active" type="button" onClick={resetMap}><span>⌖</span>Kaart</button>
-          <button type="button" onClick={() => searchInputRef.current?.focus()}><span>▣</span>Treinen</button>
-          <button type="button" onClick={() => setShowLayers(true)}><span>≋</span>Verkeersinformatie</button>
-          <button type="button" onClick={() => { setSelectedRoadEventId(null); setSelectedStation(null); clearVehicleSelection(); }}><span>!</span>Meldingen</button>
+          <button className="active" type="button" onClick={resetMap}><span><UiIcon name="map" /></span>Kaart</button>
+          <button type="button" onClick={() => searchInputRef.current?.focus()}><span><UiIcon name="train" /></span>Treinen</button>
+          <button type="button" onClick={() => setShowLayers(true)}><span><UiIcon name="car" /></span>Verkeersinformatie</button>
+          <button type="button" onClick={() => { setSelectedRoadEventId(null); setSelectedStation(null); clearVehicleSelection(); }}><span><UiIcon name="bell" /></span>Meldingen</button>
         </nav>
         <div className="sidebarLive"><div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live data" : connection}</div><small>{vehicles.length} treinen · {roadEvents.length.toLocaleString("nl-NL")} wegmeldingen</small></div>
       </header>
@@ -1493,12 +1547,12 @@ export function MobilityDashboard() {
         </div>
         <div className="liveFeedList">
           {strikeIsActive && <a className="liveFeedItem strike" href={nationalStrikeAlert.url} target="_blank" rel="noreferrer">
-            <span className="feedIcon">!</span><span className="feedCopy"><strong>{nationalStrikeAlert.title}</strong><small>NS · heel Nederland</small></span><b>Vandaag</b><span className="feedArrow">›</span>
+            <span className="feedIcon"><UiIcon name="warning" /></span><span className="feedCopy"><strong>{nationalStrikeAlert.title}</strong><small>NS · heel Nederland</small></span><b>Vandaag</b><span className="feedArrow"><UiIcon name="chevron" /></span>
           </a>}
           {recentRoadEvents.map((roadEvent) => <button className={`liveFeedItem ${roadLayerFor(roadEvent)} ${selectedRoadEventId === roadEvent.id ? "selected" : ""}`} type="button" key={roadEvent.id} onClick={() => setSelectedRoadEventId(roadEvent.id)}>
-            <span className="feedIcon">{roadEvent.type === "congestion" ? "≡" : roadEvent.type === "closure" ? "−" : roadEvent.type === "roadworks" ? "◆" : "!"}</span>
+            <span className="feedIcon"><UiIcon name={roadLayerIcon(roadLayerFor(roadEvent))} /></span>
             <span className="feedCopy"><strong>{roadEventTitle(roadEvent)}</strong><small>{roadEvent.direction ?? roadEvent.description ?? roadEvent.detailType}</small></span>
-            <b>{roadEventBadge(roadEvent)}</b><span className="feedArrow">›</span>
+            <b>{roadEventBadge(roadEvent)}</b><span className="feedArrow"><UiIcon name="chevron" /></span>
           </button>)}
         </div>
         {selectedRoadEvent && <article className="liveFeedDetail">
@@ -1590,10 +1644,10 @@ export function MobilityDashboard() {
       </section>
 
       <section className="quickFilters" aria-label="Snelle kaartfilters">
-        <button className="filterSettings" type="button" onClick={() => setShowLayers(true)} aria-label="Open alle kaartlagen">☷</button>
-        <button className="trainFilter" type="button" aria-pressed={mapLayers.trains} onClick={() => setMapLayers((current) => ({ ...current, trains: !current.trains }))}><i>▣</i><span>Treinen</span></button>
+        <button className="filterSettings" type="button" onClick={() => setShowLayers(true)} aria-label="Open alle kaartlagen"><UiIcon name="sliders" /></button>
+        <button className="trainFilter" type="button" aria-pressed={mapLayers.trains} onClick={() => setMapLayers((current) => ({ ...current, trains: !current.trains }))}><i><UiIcon name="train" /></i><span>Treinen</span></button>
         {roadLayerDefinitions.map((layer) => <button className={`roadFilter ${layer.key}`} type="button" key={layer.key} aria-pressed={roadLayers[layer.key]} onClick={() => setRoadLayers((current) => ({ ...current, [layer.key]: !current[layer.key] }))}>
-          <i>{layer.key === "congestion" ? "≡" : layer.key === "closures" ? "−" : layer.key === "roadworks" ? "◆" : "!"}</i>
+          <i><UiIcon name={roadLayerIcon(layer.key)} /></i>
           <span>{layer.key === "incidents" ? "Incidenten" : layer.label}</span>
         </button>)}
       </section>
@@ -1618,7 +1672,17 @@ export function MobilityDashboard() {
             <span><i className="legendIncident" /> Incident</span>
             <span><i className="legendRoadworks" /> Werkzaamheden</span>
           </div>
-          <div className="mapAttribution">© OpenStreetMap-bijdragers · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
+          <div className={`mapStylePicker ${showMapStyles ? "open" : ""}`}>
+            <div className="mapStyleMenu" role="menu" aria-label="Kies kaartweergave" aria-hidden={!showMapStyles}>
+              {baseMapDefinitions.map((definition) => <button role="menuitemradio" aria-checked={baseMap === definition.key} type="button" key={definition.key} onClick={() => { setBaseMap(definition.key); setShowMapStyles(false); }}>
+                <span className={`mapStylePreview ${definition.key}`} /><span>{definition.label}</span>{baseMap === definition.key && <b>✓</b>}
+              </button>)}
+            </div>
+            <button className="mapStyleCurrent" type="button" aria-expanded={showMapStyles} onClick={() => setShowMapStyles((current) => !current)}>
+              <span className={`mapStylePreview ${baseMap}`} /><span>{baseMapDefinitions.find((definition) => definition.key === baseMap)?.label}</span><UiIcon name="chevron" />
+            </button>
+          </div>
+          <div className="mapAttribution">{baseMap === "satellite" ? "Tiles © Esri" : "© OpenStreetMap-bijdragers"} · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
         </div>
         {selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
         {observation && !selectedStation && <aside className="observationPanel" aria-live="polite">

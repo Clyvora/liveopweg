@@ -1122,6 +1122,8 @@ body {
 .sideNav button:hover { background:#f1f6fa; }
 .sideNav button.active { background:#e8f2ff; color:#1268d7; }
 .sideNav button span { width:22px; color:currentColor; font-size:20px; text-align:center; }
+.uiIcon { width:1.1em; height:1.1em; display:block; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.sideNav .uiIcon { width:21px; height:21px; }
 .sidebarLive { margin-top:auto; padding:15px; border-radius:13px; background:#f4f8fb; }
 .sidebarLive .sourcePill { padding:0; border:0; background:transparent; box-shadow:none; }
 .sidebarLive small { display:block; margin-top:7px; color:#7b8d99; font-size:9px; line-height:1.45; }
@@ -1166,7 +1168,9 @@ body {
 .quickFilters button:hover { transform:translateY(-1px); }
 .quickFilters button[aria-pressed="false"] { opacity:.58; filter:saturate(.4); }
 .quickFilters i { width:27px; height:27px; display:grid; place-items:center; border-radius:50%; color:#fff; background:#7088a0; font-style:normal; font-size:14px; }
+.quickFilters i .uiIcon { width:15px; height:15px; stroke-width:2; }
 .quickFilters .filterSettings { width:54px; padding:0; justify-content:center; color:#18314a; font-size:21px; }
+.quickFilters .filterSettings .uiIcon { width:21px; height:21px; }
 .quickFilters .trainFilter i { background:#7957d9; }
 .quickFilters .congestion i { background:#e94e45; }
 .quickFilters .incidents i { background:#ff8a22; }
@@ -1200,6 +1204,7 @@ body {
 }
 .liveFeedItem:hover,.liveFeedItem.selected { background:#f3f8fc; }
 .liveFeedItem .feedIcon { width:34px; height:34px; display:grid; place-items:center; border-radius:50%; background:#6b8191; color:#fff; font-weight:900; }
+.liveFeedItem .feedIcon .uiIcon { width:18px; height:18px; stroke-width:2.1; }
 .liveFeedItem.strike .feedIcon,.liveFeedItem.closures .feedIcon { background:#dc383d; }
 .liveFeedItem.congestion .feedIcon { background:#e64b45; }
 .liveFeedItem.incidents .feedIcon { background:#ff8a22; }
@@ -1210,6 +1215,7 @@ body {
 .feedCopy small { overflow:hidden; color:#7a8c98; font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
 .liveFeedItem>b { padding:5px 7px; border-radius:7px; background:#fff0ee; color:#d74b42; font-size:9px; white-space:nowrap; }
 .feedArrow { color:#7b8d98; font-size:19px; }
+.feedArrow .uiIcon { width:15px; height:15px; }
 .liveFeedDetail { position:relative; flex:none; margin:12px; padding:16px; border:1px solid #efdad8; border-radius:13px; background:linear-gradient(145deg,#fff4f3,#fffafa); }
 .feedDetailClose { position:absolute; top:9px; right:10px; width:28px; height:28px; border:0; border-radius:8px; background:transparent; color:#43596a; font-size:21px; cursor:pointer; }
 .detailEyebrow { color:#b14f47; font:800 8px/1 var(--font-geist-mono); letter-spacing:.1em; text-transform:uppercase; }
@@ -1236,6 +1242,33 @@ body {
 .mapLegendCompact .legendIncident { width:10px; height:10px; border-radius:50%; background:#ff8b23; }
 .mapLegendCompact .legendRoadworks { width:10px; height:10px; border-radius:50%; background:#f3bf1b; }
 
+.mapStylePicker { position:absolute; z-index:23; right:calc(var(--radar-feed) + 34px); bottom:22px; }
+.mapStyleCurrent {
+  min-width:155px; height:58px; padding:6px 13px 6px 7px; display:grid; grid-template-columns:46px 1fr 16px; align-items:center; gap:10px;
+  border:1px solid rgba(255,255,255,.92); border-radius:14px; background:rgba(255,255,255,.97); box-shadow:var(--radar-shadow);
+  color:#294055; font:750 11px/1 var(--font-geist-sans); cursor:pointer;
+}
+.mapStyleCurrent>.uiIcon { width:14px; height:14px; transform:rotate(-90deg); transition:transform .18s ease; }
+.mapStylePicker.open .mapStyleCurrent>.uiIcon { transform:rotate(90deg); }
+.mapStylePreview { width:46px; height:42px; display:block; border:1px solid #d7e0e5; border-radius:8px; overflow:hidden; background-size:cover; }
+.mapStylePreview.standard { background:linear-gradient(135deg,#a8d1e6 0 31%,#e9e4d6 31% 62%,#b7d7a8 62%); }
+.mapStylePreview.light { background:linear-gradient(145deg,#f8f8f5,#e5e8e4 48%,#cbdce7 49% 55%,#f8f8f5 56%); }
+.mapStylePreview.satellite { background:linear-gradient(135deg,#365f44,#688d52 38%,#244b62 39% 54%,#82724e 55%,#39573c); }
+.mapStyleMenu {
+  position:absolute; right:0; bottom:68px; width:205px; padding:7px; display:grid; gap:4px;
+  border:1px solid rgba(255,255,255,.94); border-radius:14px; background:rgba(255,255,255,.98); box-shadow:var(--radar-shadow);
+  opacity:0; visibility:hidden; transform:translateY(7px); pointer-events:none; transition:opacity .16s ease,transform .16s ease,visibility .16s;
+}
+.mapStylePicker.open .mapStyleMenu { opacity:1; visibility:visible; transform:translateY(0); pointer-events:auto; }
+.mapStyleMenu button {
+  min-height:52px; padding:5px; display:grid; grid-template-columns:42px 1fr 18px; align-items:center; gap:10px;
+  border:0; border-radius:9px; background:transparent; color:#31485b; font:700 11px/1 var(--font-geist-sans); text-align:left; cursor:pointer;
+}
+.mapStyleMenu button:hover,.mapStyleMenu button[aria-checked="true"] { background:#edf5fd; color:#1268d7; }
+.mapStyleMenu .mapStylePreview { width:42px; height:38px; }
+.mapStyleMenu b { color:#1268d7; text-align:center; }
+.mapAttribution { right:calc(var(--radar-feed) + 34px); bottom:4px; }
+
 .mapDrawer { left:calc(var(--radar-sidebar) + 22px); bottom:88px; z-index:31; }
 .mapDrawer .roadLayerPanel { width:100%; }
 .observationPanel,.stationPanel {
@@ -1258,6 +1291,9 @@ body {
   .liveFeedDetail p { font-size:13px; }
   .mapLegendCompact { width:260px; padding:18px 20px; font-size:12px; }
   .mapLegendCompact>strong { font-size:15px; }
+  .mapStyleCurrent { min-width:190px; height:68px; grid-template-columns:54px 1fr 18px; font-size:14px; }
+  .mapStylePreview { width:54px; height:50px; }
+  .mapStyleMenu { bottom:78px; width:235px; }
 }
 
 @media (max-width:1500px) {
@@ -1291,6 +1327,11 @@ body {
   .liveFeedDetail { display:none; }
   .mapActions { left:10px; bottom:10px; }
   .mapLegendCompact { display:none; }
+  .mapStylePicker { right:10px; bottom:10px; }
+  .mapStyleCurrent { min-width:128px; height:44px; grid-template-columns:34px 1fr 14px; padding:4px 9px 4px 5px; }
+  .mapStyleCurrent .mapStylePreview { width:34px; height:32px; }
+  .mapStyleMenu { bottom:51px; width:180px; }
+  .mapAttribution { right:8px; bottom:58px; max-width:70%; }
   .mapDrawer { left:8px; bottom:64px; width:calc(100% - 16px); max-height:calc(100dvh - 82px); }
   .observationPanel,.stationPanel { top:auto; right:10px; bottom:10px; width:calc(100% - 20px); max-height:min(60dvh,520px); }
 }
