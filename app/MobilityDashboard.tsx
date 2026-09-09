@@ -35,7 +35,7 @@ type ConnectionState = "verbinden" | "live" | "herstellen" | "offline";
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
 type MapLayerKey = "trains" | "stations" | "railways";
 type BaseMapKey = "standard" | "light" | "satellite";
-type UiIconName = "map" | "train" | "car" | "bell" | "sliders" | "queue" | "warning" | "works" | "closure" | "shield" | "chevron";
+type UiIconName = "map" | "train" | "car" | "bell" | "sliders" | "clock" | "settings" | "queue" | "warning" | "works" | "closure" | "shield" | "chevron";
 type ExpectedRoute = {
   method: "EXPECTED_SHORTEST_TRACK_PATH";
   exactSwitchPathKnown: false;
@@ -84,6 +84,8 @@ function UiIcon({ name }: { name: UiIconName }) {
     car: <><path d="m5 11 1.6-4h10.8l1.6 4 1.5 1.5V18h-2v-2H5v2H3v-5.5L5 11Z" /><path d="M5 11h14" /><circle cx="7" cy="14" r="1" /><circle cx="17" cy="14" r="1" /></>,
     bell: <><path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7Z" /><path d="M10 20h4" /></>,
     sliders: <><path d="M4 7h10M18 7h2M4 17h3M11 17h9" /><circle cx="16" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></>,
+    settings: <><circle cx="12" cy="12" r="3" /><path d="M19 13.5v-3l-2-.7a7 7 0 0 0-.7-1.7l.9-1.9-2.1-2.1-1.9.9a7 7 0 0 0-1.7-.7L10.5 2h-3l-.7 2a7 7 0 0 0-1.7.7l-1.9-.9-2.1 2.1.9 1.9a7 7 0 0 0-.7 1.7L0 10.5v3l2 .7a7 7 0 0 0 .7 1.7l-.9 1.9 2.1 2.1 1.9-.9a7 7 0 0 0 1.7.7l.7 2h3l.7-2a7 7 0 0 0 1.7-.7l1.9.9 2.1-2.1-.9-1.9a7 7 0 0 0 .7-1.7l1.5-.7Z" transform="translate(2 0) scale(.83)" /></>,
     queue: <><path d="M5 7h14M5 12h14M5 17h14" /><circle cx="3" cy="7" r=".6" /><circle cx="3" cy="12" r=".6" /><circle cx="3" cy="17" r=".6" /></>,
     warning: <><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5M12 17h.01" /></>,
     works: <><path d="M4 20h16M7 20l2-9h6l2 9M8 11l4-7 4 7M9 15h6" /></>,
@@ -767,19 +769,19 @@ export function MobilityDashboard() {
     let disposed = false;
     void Promise.all([import("maplibre-gl"), loadPublicMapStyle()]).then(([{ Map, Popup }, mapStyle]) => {
       if (disposed || !mapElement.current || map.current) return;
+      const ultrawideMapView = window.innerWidth >= 2200
+        ? { center: [5.32, 52.16] as [number, number], zoom: 6.85 }
+        : {
+            bounds: [[3.15, 50.7], [7.45, 53.7]] as [[number, number], [number, number]],
+            fitBoundsOptions: {
+              padding: window.innerWidth <= 900
+                ? { top: 120, right: 22, bottom: 82, left: 22 }
+                : { top: 96, right: 60, bottom: 70, left: 140 },
+            },
+          };
       const instance = new Map({
         container: mapElement.current,
-        bounds: [[3.15, 50.7], [7.45, 53.7]],
-        fitBoundsOptions: {
-          padding: window.innerWidth <= 900
-            ? { top: 120, right: 22, bottom: 82, left: 22 }
-            : {
-                top: 96,
-                right: 60,
-                bottom: 70,
-                left: 60,
-              },
-        },
+        ...ultrawideMapView,
         attributionControl: false,
         minZoom: 5,
         maxZoom: 16,
@@ -1523,6 +1525,11 @@ export function MobilityDashboard() {
     ? { longitude: selectedMotion.longitude, latitude: selectedMotion.latitude }
     : null);
   const staleRoadEvents = roadEvents.filter((event) => event.status === "STALE").length;
+  const firstJourneyStop = journey?.stops.at(0) ?? null;
+  const lastJourneyStop = journey?.stops.at(-1) ?? null;
+  const selectedTrainSprite = selectedRollingStock.family === "unknown"
+    ? "/train-intercity-real.png"
+    : `/train-${selectedRollingStock.family}-v1.png`;
   async function shareTrain() {
     if (!observation) return;
     const url = new URL(window.location.href);
@@ -1537,10 +1544,18 @@ export function MobilityDashboard() {
   return (
     <main className="shell">
       <header className="topbar">
-        <div className="brandBlock">
-          <a className="brand" href="#map" aria-label="Liveopweg"><img className="brandLogo" src="/liveopweg-logo.png?v=3" alt="Liveopweg" /></a>
-        </div>
-        <div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live" : connection}</div>
+        <a className="railBrand" href="#map" aria-label="LiveOpWeg" onClick={resetMap}>
+          <svg className="railBrandMark" viewBox="0 0 42 34" aria-hidden="true"><path d="M6 27h10V17h10V7h10" /><circle cx="6" cy="27" r="3.5" /><circle cx="16" cy="17" r="3.5" /><circle cx="26" cy="7" r="3.5" /><circle cx="36" cy="7" r="3.5" /></svg>
+          <span className="railWordmark">Live<span>Op</span>Weg</span>
+        </a>
+        <nav className="sideNav" aria-label="Hoofdnavigatie">
+          <button className={!showAlerts && !showLayers && !observation && !selectedStation ? "active" : ""} type="button" onClick={resetMap}><UiIcon name="map" /><span>Kaart</span></button>
+          <button className={Boolean(observation) ? "active" : ""} type="button" onClick={() => searchInputRef.current?.focus()}><UiIcon name="train" /><span>Treinen</span></button>
+          <button className={Boolean(selectedStation) ? "active" : ""} type="button" onClick={() => { setMapLayers((current) => ({ ...current, stations: true })); searchInputRef.current?.focus(); }}><UiIcon name="clock" /><span>Stations</span></button>
+          <button className={showAlerts ? "active" : ""} type="button" onClick={() => { setSelectedStation(null); clearVehicleSelection(); setShowLayers(false); setShowAlerts((current) => !current); }}><span className="navIconWrap"><UiIcon name="bell" />{roadCounts.incidents + roadCounts.closures > 0 && <b>{Math.min(99, roadCounts.incidents + roadCounts.closures)}</b>}</span><span>Meldingen</span></button>
+          <button className={showLayers ? "active" : ""} type="button" onClick={() => { setShowAlerts(false); setShowLayers(true); }}><UiIcon name="settings" /><span>Instellingen</span></button>
+        </nav>
+        <div className="sidebarLive"><div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live" : connection}</div></div>
       </header>
 
       <aside className={`railAlertsPanel liveFeedPanel ${showAlerts || selectedRoadEvent ? "open" : ""} ${observation || selectedStation ? "contextOpen" : ""}`} aria-label="Actuele meldingen" aria-hidden={!showAlerts && !selectedRoadEvent}>
@@ -1623,7 +1638,6 @@ export function MobilityDashboard() {
       </section>
 
       <section className="fleetTools" aria-label="Treinselectie">
-        <div><strong>{vehicles.length}</strong><span>treinen live</span></div>
         <label>
           <span>Zoek trein, station of materieel</span>
           <input ref={searchInputRef} aria-label="Zoek trein, station of materieel" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek trein of station" />
@@ -1652,6 +1666,12 @@ export function MobilityDashboard() {
         </div>}
       </section>
 
+      <section className="radarStatusBar" aria-label="Landelijke livestatus">
+        <div><UiIcon name="train" /><strong>{vehicles.length.toLocaleString("nl-NL")}</strong><span>treinen live</span></div>
+        <div><i className={connection === "live" ? "live" : ""} /><strong>{connection === "live" ? "Verbonden" : "Wachten"}</strong><span>gegevensfeed</span></div>
+        <button type="button" onClick={() => { setShowLayers(false); setShowAlerts(true); }}><UiIcon name="warning" /><strong>{roadCounts.incidents + roadCounts.closures}</strong><span>verstoringen</span></button>
+      </section>
+
       <section className="workspace" id="map" aria-label="Landelijk realtime treindashboard">
         <div className="mapWrap">
           <div ref={mapElement} className="liveMap" aria-label="Kaart van Nederland met actuele bronposities" />
@@ -1661,10 +1681,6 @@ export function MobilityDashboard() {
             <button type="button" onClick={() => setShowLayers(true)} aria-expanded={showLayers}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4-8 4-8-4 8-4Zm-8 9 8 4 8-4M4 17l8 4 8-4" /></svg>
               <span>Lagen</span>
-              <strong>{roadEvents.length}</strong>
-            </button>
-            <button className={showAlerts ? "active" : ""} type="button" onClick={() => { setSelectedStation(null); clearVehicleSelection(); setShowLayers(false); setShowAlerts((current) => !current); }} aria-expanded={showAlerts}>
-              <UiIcon name="bell" /><span>Meldingen</span><strong>{roadCounts.incidents + roadCounts.closures}</strong>
             </button>
           </div>
           <div className="mapZoomControls" aria-label="Kaartzoom">
@@ -1688,18 +1704,21 @@ export function MobilityDashboard() {
           <div className="selectedTrainHeader">
             <div className="selectedTrainIdentity">
               <p className="selectedTrainEyebrow"><i className={computedState === "FRESH_SOURCE" ? "fresh" : "stale"} /> Trein {observation.trainNumber} · {computedState === "FRESH_SOURCE" ? "live" : "verouderd"}</p>
-              <h2>{journey?.destination.actual ?? journey?.destination.planned ?? `Materieel ${observation.materialNumber ?? "onbekend"}`}</h2>
-              <p className="selectedTrainMeta"><span>{selectedRollingStock.label}</span><span>{operatorName}</span></p>
+              <h2>{journey?.trainCategory.name ?? "Trein"} {observation.trainNumber}</h2>
+              <p className="selectedTrainMeta"><span>{operatorName}</span><span>{selectedRollingStock.label}</span></p>
             </div>
             <div className="panelHeaderActions"><button type="button" className="panelShare" onClick={() => void shareTrain()}>{trainShared ? "Gekopieerd" : "Delen"}</button><button type="button" onClick={clearVehicleSelection} aria-label="Sluit treininformatie">×</button></div>
           </div>
-          <section className="routeTimeline" aria-label="Verwachte route">
-            <div className="routeTimelineHeading"><strong>Verwachte route</strong><span>{routeLoading ? "Laden…" : expectedRoute ? `${expectedRoute.routedStops}/${expectedRoute.stops.length} op kaart` : "Nog niet beschikbaar"}</span></div>
-            {expectedRoute?.stops.slice(0, 5).map((stop, index) => <div className={`routeStop ${index === 0 ? "next" : ""}`} key={`${stop.code}-${index}`}>
-              <i /><span>{stop.name}</span><time dateTime={stop.arrivalAt ?? stop.departureAt ?? undefined}>{formatJourneyClock(stop.arrivalAt ?? stop.departureAt)}</time>
-            </div>)}
-            {expectedRoute && <small>Route volgt ProRail-spoorcurves; aansluitingen tot 25 meter worden afgeleid. De actuele wisselkeuze is niet bekend.</small>}
+          <div className="trainHero" aria-hidden="true"><img src={selectedTrainSprite} alt="" /></div>
+          <section className="routeOverview" aria-label="Treinroute">
+            <div><i /><strong>{firstJourneyStop?.station.longName ?? "Vertrekstation onbekend"}</strong><time>{formatJourneyClock(firstJourneyStop?.departure.actualAt ?? firstJourneyStop?.departure.plannedAt ?? null)}</time></div>
+            <div><i /><strong>{lastJourneyStop?.station.longName ?? journey?.destination.actual ?? journey?.destination.planned ?? "Eindbestemming onbekend"}</strong><time>{formatJourneyClock(lastJourneyStop?.arrival.actualAt ?? lastJourneyStop?.arrival.plannedAt ?? null)}</time></div>
           </section>
+          <div className="trainQuickFacts">
+            <div><span>Snelheid</span><strong>{observation.speed ? `${Math.round(observation.speed.valueKmh)} km/u` : "—"}</strong></div>
+            <div><span>Vertraging</span><strong className={currentDelay && currentDelay > 0 ? "delayLate" : "delayOnTime"}>{formatDelay(currentDelay)}</strong></div>
+            <div><span>Volgende halte</span><strong>{nextStop?.station.shortName ?? nextStop?.station.longName ?? "—"}</strong></div>
+          </div>
           <div className="nextStopCard">
             <div className="nextStopName">
               <span>Volgende halte</span>
@@ -1714,12 +1733,13 @@ export function MobilityDashboard() {
               <strong>{nextStopTrack ?? "—"}</strong>
             </div>
           </div>
-          <div className="trainQuickFacts">
-            <div><span>Treintype</span><strong>{selectedRollingStock.label}</strong></div>
-            <div><span>Vervoerder</span><strong>{operatorName}</strong></div>
-            <div><span>Snelheid</span><strong>{observation.speed ? `${Math.round(observation.speed.valueKmh)} km/h` : "—"}</strong></div>
-            <div><span>Vertraging</span><strong className={currentDelay && currentDelay > 0 ? "delayLate" : "delayOnTime"}>{formatDelay(currentDelay)}</strong></div>
-          </div>
+          <section className="routeTimeline" aria-label="Verwachte route">
+            <div className="routeTimelineHeading"><strong>Ritdetails</strong><span>{routeLoading ? "Laden…" : expectedRoute ? `${expectedRoute.routedStops}/${expectedRoute.stops.length} op kaart` : "Nog niet beschikbaar"}</span></div>
+            {expectedRoute?.stops.slice(0, 5).map((stop, index) => <div className={`routeStop ${index === 0 ? "next" : ""}`} key={`${stop.code}-${index}`}>
+              <i /><span>{stop.name}</span><time dateTime={stop.arrivalAt ?? stop.departureAt ?? undefined}>{formatJourneyClock(stop.arrivalAt ?? stop.departureAt)}</time>
+            </div>)}
+            {expectedRoute && <small>Route volgt ProRail-spoorcurves; actuele wisselstanden zijn niet beschikbaar.</small>}
+          </section>
           <p className="selectedTrainState">Bijgewerkt {measuredAge} geleden</p>
           <details className="observationDetails">
             <summary>Meer details</summary>
