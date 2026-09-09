@@ -104,6 +104,18 @@ function roadEventLabel(event: RoadEvent): string {
   return labels[event.type];
 }
 
+function roadEventTitle(event: RoadEvent): string {
+  const label = roadEventLabel(event);
+  return event.roadName ? `${label} ${event.roadName}` : label;
+}
+
+function roadEventBadge(event: RoadEvent): string {
+  if (event.delaySeconds !== null) return `+${Math.max(1, Math.round(event.delaySeconds / 60))} min`;
+  if (event.queueLengthMeters !== null) return `${(event.queueLengthMeters / 1_000).toLocaleString("nl-NL", { maximumFractionDigits: 1 })} km`;
+  if (event.temporarySpeedLimitKmh !== null) return `${event.temporarySpeedLimitKmh} km/h`;
+  return event.status === "PLANNED" ? "Gepland" : "Actief";
+}
+
 function formatTime(value: string | null): string {
   if (!value) return "Onbekend";
   return new Intl.DateTimeFormat("nl-NL", {
@@ -435,6 +447,7 @@ function drawTrainIcon(
 export function MobilityDashboard() {
   const mapElement = useRef<HTMLDivElement>(null);
   const trainOverlayElement = useRef<HTMLCanvasElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const trainSpritesRef = useRef<TrainSprites>({
     virm: null,
     icng: null,
@@ -574,6 +587,11 @@ export function MobilityDashboard() {
   const stationResults = useMemo(() => searchStations(query), [query]);
   const availableVehicleIds = useMemo(() => new Set(vehicles.map((vehicle) => vehicle.vehicleId)), [vehicles]);
   const roadEvents = useMemo(() => Object.values(roadEventsById), [roadEventsById]);
+  const recentRoadEvents = useMemo(() => roadEvents.toSorted((left, right) => {
+    const leftTime = Date.parse(left.time.sourceUpdatedAt ?? left.time.publicationTime);
+    const rightTime = Date.parse(right.time.sourceUpdatedAt ?? right.time.publicationTime);
+    return rightTime - leftTime;
+  }).slice(0, 5), [roadEvents]);
   const selectedRoadEvent = selectedRoadEventId ? roadEventsById[selectedRoadEventId] ?? null : null;
   const roadCounts = useMemo(() => Object.fromEntries(roadLayerDefinitions.map(({ key }) => [
     key, roadEvents.filter((event) => roadLayerFor(event) === key).length,
@@ -625,6 +643,14 @@ export function MobilityDashboard() {
       offset: window.innerWidth <= 760 ? [0, -Math.min(140, window.innerHeight * 0.2)] : [-195, 0],
       duration: 700,
     });
+  }, [clearVehicleSelection]);
+
+  const resetMap = useCallback(() => {
+    setShowLayers(false);
+    setSelectedRoadEventId(null);
+    setSelectedStation(null);
+    clearVehicleSelection();
+    map.current?.easeTo({ center: [5.3, 52.2], duration: 500 });
   }, [clearVehicleSelection]);
 
   useEffect(() => {
@@ -692,9 +718,14 @@ export function MobilityDashboard() {
         container: mapElement.current,
         bounds: [[3.15, 50.7], [7.45, 53.7]],
         fitBoundsOptions: {
-          padding: window.innerWidth <= 760
-            ? { top: 32, right: 22, bottom: 32, left: 22 }
-            : { top: 60, right: 60, bottom: 60, left: 60 },
+          padding: window.innerWidth <= 900
+            ? { top: 120, right: 22, bottom: 82, left: 22 }
+            : {
+                top: 105,
+                right: Math.min(560, window.innerWidth * 0.23),
+                bottom: 70,
+                left: Math.min(320, window.innerWidth * 0.16),
+              },
         },
         attributionControl: false,
         scrollZoom: false,
@@ -1442,27 +1473,48 @@ export function MobilityDashboard() {
   return (
     <main className="shell">
       <header className="topbar">
-        <a className="brand" href="#map" aria-label="Liveopweg">
-          <img className="brandLogo" src="/liveopweg-logo.png?v=3" alt="Liveopweg" />
-        </a>
-        <div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live" : connection}</div>
+        <div className="brandBlock">
+          <a className="brand" href="#map" aria-label="Liveopweg"><img className="brandLogo" src="/liveopweg-logo.png?v=3" alt="Liveopweg" /></a>
+          <p>Nederland beweegt. Live.</p>
+        </div>
+        <nav className="sideNav" aria-label="Hoofdnavigatie">
+          <button className="active" type="button" onClick={resetMap}><span>⌖</span>Kaart</button>
+          <button type="button" onClick={() => searchInputRef.current?.focus()}><span>▣</span>Treinen</button>
+          <button type="button" onClick={() => setShowLayers(true)}><span>≋</span>Verkeersinformatie</button>
+          <button type="button" onClick={() => { setSelectedRoadEventId(null); setSelectedStation(null); clearVehicleSelection(); }}><span>!</span>Meldingen</button>
+        </nav>
+        <div className="sidebarLive"><div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live data" : connection}</div><small>{vehicles.length} treinen · {roadEvents.length.toLocaleString("nl-NL")} wegmeldingen</small></div>
       </header>
 
-      <aside className={`railAlertsPanel ${observation || selectedStation ? "contextOpen" : ""}`} aria-label="Actuele spoorberichten">
-        <div className="railAlertsHeader">
-          <div><span className="railAlertsKicker">Actueel op het spoor</span><strong>NS-meldingen</strong></div>
-          <span className={`railAlertCount ${strikeIsActive ? "critical" : "calm"}`}>{strikeIsActive ? "1 actief" : "Geen grote melding"}</span>
+      <aside className={`railAlertsPanel liveFeedPanel ${observation || selectedStation ? "contextOpen" : ""}`} aria-label="Actuele meldingen">
+        <div className="railAlertsHeader liveFeedHeader">
+          <div><span className="railAlertsKicker">Live overzicht</span><strong>Actuele meldingen</strong></div>
+          <span className="railAlertCount">{roadEvents.length.toLocaleString("nl-NL")}</span>
         </div>
-        {strikeIsActive ? <article className="railAlertCard critical">
-          <div className="railAlertLabel"><i /> Landelijke impact</div>
+        <div className="liveFeedList">
+          {strikeIsActive && <a className="liveFeedItem strike" href={nationalStrikeAlert.url} target="_blank" rel="noreferrer">
+            <span className="feedIcon">!</span><span className="feedCopy"><strong>{nationalStrikeAlert.title}</strong><small>NS · heel Nederland</small></span><b>Vandaag</b><span className="feedArrow">›</span>
+          </a>}
+          {recentRoadEvents.map((roadEvent) => <button className={`liveFeedItem ${roadLayerFor(roadEvent)} ${selectedRoadEventId === roadEvent.id ? "selected" : ""}`} type="button" key={roadEvent.id} onClick={() => setSelectedRoadEventId(roadEvent.id)}>
+            <span className="feedIcon">{roadEvent.type === "congestion" ? "≡" : roadEvent.type === "closure" ? "−" : roadEvent.type === "roadworks" ? "◆" : "!"}</span>
+            <span className="feedCopy"><strong>{roadEventTitle(roadEvent)}</strong><small>{roadEvent.direction ?? roadEvent.description ?? roadEvent.detailType}</small></span>
+            <b>{roadEventBadge(roadEvent)}</b><span className="feedArrow">›</span>
+          </button>)}
+        </div>
+        {selectedRoadEvent && <article className="liveFeedDetail">
+          <button className="feedDetailClose" type="button" onClick={() => setSelectedRoadEventId(null)} aria-label="Sluit melding">×</button>
+          <span className="detailEyebrow">{roadEventLabel(selectedRoadEvent)} · live</span>
+          <h2>{roadEventTitle(selectedRoadEvent)}</h2>
+          <p>{selectedRoadEvent.description ?? `${selectedRoadEvent.detailType}. Geen extra publieksinformatie meegeleverd.`}</p>
+          <div><span>{selectedRoadEvent.direction ?? "Richting onbekend"}</span><strong>{roadEventBadge(selectedRoadEvent)}</strong></div>
+        </article>}
+        {!selectedRoadEvent && strikeIsActive && <article className="liveFeedDetail strikeDetail">
+          <span className="detailEyebrow">NS · landelijke impact</span>
           <h2>{nationalStrikeAlert.title}</h2>
           <p>{nationalStrikeAlert.body}</p>
-          <div className="railAlertMeta">
-            <span>NS · bijgewerkt {formatJourneyClock(nationalStrikeAlert.updatedAt)}</span>
-            <a href={nationalStrikeAlert.url} target="_blank" rel="noreferrer">Bekijk bij NS ↗</a>
-          </div>
-        </article> : <article className="railAlertCard calm"><div className="railAlertLabel"><i /> Geen landelijke calamiteit</div><p>Controleer voor vertrek altijd de reisplanner van je vervoerder.</p></article>}
-        <div className="railFeedSummary"><span><i className={connection === "live" ? "live" : ""} /> Positiefeed</span><strong>{vehicles.length} treinen zichtbaar</strong></div>
+          <div><span>Bijgewerkt {formatJourneyClock(nationalStrikeAlert.updatedAt)}</span><a href={nationalStrikeAlert.url} target="_blank" rel="noreferrer">Bekijk bij NS ↗</a></div>
+        </article>}
+        <div className="railFeedSummary"><span><i className={connection === "live" ? "live" : ""} /> Live bronnen</span><strong>{vehicles.length} treinen zichtbaar</strong></div>
       </aside>
 
       <section className={`roadOverview mapDrawer ${showLayers ? "open" : ""}`} aria-label="NDW-weglagen en geselecteerde wegmelding" aria-hidden={!showLayers}>
@@ -1505,33 +1557,13 @@ export function MobilityDashboard() {
           </div>
           <p className="roadSourceNote">Bron: NDW Actueel Beeld · leveranciersinformatie kan ongevalideerd zijn · volledige snapshot iedere 60 seconden.</p>
         </div>
-        <aside className="roadEventCard" aria-live="polite">
-          <p className="panelKicker">Geselecteerde wegmelding</p>
-          <h2>{selectedRoadEvent ? roadEventLabel(selectedRoadEvent) : "Kies een melding op de kaart"}</h2>
-          {selectedRoadEvent ? <>
-            <p>{selectedRoadEvent.description ?? `${selectedRoadEvent.detailType}. Geen publieksomschrijving meegeleverd.`}</p>
-            <dl>
-              <div><dt>Status</dt><dd>{selectedRoadEvent.status}</dd></div>
-              <div><dt>Weg</dt><dd>{selectedRoadEvent.roadName ?? "Niet meegeleverd"}</dd></div>
-              <div><dt>Richting</dt><dd>{selectedRoadEvent.direction ?? "Niet meegeleverd"}</dd></div>
-              <div><dt>Bron</dt><dd>{selectedRoadEvent.source}</dd></div>
-              <div><dt>Bronupdate</dt><dd>{formatTime(selectedRoadEvent.time.sourceUpdatedAt ?? selectedRoadEvent.time.publicationTime)}</dd></div>
-              {selectedRoadEvent.time.validFrom && <div><dt>Start</dt><dd>{formatTime(selectedRoadEvent.time.validFrom)}</dd></div>}
-              {selectedRoadEvent.time.validUntil && <div><dt>Einde</dt><dd>{formatTime(selectedRoadEvent.time.validUntil)}</dd></div>}
-              {selectedRoadEvent.queueLengthMeters !== null && <div><dt>Filelengte</dt><dd>{(selectedRoadEvent.queueLengthMeters / 1_000).toLocaleString("nl-NL", { maximumFractionDigits: 1 })} km</dd></div>}
-              {selectedRoadEvent.delaySeconds !== null && <div><dt>Vertraging</dt><dd>{Math.round(selectedRoadEvent.delaySeconds / 60)} min</dd></div>}
-              {selectedRoadEvent.temporarySpeedLimitKmh !== null && <div><dt>Tijdelijke limiet</dt><dd>{selectedRoadEvent.temporarySpeedLimitKmh} km/h</dd></div>}
-            </dl>
-            <small>SOURCE · {selectedRoadEvent.provenance.geometryOrigin} · versie {selectedRoadEvent.version}</small>
-          </> : <p>Selecteer een gekleurde lijn of stip. Op lage zoomniveaus worden puntmeldingen per categorie gebundeld.</p>}
-        </aside>
       </section>
 
       <section className="fleetTools" aria-label="Treinselectie">
         <div><strong>{vehicles.length}</strong><span>treinen live</span></div>
         <label>
           <span>Zoek trein, station of materieel</span>
-          <input aria-label="Zoek trein, station of materieel" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek trein of station" />
+          <input ref={searchInputRef} aria-label="Zoek trein, station of materieel" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek trein of station" />
         </label>
         {query.trim() && <div className="trainResults">
           {stationResults.length > 0 && <p className="searchGroupLabel">Stations</p>}
@@ -1557,6 +1589,15 @@ export function MobilityDashboard() {
         </div>}
       </section>
 
+      <section className="quickFilters" aria-label="Snelle kaartfilters">
+        <button className="filterSettings" type="button" onClick={() => setShowLayers(true)} aria-label="Open alle kaartlagen">☷</button>
+        <button className="trainFilter" type="button" aria-pressed={mapLayers.trains} onClick={() => setMapLayers((current) => ({ ...current, trains: !current.trains }))}><i>▣</i><span>Treinen</span></button>
+        {roadLayerDefinitions.map((layer) => <button className={`roadFilter ${layer.key}`} type="button" key={layer.key} aria-pressed={roadLayers[layer.key]} onClick={() => setRoadLayers((current) => ({ ...current, [layer.key]: !current[layer.key] }))}>
+          <i>{layer.key === "congestion" ? "≡" : layer.key === "closures" ? "−" : layer.key === "roadworks" ? "◆" : "!"}</i>
+          <span>{layer.key === "incidents" ? "Incidenten" : layer.label}</span>
+        </button>)}
+      </section>
+
       <section className="workspace" id="map" aria-label="Landelijk realtime treindashboard">
         <div className="mapWrap">
           <div ref={mapElement} className="liveMap" aria-label="Kaart van Nederland met actuele bronposities" />
@@ -1568,6 +1609,14 @@ export function MobilityDashboard() {
               <span>Lagen</span>
               <strong>{roadEvents.length}</strong>
             </button>
+          </div>
+          <div className="mapLegendCompact" aria-label="Legenda">
+            <strong>Legenda</strong>
+            <span><i className="legendRail" /> Spoorlijn</span>
+            <span><i className="legendTrain" /> Trein</span>
+            <span><i className="legendCongestion" /> File</span>
+            <span><i className="legendIncident" /> Incident</span>
+            <span><i className="legendRoadworks" /> Werkzaamheden</span>
           </div>
           <div className="mapAttribution">© OpenStreetMap-bijdragers · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
         </div>

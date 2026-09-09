@@ -1080,3 +1080,223 @@ body {
   .nextStopCard { margin-left:12px; margin-right:12px; }
   .trainQuickFacts { margin-left:12px; margin-right:12px; }
 }
+
+/* Mockup-inspired radar shell: navigation, filters and live feed stay above the map. */
+:root {
+  --radar-sidebar:clamp(230px,14vw,310px);
+  --radar-feed:clamp(390px,22vw,520px);
+  --radar-blue:#1268d7;
+  --radar-navy:#14253d;
+  --radar-border:#dce5eb;
+  --radar-shadow:0 18px 50px rgba(29,55,78,.16);
+}
+
+.topbar {
+  position:absolute;
+  inset:0 auto 0 0;
+  z-index:30;
+  width:var(--radar-sidebar);
+  height:auto;
+  padding:clamp(24px,1.7vw,36px) clamp(18px,1.25vw,28px);
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  border:0;
+  border-right:1px solid rgba(216,227,234,.92);
+  border-radius:0;
+  background:rgba(255,255,255,.965);
+  box-shadow:10px 0 35px rgba(26,55,77,.08);
+  backdrop-filter:blur(18px);
+}
+.brandBlock { display:grid; gap:8px; }
+.brandBlock .brand { display:block; }
+.brandBlock .brandLogo { width:min(100%,205px); height:auto; display:block; }
+.brandBlock p { margin:0 0 18px; padding-left:3px; color:#788b99; font-size:11px; letter-spacing:.01em; }
+.topbar>.sourcePill { display:none; }
+.sideNav { display:grid; gap:8px; }
+.sideNav button {
+  width:100%; min-height:52px; padding:0 15px; display:flex; align-items:center; gap:13px;
+  border:0; border-radius:13px; background:transparent; color:#24384f;
+  font:750 14px/1 var(--font-geist-sans); text-align:left; cursor:pointer;
+}
+.sideNav button:hover { background:#f1f6fa; }
+.sideNav button.active { background:#e8f2ff; color:#1268d7; }
+.sideNav button span { width:22px; color:currentColor; font-size:20px; text-align:center; }
+.sidebarLive { margin-top:auto; padding:15px; border-radius:13px; background:#f4f8fb; }
+.sidebarLive .sourcePill { padding:0; border:0; background:transparent; box-shadow:none; }
+.sidebarLive small { display:block; margin-top:7px; color:#7b8d99; font-size:9px; line-height:1.45; }
+
+.fleetTools {
+  position:absolute;
+  z-index:24;
+  top:18px;
+  left:calc(var(--radar-sidebar) + 22px);
+  width:clamp(440px,26vw,650px);
+  display:grid;
+  grid-template-columns:auto minmax(260px,1fr);
+  gap:10px;
+  margin:0;
+}
+.fleetTools>div:first-child,
+.fleetTools input { height:54px; border:1px solid rgba(255,255,255,.9); border-radius:15px; background-color:rgba(255,255,255,.97); box-shadow:var(--radar-shadow); }
+.fleetTools>div:first-child { padding:0 17px; }
+.fleetTools>div:first-child strong { color:var(--radar-navy); font-size:21px; }
+.fleetTools>div:first-child span { color:#758795; font-size:9px; }
+.fleetTools input { padding:0 18px 0 47px; font-size:14px; }
+.fleetTools .trainResults { top:64px; left:98px; right:0; max-height:min(420px,calc(100dvh - 105px)); }
+
+.quickFilters {
+  position:absolute;
+  z-index:23;
+  top:18px;
+  left:calc(var(--radar-sidebar) + clamp(485px,28vw,690px));
+  right:calc(var(--radar-feed) + 34px);
+  min-width:0;
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.quickFilters::-webkit-scrollbar { display:none; }
+.quickFilters button {
+  flex:none; height:54px; padding:0 12px; display:flex; align-items:center; gap:6px;
+  border:1px solid rgba(255,255,255,.9); border-radius:15px; background:rgba(255,255,255,.96);
+  box-shadow:0 13px 35px rgba(29,55,78,.13); color:#26394d; font:750 11px/1 var(--font-geist-sans); cursor:pointer;
+}
+.quickFilters button:hover { transform:translateY(-1px); }
+.quickFilters button[aria-pressed="false"] { opacity:.58; filter:saturate(.4); }
+.quickFilters i { width:27px; height:27px; display:grid; place-items:center; border-radius:50%; color:#fff; background:#7088a0; font-style:normal; font-size:14px; }
+.quickFilters .filterSettings { width:54px; padding:0; justify-content:center; color:#18314a; font-size:21px; }
+.quickFilters .trainFilter i { background:#7957d9; }
+.quickFilters .congestion i { background:#e94e45; }
+.quickFilters .incidents i { background:#ff8a22; }
+.quickFilters .roadworks i { background:#f4bf19; color:#253344; }
+.quickFilters .closures i { background:#dd3538; }
+.quickFilters .safety i { background:#2379d7; }
+
+.railAlertsPanel.liveFeedPanel {
+  position:absolute;
+  z-index:25;
+  inset:18px 18px 18px auto;
+  width:var(--radar-feed);
+  max-height:none;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.94);
+  border-radius:18px;
+  background:rgba(255,255,255,.975);
+  box-shadow:var(--radar-shadow);
+}
+.liveFeedPanel.contextOpen { display:none; }
+.liveFeedHeader { flex:none; padding:17px 18px 14px; }
+.liveFeedHeader .railAlertCount { background:#edf3f7; color:#587080; }
+.liveFeedList { min-height:0; overflow:auto; scrollbar-width:thin; }
+.liveFeedItem {
+  position:relative; width:100%; min-height:67px; padding:10px 14px;
+  display:grid; grid-template-columns:36px minmax(0,1fr) auto 12px; align-items:center; gap:10px;
+  border:0; border-bottom:1px solid #e8eef2; background:#fff; color:var(--radar-navy);
+  font-family:inherit; text-align:left; text-decoration:none; cursor:pointer;
+}
+.liveFeedItem:hover,.liveFeedItem.selected { background:#f3f8fc; }
+.liveFeedItem .feedIcon { width:34px; height:34px; display:grid; place-items:center; border-radius:50%; background:#6b8191; color:#fff; font-weight:900; }
+.liveFeedItem.strike .feedIcon,.liveFeedItem.closures .feedIcon { background:#dc383d; }
+.liveFeedItem.congestion .feedIcon { background:#e64b45; }
+.liveFeedItem.incidents .feedIcon { background:#ff8a22; }
+.liveFeedItem.roadworks .feedIcon { background:#f6bd18; color:#303a42; }
+.liveFeedItem.safety .feedIcon { background:#2777ce; }
+.feedCopy { min-width:0; display:grid; gap:4px; }
+.feedCopy strong { overflow:hidden; color:#263b50; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+.feedCopy small { overflow:hidden; color:#7a8c98; font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
+.liveFeedItem>b { padding:5px 7px; border-radius:7px; background:#fff0ee; color:#d74b42; font-size:9px; white-space:nowrap; }
+.feedArrow { color:#7b8d98; font-size:19px; }
+.liveFeedDetail { position:relative; flex:none; margin:12px; padding:16px; border:1px solid #efdad8; border-radius:13px; background:linear-gradient(145deg,#fff4f3,#fffafa); }
+.feedDetailClose { position:absolute; top:9px; right:10px; width:28px; height:28px; border:0; border-radius:8px; background:transparent; color:#43596a; font-size:21px; cursor:pointer; }
+.detailEyebrow { color:#b14f47; font:800 8px/1 var(--font-geist-mono); letter-spacing:.1em; text-transform:uppercase; }
+.liveFeedDetail h2 { margin:8px 30px 7px 0; font-size:16px; line-height:1.15; }
+.liveFeedDetail p { margin:0; color:#566b79; font-size:10px; line-height:1.5; }
+.liveFeedDetail>div { display:flex; justify-content:space-between; gap:12px; margin-top:12px; padding-top:10px; border-top:1px solid #efdedd; color:#6d808c; font-size:9px; }
+.liveFeedDetail>div strong { color:#d24a42; }
+.strikeDetail a { color:#1767b1; font-weight:800; text-decoration:none; }
+.liveFeedPanel .railFeedSummary { flex:none; padding:12px 18px 16px; border-top:1px solid #e8eef2; }
+
+.mapActions { z-index:22; left:calc(var(--radar-sidebar) + 22px); bottom:22px; }
+.mapLegendCompact {
+  position:absolute; z-index:21; left:calc(var(--radar-sidebar) + 22px); bottom:88px;
+  width:210px; padding:14px 16px; display:grid; grid-template-columns:1fr 1fr; gap:9px 12px;
+  border:1px solid rgba(255,255,255,.9); border-radius:14px; background:rgba(255,255,255,.95);
+  box-shadow:0 14px 36px rgba(29,55,78,.13); color:#5f7482; font-size:9px;
+}
+.mapLegendCompact>strong { grid-column:1/-1; color:#263b50; font-size:12px; }
+.mapLegendCompact span { display:flex; align-items:center; gap:7px; white-space:nowrap; }
+.mapLegendCompact i { width:15px; height:4px; border-radius:8px; background:#8496a2; }
+.mapLegendCompact .legendRail { height:0; border-top:2px dashed #617d98; background:transparent; }
+.mapLegendCompact .legendTrain { width:12px; height:12px; border-radius:50%; background:#7351d1; box-shadow:0 0 0 2px #fff,0 0 0 3px #7351d1; }
+.mapLegendCompact .legendCongestion { background:#e14b43; }
+.mapLegendCompact .legendIncident { width:10px; height:10px; border-radius:50%; background:#ff8b23; }
+.mapLegendCompact .legendRoadworks { width:10px; height:10px; border-radius:50%; background:#f3bf1b; }
+
+.mapDrawer { left:calc(var(--radar-sidebar) + 22px); bottom:88px; z-index:31; }
+.mapDrawer .roadLayerPanel { width:100%; }
+.observationPanel,.stationPanel {
+  z-index:26; top:18px; right:18px; bottom:18px; width:var(--radar-feed); max-height:none;
+  border-radius:18px; box-shadow:var(--radar-shadow);
+}
+
+@media (min-width:3000px) {
+  .sideNav button { min-height:64px; font-size:17px; }
+  .brandBlock p { font-size:14px; }
+  .sidebarLive small { font-size:12px; }
+  .fleetTools>div:first-child,.fleetTools input,.quickFilters button { height:64px; }
+  .fleetTools input { font-size:17px; }
+  .quickFilters button { padding:0 19px; font-size:14px; }
+  .quickFilters .filterSettings { width:64px; }
+  .liveFeedItem { min-height:82px; padding:13px 18px; }
+  .feedCopy strong { font-size:15px; }
+  .feedCopy small,.liveFeedItem>b { font-size:12px; }
+  .liveFeedDetail h2 { font-size:20px; }
+  .liveFeedDetail p { font-size:13px; }
+  .mapLegendCompact { width:260px; padding:18px 20px; font-size:12px; }
+  .mapLegendCompact>strong { font-size:15px; }
+}
+
+@media (max-width:1500px) {
+  :root { --radar-sidebar:220px; --radar-feed:360px; }
+  .quickFilters { left:calc(var(--radar-sidebar) + 490px); }
+  .quickFilters button { padding:0 12px; }
+  .quickFilters button span { display:none; }
+}
+
+@media (max-width:900px) {
+  :root { --radar-sidebar:0px; --radar-feed:calc(100% - 20px); }
+  .topbar {
+    inset:0 0 auto 0; width:auto; height:56px; padding:0 13px; flex-direction:row; align-items:center;
+    border-right:0; border-bottom:1px solid #dde6ec; box-shadow:0 8px 25px rgba(26,55,77,.08);
+  }
+  .brandBlock { display:block; }
+  .brandBlock .brandLogo { width:125px; }
+  .brandBlock p,.sideNav { display:none; }
+  .sidebarLive { margin:0 0 0 auto; padding:0; background:transparent; }
+  .sidebarLive small { display:none; }
+  .fleetTools { top:68px; left:10px; width:calc(100% - 20px); grid-template-columns:72px minmax(0,1fr); }
+  .fleetTools>div:first-child,.fleetTools input { height:46px; border-radius:12px; }
+  .fleetTools .trainResults { top:54px; left:79px; }
+  .quickFilters { top:122px; left:10px; right:10px; }
+  .quickFilters button { height:42px; border-radius:11px; padding:0 12px; }
+  .quickFilters .filterSettings { width:42px; }
+  .quickFilters button span { display:inline; }
+  .railAlertsPanel.liveFeedPanel { inset:auto 10px 66px; width:auto; max-height:35dvh; border-radius:15px; }
+  .liveFeedPanel.contextOpen { display:none; }
+  .liveFeedList { max-height:18dvh; }
+  .liveFeedDetail { display:none; }
+  .mapActions { left:10px; bottom:10px; }
+  .mapLegendCompact { display:none; }
+  .mapDrawer { left:8px; bottom:64px; width:calc(100% - 16px); max-height:calc(100dvh - 82px); }
+  .observationPanel,.stationPanel { top:auto; right:10px; bottom:10px; width:calc(100% - 20px); max-height:min(60dvh,520px); }
+}
+
+@media (max-width:560px) {
+  .quickFilters button span { display:none; }
+  .quickFilters i { width:24px; height:24px; }
+  .liveFeedItem { grid-template-columns:34px minmax(0,1fr) auto 10px; }
+}

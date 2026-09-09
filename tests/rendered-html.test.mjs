@@ -25,7 +25,9 @@ test("server-renders uitsluitend de fullscreen livekaart met contextuele lagen",
   assert.match(html, /Afsluitingen/);
   assert.match(html, /Veiligheidsmeldingen/);
   assert.match(html, /leveranciersinformatie kan ongevalideerd zijn/);
-  assert.match(html, /Kies een melding op de kaart/);
+  assert.match(html, /Actuele meldingen/);
+  assert.match(html, /Snelle kaartfilters/);
+  assert.match(html, /Legenda/);
   assert.match(html, /Kaartbediening/);
   assert.match(html, /Sluit kaartlagen/);
   assert.match(html, /Zoek trein, station of materieel/);
