@@ -58,40 +58,10 @@ const fallbackMapStyle: StyleSpecification = {
   layers: [{ id: "osm", type: "raster", source: "osm", paint: { "raster-saturation": -0.72, "raster-contrast": 0.12 } }],
 };
 
-async function loadPublicMapStyle(): Promise<StyleSpecification> {
-  const abortController = new AbortController();
-  const timeout = window.setTimeout(() => abortController.abort(), 6_000);
-  try {
-    const [styleResponse, tileJsonResponse] = await Promise.all([
-      fetch("https://tiles.openfreemap.org/styles/positron", { signal: abortController.signal }),
-      fetch("https://tiles.openfreemap.org/planet", { signal: abortController.signal }),
-    ]);
-    if (!styleResponse.ok || !tileJsonResponse.ok) throw new Error("OpenFreeMap is niet bereikbaar");
-
-    const style = await styleResponse.json() as StyleSpecification;
-    const tileJson = await tileJsonResponse.json() as {
-      tiles?: string[];
-      minzoom?: number;
-      maxzoom?: number;
-      bounds?: [number, number, number, number];
-      attribution?: string;
-    };
-    if (!tileJson.tiles?.length) throw new Error("OpenFreeMap heeft geen tegels teruggegeven");
-
-    style.sources.openmaptiles = {
-      type: "vector",
-      tiles: tileJson.tiles,
-      minzoom: tileJson.minzoom,
-      maxzoom: tileJson.maxzoom,
-      bounds: tileJson.bounds,
-      attribution: tileJson.attribution,
-    };
-    return style;
-  } catch {
-    return fallbackMapStyle;
-  } finally {
-    window.clearTimeout(timeout);
-  }
+function loadPublicMapStyle(): StyleSpecification {
+  // Een kleine rasterstijl start betrouwbaar in alle browsers en houdt de
+  // interactieve trein-, spoor- en weglaag onafhankelijk van een vectorkaart.
+  return fallbackMapStyle;
 }
 
 const roadLayerDefinitions: { key: RoadLayerKey; label: string; color: string }[] = [
@@ -1530,7 +1500,7 @@ export function MobilityDashboard() {
               <strong>{roadEvents.length}</strong>
             </button>
           </div>
-          <div className="mapAttribution">© OpenFreeMap · © OpenMapTiles · © OpenStreetMap-bijdragers · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
+          <div className="mapAttribution">© OpenStreetMap-bijdragers · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
         </div>
         {selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
         {observation && !selectedStation && <aside className="observationPanel" aria-live="polite">
