@@ -642,6 +642,7 @@ export function MobilityDashboard() {
   const roadCounts = useMemo(() => Object.fromEntries(roadLayerDefinitions.map(({ key }) => [
     key, roadEvents.filter((event) => roadLayerFor(event) === key).length,
   ])) as Record<RoadLayerKey, number>, [roadEvents]);
+  const roadTrafficEnabled = Object.values(roadLayers).some(Boolean);
 
   const selectVehicle = useCallback((vehicleId: string, focusMap = true) => {
     const selected = vehiclesById[vehicleId];
@@ -767,10 +768,10 @@ export function MobilityDashboard() {
           padding: window.innerWidth <= 900
             ? { top: 120, right: 22, bottom: 82, left: 22 }
             : {
-                top: 105,
-                right: Math.min(560, window.innerWidth * 0.23),
+                top: 96,
+                right: Math.min(440, window.innerWidth * 0.15),
                 bottom: 70,
-                left: Math.min(320, window.innerWidth * 0.16),
+                left: Math.min(120, window.innerWidth * 0.05),
               },
         },
         attributionControl: false,
@@ -1148,7 +1149,7 @@ export function MobilityDashboard() {
                 ? spriteForVehicle(vehicleId, sample.current.materialNumber, trainSpritesRef.current)
                 : null;
               const responsiveMarkerScale = zoom < 7
-                ? (window.innerWidth >= 2200 ? 0.86 : window.innerWidth >= 1400 ? 0.68 : 0.58)
+                ? (window.innerWidth >= 2200 ? 1.05 : window.innerWidth >= 1400 ? 0.84 : 0.68)
                 : markerScale;
               drawTrainIcon(
                 context,
@@ -1535,10 +1536,10 @@ export function MobilityDashboard() {
           <p>Nederland beweegt. Live.</p>
         </div>
         <nav className="sideNav" aria-label="Hoofdnavigatie">
-          <button className="active" type="button" onClick={resetMap}><span><UiIcon name="map" /></span>Kaart</button>
-          <button type="button" onClick={() => searchInputRef.current?.focus()}><span><UiIcon name="train" /></span>Treinen</button>
-          <button type="button" onClick={() => setShowLayers(true)}><span><UiIcon name="car" /></span>Verkeersinformatie</button>
-          <button type="button" onClick={() => { setSelectedRoadEventId(null); setSelectedStation(null); clearVehicleSelection(); }}><span><UiIcon name="bell" /></span>Meldingen</button>
+          <button className="active" type="button" title="Kaart" aria-label="Kaart" onClick={resetMap}><span><UiIcon name="map" /></span><b>Kaart</b></button>
+          <button type="button" title="Treinen zoeken" aria-label="Treinen zoeken" onClick={() => searchInputRef.current?.focus()}><span><UiIcon name="train" /></span><b>Treinen</b></button>
+          <button type="button" title="Verkeersinformatie" aria-label="Verkeersinformatie" onClick={() => setShowLayers(true)}><span><UiIcon name="car" /></span><b>Verkeer</b></button>
+          <button type="button" title="Actuele meldingen" aria-label="Actuele meldingen" onClick={() => { setSelectedRoadEventId(null); setSelectedStation(null); clearVehicleSelection(); }}><span><UiIcon name="bell" /></span><b>Meldingen</b></button>
         </nav>
         <div className="sidebarLive"><div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live data" : connection}</div><small>{vehicles.length} treinen · {roadEvents.length.toLocaleString("nl-NL")} wegmeldingen</small></div>
       </header>
@@ -1548,6 +1549,12 @@ export function MobilityDashboard() {
           <div><span className="railAlertsKicker">Live overzicht</span><strong>Actuele meldingen</strong></div>
           <span className="railAlertCount">{roadEvents.length.toLocaleString("nl-NL")}</span>
         </div>
+        <div className="networkSummary" aria-label="Landelijk live-overzicht">
+          <div><strong>{vehicles.length}</strong><span>treinen live</span></div>
+          <div><strong>{roadCounts.incidents + roadCounts.closures}</strong><span>ernstige meldingen</span></div>
+          <div><strong className={connection === "live" ? "statusLive" : ""}>{connection === "live" ? "Live" : "Wachten"}</strong><span>gegevensfeed</span></div>
+        </div>
+        <div className="feedSectionTitle"><strong>Laatste updates</strong><span>Meest recent</span></div>
         <div className="liveFeedList">
           {strikeIsActive && <a className="liveFeedItem strike" href={nationalStrikeAlert.url} target="_blank" rel="noreferrer">
             <span className="feedIcon"><UiIcon name="warning" /></span><span className="feedCopy"><strong>{nationalStrikeAlert.title}</strong><small>NS · heel Nederland</small></span><b>Vandaag</b><span className="feedArrow"><UiIcon name="chevron" /></span>
@@ -1649,10 +1656,8 @@ export function MobilityDashboard() {
       <section className="quickFilters" aria-label="Snelle kaartfilters">
         <button className="filterSettings" type="button" onClick={() => setShowLayers(true)} aria-label="Open alle kaartlagen"><UiIcon name="sliders" /></button>
         <button className="trainFilter" type="button" aria-pressed={mapLayers.trains} onClick={() => setMapLayers((current) => ({ ...current, trains: !current.trains }))}><i><UiIcon name="train" /></i><span>Treinen</span></button>
-        {roadLayerDefinitions.map((layer) => <button className={`roadFilter ${layer.key}`} type="button" key={layer.key} aria-pressed={roadLayers[layer.key]} onClick={() => setRoadLayers((current) => ({ ...current, [layer.key]: !current[layer.key] }))}>
-          <i><UiIcon name={roadLayerIcon(layer.key)} /></i>
-          <span>{layer.key === "incidents" ? "Incidenten" : layer.label}</span>
-        </button>)}
+        <button className="roadFilter trafficFilter" type="button" aria-pressed={roadTrafficEnabled} onClick={() => setRoadLayers({ congestion: !roadTrafficEnabled, incidents: !roadTrafficEnabled, roadworks: !roadTrafficEnabled, closures: !roadTrafficEnabled, safety: !roadTrafficEnabled })}><i><UiIcon name="car" /></i><span>Wegverkeer</span></button>
+        <button className="alertsFilter" type="button" onClick={() => { setSelectedStation(null); clearVehicleSelection(); }}><i><UiIcon name="bell" /></i><span>Meldingen</span></button>
       </section>
 
       <section className="workspace" id="map" aria-label="Landelijk realtime treindashboard">

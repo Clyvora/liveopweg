@@ -1356,3 +1356,77 @@ body {
   .quickFilters i { width:24px; height:24px; }
   .liveFeedItem { grid-template-columns:34px minmax(0,1fr) auto 10px; }
 }
+
+/* Focused live-radar layout: more map, less chrome. */
+@media (min-width:901px) {
+  :root { --radar-sidebar:88px; --radar-feed:clamp(360px,18vw,430px); }
+  .topbar { width:var(--radar-sidebar); padding:18px 10px 14px; align-items:center; }
+  .brandBlock { display:grid; place-items:center; }
+  .brandBlock .brand { display:block; }
+  .brandBlock .brandLogo { display:block; width:72px; height:auto; }
+  .brandBlock p { display:none; }
+  .sideNav { width:100%; margin-top:24px; gap:7px; }
+  .sideNav button {
+    min-height:67px; padding:7px 2px; flex-direction:column; justify-content:center; gap:6px;
+    border-radius:12px; font-size:9px; text-align:center;
+  }
+  .sideNav button span { width:auto; }
+  .sideNav button b { font-size:9px; line-height:1; }
+  .sideNav .uiIcon { width:22px; height:22px; }
+  .sidebarLive { width:100%; padding:12px 3px; display:grid; place-items:center; text-align:center; }
+  .sidebarLive .sourcePill { display:grid; justify-items:center; gap:7px; font-size:7px; line-height:1.15; text-align:center; }
+  .sidebarLive small { display:none; }
+
+  .fleetTools { left:calc(var(--radar-sidebar) + 16px); width:clamp(430px,27vw,650px); }
+  .quickFilters { left:calc(var(--radar-sidebar) + clamp(460px,29vw,690px)); right:calc(var(--radar-feed) + 28px); }
+  .quickFilters button { padding:0 16px; font-size:12px; }
+  .quickFilters .trafficFilter i { background:#e64b45; }
+  .quickFilters .alertsFilter i { background:#2379d7; }
+  .railAlertsPanel.liveFeedPanel { inset:12px 12px 12px auto; }
+  .mapActions,.mapLegendCompact,.mapDrawer { left:calc(var(--radar-sidebar) + 16px); }
+  .mapZoomControls,.mapStylePicker { right:calc(var(--radar-feed) + 28px); }
+  .mapAttribution { right:calc(var(--radar-feed) + 28px); }
+}
+
+.networkSummary {
+  flex:none; margin:12px; padding:12px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1px;
+  overflow:hidden; border:1px solid #e1e9ee; border-radius:12px; background:#e1e9ee;
+}
+.networkSummary div { min-width:0; padding:10px 8px; display:grid; gap:5px; background:#f8fafc; text-align:center; }
+.networkSummary strong { color:#203b51; font:800 17px/1 var(--font-geist-mono); }
+.networkSummary strong.statusLive { color:#21825c; }
+.networkSummary span { color:#7a8c98; font-size:8px; line-height:1.25; }
+.feedSectionTitle { flex:none; padding:2px 17px 9px; display:flex; align-items:center; justify-content:space-between; color:#2d4558; }
+.feedSectionTitle strong { font-size:11px; }
+.feedSectionTitle span { color:#84949e; font-size:8px; }
+
+@media (min-width:3000px) {
+  :root { --radar-sidebar:108px; --radar-feed:470px; }
+  .brandBlock .brandLogo { width:88px; }
+  .sideNav button { min-height:82px; }
+  .sideNav button b { font-size:11px; }
+  .sideNav .uiIcon { width:27px; height:27px; }
+  .sidebarLive .sourcePill { font-size:9px; }
+  .networkSummary strong { font-size:21px; }
+  .networkSummary span { font-size:10px; }
+  .feedSectionTitle strong { font-size:14px; }
+  .feedSectionTitle span { font-size:10px; }
+}
+
+@media (max-width:1500px) and (min-width:901px) {
+  :root { --radar-sidebar:76px; --radar-feed:350px; }
+  .topbar { padding-left:7px; padding-right:7px; }
+  .brandBlock .brandLogo { width:64px; }
+  .sideNav button { min-height:61px; }
+  .quickFilters { left:calc(var(--radar-sidebar) + 500px); }
+  .quickFilters button span { display:inline; }
+}
+
+@media (max-width:900px) {
+  .brandBlock .brand { display:block; }
+  .networkSummary { margin:8px 10px; padding:7px; }
+  .networkSummary div { padding:7px 5px; }
+  .networkSummary strong { font-size:14px; }
+  .feedSectionTitle { padding:0 13px 7px; }
+  .railAlertsPanel.liveFeedPanel { max-height:42dvh; }
+}
