@@ -33,6 +33,7 @@ import { StationPanel } from "./StationPanel";
 
 type ConnectionState = "verbinden" | "live" | "herstellen" | "offline";
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
+type MapLayerKey = "trains" | "stations" | "railways";
 type ExpectedRoute = {
   method: "EXPECTED_SHORTEST_TRACK_PATH";
   exactSwitchPathKnown: false;
@@ -71,6 +72,20 @@ const roadLayerDefinitions: { key: RoadLayerKey; label: string; color: string }[
   { key: "closures", label: "Afsluitingen", color: "#242d32" },
   { key: "safety", label: "Veiligheidsmeldingen", color: "#2c7292" },
 ];
+
+const mapLayerDefinitions: { key: MapLayerKey; label: string; color: string }[] = [
+  { key: "trains", label: "Live treinen", color: "#1467d8" },
+  { key: "stations", label: "Stations", color: "#ffffff" },
+  { key: "railways", label: "Spoorlijnen", color: "#66516f" },
+];
+
+const nationalStrikeAlert = {
+  title: "Landelijke ov-staking",
+  body: "Vandaag rijden er in heel Nederland geen reguliere NS-treinen. Alleen de Airportsprinter rijdt vier keer per uur tussen Amsterdam Centraal, Schiphol en Hoofddorp.",
+  updatedAt: "2026-09-09T07:00:00+02:00",
+  validUntil: "2026-09-10T04:00:00+02:00",
+  url: "https://www.ns.nl/reisinformatie/calamiteiten/ov-staking-vandaag-de-hele-dag-geen-treinen.html",
+};
 
 function roadLayerFor(event: RoadEvent): RoadLayerKey {
   if (event.type === "congestion") return "congestion";
@@ -462,6 +477,9 @@ export function MobilityDashboard() {
   const [roadEventsById, setRoadEventsById] = useState<Record<string, RoadEvent>>({});
   const [selectedRoadEventId, setSelectedRoadEventId] = useState<string | null>(null);
   const [showLayers, setShowLayers] = useState(false);
+  const [mapLayers, setMapLayers] = useState<Record<MapLayerKey, boolean>>({
+    trains: true, stations: true, railways: true,
+  });
   const [roadLayers, setRoadLayers] = useState<Record<RoadLayerKey, boolean>>({
     congestion: true, incidents: true, roadworks: true, closures: true, safety: true,
   });
@@ -577,7 +595,6 @@ export function MobilityDashboard() {
     if (focusMap && map.current) {
       map.current.easeTo({
         center: [selected.position.longitude, selected.position.latitude],
-        zoom: Math.max(map.current.getZoom(), 10),
         offset: window.innerWidth <= 760
           ? [0, -Math.min(110, window.innerHeight * 0.14)]
           : [-190, 0],
@@ -605,7 +622,6 @@ export function MobilityDashboard() {
     setShowLayers(false);
     map.current?.easeTo({
       center: [station.longitude, station.latitude],
-      zoom: Math.max(map.current.getZoom(), 11),
       offset: window.innerWidth <= 760 ? [0, -Math.min(140, window.innerHeight * 0.2)] : [-195, 0],
       duration: 700,
     });
@@ -681,11 +697,20 @@ export function MobilityDashboard() {
             : { top: 60, right: 60, bottom: 60, left: 60 },
         },
         attributionControl: false,
+        scrollZoom: false,
+        boxZoom: false,
+        doubleClickZoom: false,
+        touchZoomRotate: false,
+        keyboard: false,
+        dragRotate: false,
         style: mapStyle,
       });
       map.current = instance;
       instance.on("load", () => {
         if (disposed) return;
+        const nationalZoom = instance.getZoom();
+        instance.setMinZoom(nationalZoom);
+        instance.setMaxZoom(nationalZoom);
         const stationPopup = new Popup({ closeButton: false, closeOnClick: true, offset: 12, className: "stationTooltip" });
         const stationAtPoint = (point: { x: number; y: number }) => {
           let nearest: { station: RailStation; distance: number } | null = null;
@@ -892,10 +917,7 @@ export function MobilityDashboard() {
             const feature = event.features?.[0];
             const clusterId = Number(feature?.properties?.cluster_id);
             if (!feature || !Number.isFinite(clusterId) || feature.geometry.type !== "Point") return;
-            const source = instance.getSource(pointSourceId) as GeoJSONSource;
-            void source.getClusterExpansionZoom(clusterId).then((zoom) => {
-              instance.easeTo({ center: feature.geometry.coordinates as [number, number], zoom, duration: 500 });
-            });
+            instance.easeTo({ center: feature.geometry.coordinates as [number, number], duration: 500 });
           });
         }
         instance.addSource("selected-road-event", {
@@ -1000,7 +1022,7 @@ export function MobilityDashboard() {
             // Stationpunten gebruiken dezelfde lichte canvaslaag als de treinen.
             // Tekenen vóór de treinen houdt de vloot zichtbaar en aanklikbaar.
             context.save();
-            for (const station of railStations) {
+            for (const station of mapLayers.stations ? railStations : []) {
               if (zoom < stationMinZoom(station)) continue;
               const point = instance.project([station.longitude, station.latitude]);
               if (point.x < -15 || point.x > width + 15 || point.y < -15 || point.y > height + 15) continue;
@@ -1021,7 +1043,7 @@ export function MobilityDashboard() {
               }
             }
             context.restore();
-            for (const [vehicleId, sample] of motionSamplesRef.current) {
+            for (const [vehicleId, sample] of mapLayers.trains ? motionSamplesRef.current : []) {
               const motion = renderMotion(sample, nowMs, renderDelayMs);
               const position = trackMotionPosition(
                 trackMotionSamplesRef.current.get(vehicleId) ?? null,
@@ -1046,6 +1068,9 @@ export function MobilityDashboard() {
               const sprite = zoom >= 9.3
                 ? spriteForVehicle(vehicleId, sample.current.materialNumber, trainSpritesRef.current)
                 : null;
+              const responsiveMarkerScale = zoom < 7
+                ? (window.innerWidth >= 2200 ? 0.86 : window.innerWidth >= 1400 ? 0.68 : 0.58)
+                : markerScale;
               drawTrainIcon(
                 context,
                 projected.x,
@@ -1054,7 +1079,7 @@ export function MobilityDashboard() {
                 sprite,
                 isSelected,
                 matched,
-                markerScale,
+                responsiveMarkerScale,
               );
             }
           }
@@ -1082,7 +1107,7 @@ export function MobilityDashboard() {
 
     animationFrame = window.requestAnimationFrame(renderFrame);
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [mapReady]);
+  }, [mapLayers, mapReady]);
 
   useEffect(() => {
     const instance = map.current;
@@ -1127,6 +1152,18 @@ export function MobilityDashboard() {
     instance.once("idle", applyMatchDebug);
     return () => { instance.off("idle", applyMatchDebug); };
   }, [debugMatching, mapReady, selectedVehicleId, trackMatchesByVehicle]);
+
+  useEffect(() => {
+    const instance = map.current;
+    if (!mapReady || !instance) return;
+    const setVisibility = (layerIds: string[], visible: boolean) => {
+      for (const layerId of layerIds) {
+        if (instance.getLayer(layerId)) instance.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+      }
+    };
+    setVisibility(["rail-fleet-points", "rail-fleet-selected"], mapLayers.trains);
+    setVisibility(["pdok-rail-geometry-lines"], mapLayers.railways);
+  }, [mapLayers, mapReady]);
 
   useEffect(() => {
     const instance = map.current;
@@ -1382,6 +1419,7 @@ export function MobilityDashboard() {
     ?? nextStop?.departure.plannedTrack
     ?? null;
   const operatorName = journey?.operator ?? "Onbekend";
+  const strikeIsActive = now <= Date.parse(nationalStrikeAlert.validUntil);
   const selectedTrackMatch = selectedVehicleId ? trackMatchesByVehicle[selectedVehicleId] ?? null : null;
   const acceptedSelectedMatch = selectedTrackMatch?.snappedPosition && selectedTrackMatch.status.startsWith("MATCHED")
     ? selectedTrackMatch
@@ -1410,6 +1448,23 @@ export function MobilityDashboard() {
         <div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live" : connection}</div>
       </header>
 
+      <aside className={`railAlertsPanel ${observation || selectedStation ? "contextOpen" : ""}`} aria-label="Actuele spoorberichten">
+        <div className="railAlertsHeader">
+          <div><span className="railAlertsKicker">Actueel op het spoor</span><strong>NS-meldingen</strong></div>
+          <span className={`railAlertCount ${strikeIsActive ? "critical" : "calm"}`}>{strikeIsActive ? "1 actief" : "Geen grote melding"}</span>
+        </div>
+        {strikeIsActive ? <article className="railAlertCard critical">
+          <div className="railAlertLabel"><i /> Landelijke impact</div>
+          <h2>{nationalStrikeAlert.title}</h2>
+          <p>{nationalStrikeAlert.body}</p>
+          <div className="railAlertMeta">
+            <span>NS · bijgewerkt {formatJourneyClock(nationalStrikeAlert.updatedAt)}</span>
+            <a href={nationalStrikeAlert.url} target="_blank" rel="noreferrer">Bekijk bij NS ↗</a>
+          </div>
+        </article> : <article className="railAlertCard calm"><div className="railAlertLabel"><i /> Geen landelijke calamiteit</div><p>Controleer voor vertrek altijd de reisplanner van je vervoerder.</p></article>}
+        <div className="railFeedSummary"><span><i className={connection === "live" ? "live" : ""} /> Positiefeed</span><strong>{vehicles.length} treinen zichtbaar</strong></div>
+      </aside>
+
       <section className={`roadOverview mapDrawer ${showLayers ? "open" : ""}`} aria-label="NDW-weglagen en geselecteerde wegmelding" aria-hidden={!showLayers}>
         <button className="drawerClose" type="button" onClick={() => setShowLayers(false)} aria-label="Sluit kaartlagen">×</button>
         <div className="roadLayerPanel">
@@ -1420,6 +1475,19 @@ export function MobilityDashboard() {
             </div>
             <span>{roadEvents.length.toLocaleString("nl-NL")} zichtbaar{staleRoadEvents ? ` · ${staleRoadEvents} verouderd` : ""}</span>
           </div>
+          <div className="layerToggleSection">
+            <h3>Kaart</h3>
+            <div className="roadToggles mapLayerToggles">
+              {mapLayerDefinitions.map((layer) => (
+                <label key={layer.key} style={{ "--road-color": layer.color } as React.CSSProperties}>
+                  <input type="checkbox" checked={mapLayers[layer.key]} onChange={(event) => setMapLayers((current) => ({ ...current, [layer.key]: event.target.checked }))} />
+                  <i aria-hidden="true" /><span>{layer.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="layerToggleSection">
+            <h3>Wegverkeer</h3>
           <div className="roadToggles">
             {roadLayerDefinitions.map((layer) => (
               <label key={layer.key} style={{ "--road-color": layer.color } as React.CSSProperties}>
@@ -1433,6 +1501,7 @@ export function MobilityDashboard() {
                 <strong>{roadCounts[layer.key]}</strong>
               </label>
             ))}
+          </div>
           </div>
           <p className="roadSourceNote">Bron: NDW Actueel Beeld · leveranciersinformatie kan ongevalideerd zijn · volledige snapshot iedere 60 seconden.</p>
         </div>

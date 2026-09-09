@@ -939,6 +939,121 @@ body {
 .stationExpand span { font-size:15px; line-height:1; }
 .stationExpand.smallOnly { display:none; }
 .stationPanelFooter { padding:10px 16px 12px; border-top:1px solid #e3eaf0; background:#f8fafb; line-height:1.3; }
+
+/* Ruimere radarinterface voor desktop en ultrawide schermen. */
+.topbar {
+  top:clamp(20px,1.5vw,32px);
+  left:clamp(22px,1.7vw,42px);
+  right:clamp(22px,1.7vw,42px);
+  height:clamp(44px,3vw,64px);
+}
+.brandLogo { width:clamp(156px,6.5vw,224px); }
+.sourcePill { font-size:clamp(10px,.42vw,14px); }
+.sourcePill span { width:8px; height:8px; }
+.fleetTools {
+  top:clamp(84px,6vw,122px);
+  left:clamp(22px,1.7vw,42px);
+  width:clamp(500px,25vw,720px);
+  min-width:0;
+  grid-template-columns:auto minmax(280px,1fr);
+  gap:12px;
+}
+.fleetTools>div:first-child,
+.fleetTools input { height:clamp(52px,3.2vw,68px); border-radius:15px; }
+.fleetTools>div:first-child { padding:0 clamp(15px,1vw,24px); gap:8px; }
+.fleetTools>div:first-child strong { font-size:clamp(20px,1vw,30px); }
+.fleetTools>div:first-child span { font-size:clamp(10px,.42vw,14px); }
+.fleetTools input { padding-left:48px; background-position:17px center; background-size:19px 19px; font-size:clamp(14px,.62vw,18px); }
+.fleetTools .trainResults { top:calc(clamp(52px,3.2vw,68px) + 10px); left:clamp(108px,5vw,150px); font-size:14px; }
+
+.railAlertsPanel {
+  position:absolute;
+  z-index:13;
+  top:clamp(92px,6.5vw,132px);
+  right:clamp(22px,1.7vw,42px);
+  width:clamp(360px,20vw,500px);
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.84);
+  border-radius:18px;
+  background:rgba(255,255,255,.96);
+  box-shadow:0 20px 55px rgba(16,42,67,.2);
+  color:var(--ui-navy);
+  backdrop-filter:blur(14px);
+}
+.railAlertsHeader { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:16px 18px 13px; border-bottom:1px solid #e4eaee; }
+.railAlertsHeader>div { display:grid; gap:4px; }
+.railAlertsKicker { color:#778b98; font:800 9px/1 var(--font-geist-mono); letter-spacing:.12em; text-transform:uppercase; }
+.railAlertsHeader strong { font-size:clamp(16px,.78vw,21px); }
+.railAlertCount { flex:none; padding:7px 9px; border-radius:999px; font:800 9px/1 var(--font-geist-mono); }
+.railAlertCount.critical { background:#fff0ed; color:#a33a2f; }
+.railAlertCount.calm { background:#e7f4ed; color:#28724e; }
+.railAlertCard { margin:12px; padding:16px; border-radius:13px; background:#f5f8fa; }
+.railAlertCard.critical { border:1px solid #f0c9c2; border-left:5px solid #d45040; background:#fff7f5; }
+.railAlertLabel { display:flex; align-items:center; gap:7px; color:#a13d33; font:800 9px/1 var(--font-geist-mono); letter-spacing:.09em; text-transform:uppercase; }
+.railAlertLabel i { width:8px; height:8px; border-radius:50%; background:#d45040; box-shadow:0 0 0 4px rgba(212,80,64,.12); }
+.railAlertCard h2 { margin:11px 0 7px; font-size:clamp(18px,.9vw,25px); line-height:1.08; letter-spacing:-.025em; }
+.railAlertCard p { margin:0; color:#506674; font-size:clamp(11px,.48vw,14px); line-height:1.5; }
+.railAlertMeta { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:13px; padding-top:11px; border-top:1px solid #efdcd8; }
+.railAlertMeta span { color:#7a8a94; font:700 8px/1.3 var(--font-geist-mono); }
+.railAlertMeta a { color:#1767b1; font-size:10px; font-weight:800; text-decoration:none; white-space:nowrap; }
+.railFeedSummary { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:0 18px 16px; color:#667b88; font-size:10px; }
+.railFeedSummary span { display:flex; align-items:center; gap:7px; }
+.railFeedSummary i { width:7px; height:7px; border-radius:50%; background:#9aa8af; }
+.railFeedSummary i.live { background:#1c9a66; box-shadow:0 0 0 3px rgba(28,154,102,.12); }
+.railFeedSummary strong { color:#314f61; font-size:10px; }
+
+.mapActions { top:auto; left:clamp(22px,1.7vw,42px); bottom:clamp(24px,2vw,40px); }
+.mapActions button { height:clamp(46px,2.8vw,58px); padding:0 16px; border-radius:14px; font-size:clamp(12px,.52vw,15px); }
+.mapActions svg { width:20px; height:20px; }
+.mapActions strong { font-size:10px; }
+.mapDrawer {
+  top:auto;
+  left:clamp(22px,1.7vw,42px);
+  bottom:clamp(84px,5.6vw,112px);
+  width:clamp(390px,22vw,520px);
+  max-height:calc(100dvh - 150px);
+  padding:50px 12px 12px;
+  transform:translateY(calc(100% + 140px));
+}
+.mapDrawer.open { transform:translateY(0); }
+.mapDrawer .roadLayerPanel { padding:18px; }
+.layerToggleSection { margin-top:18px; }
+.layerToggleSection h3 { margin:0 0 9px; color:#6a7d88; font:800 9px/1 var(--font-geist-mono); letter-spacing:.1em; text-transform:uppercase; }
+.mapDrawer .mapLayerToggles { grid-template-columns:repeat(3,1fr); }
+.mapDrawer .mapLayerToggles label { grid-template-columns:auto 1fr; }
+.mapDrawer .roadToggles span { font-size:11px; }
+
+.observationPanel { right:clamp(22px,1.7vw,42px); bottom:clamp(22px,1.7vw,42px); width:clamp(390px,20vw,500px); }
+.stationPanel { right:clamp(22px,1.7vw,42px); width:clamp(420px,22vw,560px); }
+
+@media (min-width:2200px) {
+  .railAlertsHeader { padding:20px 22px 16px; }
+  .railAlertCard { margin:15px; padding:20px; }
+  .railFeedSummary { padding:0 22px 20px; font-size:13px; }
+  .railFeedSummary strong { font-size:13px; }
+  .mapDrawer .roadToggles label { min-height:46px; }
+  .mapDrawer .roadToggles span { font-size:13px; }
+  .mapDrawer .roadToggles strong { font-size:13px; }
+}
+
+@media (max-width:900px) {
+  .topbar { top:12px; left:12px; right:12px; height:38px; }
+  .brandLogo { width:128px; }
+  .fleetTools { top:62px; left:12px; width:calc(100% - 24px); grid-template-columns:76px minmax(0,1fr); gap:7px; }
+  .fleetTools>div:first-child,.fleetTools input { height:44px; border-radius:11px; }
+  .fleetTools>div:first-child { padding:0 10px; }
+  .fleetTools>div:first-child strong { font-size:17px; }
+  .fleetTools>div:first-child span { font-size:8px; }
+  .fleetTools input { font-size:13px; }
+  .railAlertsPanel { top:auto; right:10px; bottom:68px; width:calc(100% - 20px); max-height:34dvh; overflow-y:auto; }
+  .railAlertsPanel.contextOpen { display:none; }
+  .railAlertCard { padding:13px; }
+  .railAlertCard p { font-size:11px; }
+  .mapActions { left:12px; bottom:12px; }
+  .mapActions button { height:44px; border-radius:12px; font-size:12px; }
+  .mapDrawer { left:8px; bottom:64px; width:calc(100% - 16px); max-height:calc(100dvh - 82px); }
+  .mapDrawer .mapLayerToggles { grid-template-columns:1fr 1fr; }
+}
 .stationPanelFooter p { margin:0; color:#8798a2; font-size:9px; line-height:1.4; }
 .stationPanelFooter a { display:inline-block; margin-top:5px; color:#7e93a1; font-size:8px; text-decoration:none; }
 .stationPanelHeader,.stationTabs,.stationBoardSummary,.stationActivity,.stationBoardColumns,.stationExpand,.stationPanelFooter { flex-shrink:0; }
