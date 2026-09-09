@@ -534,6 +534,7 @@ export function MobilityDashboard() {
   const [roadEventsById, setRoadEventsById] = useState<Record<string, RoadEvent>>({});
   const [selectedRoadEventId, setSelectedRoadEventId] = useState<string | null>(null);
   const [showLayers, setShowLayers] = useState(false);
+  const [showAlerts, setShowAlerts] = useState(false);
   const [baseMap, setBaseMap] = useState<BaseMapKey>("standard");
   const [showMapStyles, setShowMapStyles] = useState(false);
   const [mapLayers, setMapLayers] = useState<Record<MapLayerKey, boolean>>({
@@ -642,7 +643,6 @@ export function MobilityDashboard() {
   const roadCounts = useMemo(() => Object.fromEntries(roadLayerDefinitions.map(({ key }) => [
     key, roadEvents.filter((event) => roadLayerFor(event) === key).length,
   ])) as Record<RoadLayerKey, number>, [roadEvents]);
-  const roadTrafficEnabled = Object.values(roadLayers).some(Boolean);
 
   const selectVehicle = useCallback((vehicleId: string, focusMap = true) => {
     const selected = vehiclesById[vehicleId];
@@ -655,6 +655,8 @@ export function MobilityDashboard() {
     setExpectedRoute(null);
     setRouteLoading(true);
     setQuery("");
+    setShowAlerts(false);
+    setShowLayers(false);
     replaceSelectionUrl({ train: selected.trainNumber });
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ protocolVersion: 2, type: "select", vehicleId }));
     if (focusMap && map.current) {
@@ -685,6 +687,7 @@ export function MobilityDashboard() {
     setSelectedStation(station);
     replaceSelectionUrl({ station: station.code });
     setShowLayers(false);
+    setShowAlerts(false);
     map.current?.easeTo({
       center: [station.longitude, station.latitude],
       offset: window.innerWidth <= 760 ? [0, -Math.min(140, window.innerHeight * 0.2)] : [-195, 0],
@@ -694,6 +697,7 @@ export function MobilityDashboard() {
 
   const resetMap = useCallback(() => {
     setShowLayers(false);
+    setShowAlerts(false);
     setSelectedRoadEventId(null);
     setSelectedStation(null);
     clearVehicleSelection();
@@ -735,6 +739,7 @@ export function MobilityDashboard() {
       if (event.key !== "Escape") return;
       setSelectedStation(null);
       setShowLayers(false);
+      setShowAlerts(false);
       clearVehicleSelection();
     };
     window.addEventListener("keydown", close);
@@ -748,7 +753,8 @@ export function MobilityDashboard() {
   useEffect(() => {
     selectRoadFromMapRef.current = (eventId) => {
       setSelectedRoadEventId(eventId);
-      setShowLayers(true);
+      setShowLayers(false);
+      setShowAlerts(true);
     };
   }, []);
 
@@ -769,9 +775,9 @@ export function MobilityDashboard() {
             ? { top: 120, right: 22, bottom: 82, left: 22 }
             : {
                 top: 96,
-                right: Math.min(440, window.innerWidth * 0.15),
+                right: 60,
                 bottom: 70,
-                left: Math.min(120, window.innerWidth * 0.05),
+                left: 60,
               },
         },
         attributionControl: false,
@@ -1533,21 +1539,14 @@ export function MobilityDashboard() {
       <header className="topbar">
         <div className="brandBlock">
           <a className="brand" href="#map" aria-label="Liveopweg"><img className="brandLogo" src="/liveopweg-logo.png?v=3" alt="Liveopweg" /></a>
-          <p>Nederland beweegt. Live.</p>
         </div>
-        <nav className="sideNav" aria-label="Hoofdnavigatie">
-          <button className="active" type="button" title="Kaart" aria-label="Kaart" onClick={resetMap}><span><UiIcon name="map" /></span><b>Kaart</b></button>
-          <button type="button" title="Treinen zoeken" aria-label="Treinen zoeken" onClick={() => searchInputRef.current?.focus()}><span><UiIcon name="train" /></span><b>Treinen</b></button>
-          <button type="button" title="Verkeersinformatie" aria-label="Verkeersinformatie" onClick={() => setShowLayers(true)}><span><UiIcon name="car" /></span><b>Verkeer</b></button>
-          <button type="button" title="Actuele meldingen" aria-label="Actuele meldingen" onClick={() => { setSelectedRoadEventId(null); setSelectedStation(null); clearVehicleSelection(); }}><span><UiIcon name="bell" /></span><b>Meldingen</b></button>
-        </nav>
-        <div className="sidebarLive"><div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live data" : connection}</div><small>{vehicles.length} treinen · {roadEvents.length.toLocaleString("nl-NL")} wegmeldingen</small></div>
+        <div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live" : connection}</div>
       </header>
 
-      <aside className={`railAlertsPanel liveFeedPanel ${observation || selectedStation ? "contextOpen" : ""}`} aria-label="Actuele meldingen">
+      <aside className={`railAlertsPanel liveFeedPanel ${showAlerts || selectedRoadEvent ? "open" : ""} ${observation || selectedStation ? "contextOpen" : ""}`} aria-label="Actuele meldingen" aria-hidden={!showAlerts && !selectedRoadEvent}>
         <div className="railAlertsHeader liveFeedHeader">
           <div><span className="railAlertsKicker">Live overzicht</span><strong>Actuele meldingen</strong></div>
-          <span className="railAlertCount">{roadEvents.length.toLocaleString("nl-NL")}</span>
+          <div className="liveFeedHeaderActions"><span className="railAlertCount">{roadEvents.length.toLocaleString("nl-NL")}</span><button type="button" onClick={() => { setShowAlerts(false); setSelectedRoadEventId(null); }} aria-label="Sluit meldingen">×</button></div>
         </div>
         <div className="networkSummary" aria-label="Landelijk live-overzicht">
           <div><strong>{vehicles.length}</strong><span>treinen live</span></div>
@@ -1653,13 +1652,6 @@ export function MobilityDashboard() {
         </div>}
       </section>
 
-      <section className="quickFilters" aria-label="Snelle kaartfilters">
-        <button className="filterSettings" type="button" onClick={() => setShowLayers(true)} aria-label="Open alle kaartlagen"><UiIcon name="sliders" /></button>
-        <button className="trainFilter" type="button" aria-pressed={mapLayers.trains} onClick={() => setMapLayers((current) => ({ ...current, trains: !current.trains }))}><i><UiIcon name="train" /></i><span>Treinen</span></button>
-        <button className="roadFilter trafficFilter" type="button" aria-pressed={roadTrafficEnabled} onClick={() => setRoadLayers({ congestion: !roadTrafficEnabled, incidents: !roadTrafficEnabled, roadworks: !roadTrafficEnabled, closures: !roadTrafficEnabled, safety: !roadTrafficEnabled })}><i><UiIcon name="car" /></i><span>Wegverkeer</span></button>
-        <button className="alertsFilter" type="button" onClick={() => { setSelectedStation(null); clearVehicleSelection(); }}><i><UiIcon name="bell" /></i><span>Meldingen</span></button>
-      </section>
-
       <section className="workspace" id="map" aria-label="Landelijk realtime treindashboard">
         <div className="mapWrap">
           <div ref={mapElement} className="liveMap" aria-label="Kaart van Nederland met actuele bronposities" />
@@ -1671,18 +1663,13 @@ export function MobilityDashboard() {
               <span>Lagen</span>
               <strong>{roadEvents.length}</strong>
             </button>
+            <button className={showAlerts ? "active" : ""} type="button" onClick={() => { setSelectedStation(null); clearVehicleSelection(); setShowLayers(false); setShowAlerts((current) => !current); }} aria-expanded={showAlerts}>
+              <UiIcon name="bell" /><span>Meldingen</span><strong>{roadCounts.incidents + roadCounts.closures}</strong>
+            </button>
           </div>
           <div className="mapZoomControls" aria-label="Kaartzoom">
             <button type="button" onClick={() => map.current?.zoomIn({ duration: 250 })} aria-label="Inzoomen op kaart">+</button>
             <button type="button" onClick={() => map.current?.zoomOut({ duration: 250 })} aria-label="Uitzoomen op kaart">−</button>
-          </div>
-          <div className="mapLegendCompact" aria-label="Legenda">
-            <strong>Legenda</strong>
-            <span><i className="legendRail" /> Spoorlijn</span>
-            <span><i className="legendTrain" /> Trein</span>
-            <span><i className="legendCongestion" /> File</span>
-            <span><i className="legendIncident" /> Incident</span>
-            <span><i className="legendRoadworks" /> Werkzaamheden</span>
           </div>
           <div className={`mapStylePicker ${showMapStyles ? "open" : ""}`}>
             <div className="mapStyleMenu" role="menu" aria-label="Kies kaartweergave" aria-hidden={!showMapStyles}>
