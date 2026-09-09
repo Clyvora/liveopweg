@@ -12,8 +12,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.liveopweg.nl"),
+  metadataBase: new URL(configuredSiteUrl || "https://www.liveopweg.nl"),
   title: "Liveopweg — Nederland beweegt. Live.",
   description: "Nederlandse realtime treinposities, officiële NDW-wegmeldingen en brongetrouwe replay.",
   openGraph: {
