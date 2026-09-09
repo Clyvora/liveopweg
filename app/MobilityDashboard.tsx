@@ -501,6 +501,7 @@ export function MobilityDashboard() {
     sprinter: null,
   });
   const map = useRef<MapLibreMap | null>(null);
+  const initialZoomRef = useRef<number | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const selectFromMapRef = useRef<(vehicleId: string) => void>(() => undefined);
   const motionSamplesRef = useRef(new Map<string, MotionSample>());
@@ -695,7 +696,7 @@ export function MobilityDashboard() {
     setSelectedRoadEventId(null);
     setSelectedStation(null);
     clearVehicleSelection();
-    map.current?.easeTo({ center: [5.3, 52.2], duration: 500 });
+    map.current?.easeTo({ center: [5.3, 52.2], zoom: initialZoomRef.current ?? undefined, duration: 500 });
   }, [clearVehicleSelection]);
 
   useEffect(() => {
@@ -773,20 +774,22 @@ export function MobilityDashboard() {
               },
         },
         attributionControl: false,
-        scrollZoom: false,
-        boxZoom: false,
-        doubleClickZoom: false,
-        touchZoomRotate: false,
-        keyboard: false,
+        minZoom: 5,
+        maxZoom: 16,
+        scrollZoom: true,
+        boxZoom: true,
+        doubleClickZoom: true,
+        touchZoomRotate: true,
+        touchPitch: false,
+        keyboard: true,
         dragRotate: false,
         style: mapStyle,
       });
       map.current = instance;
       instance.on("load", () => {
         if (disposed) return;
-        const nationalZoom = instance.getZoom();
-        instance.setMinZoom(nationalZoom);
-        instance.setMaxZoom(nationalZoom);
+        initialZoomRef.current = instance.getZoom();
+        instance.touchZoomRotate.disableRotation();
         const stationPopup = new Popup({ closeButton: false, closeOnClick: true, offset: 12, className: "stationTooltip" });
         const stationAtPoint = (point: { x: number; y: number }) => {
           let nearest: { station: RailStation; distance: number } | null = null;
@@ -1663,6 +1666,10 @@ export function MobilityDashboard() {
               <span>Lagen</span>
               <strong>{roadEvents.length}</strong>
             </button>
+          </div>
+          <div className="mapZoomControls" aria-label="Kaartzoom">
+            <button type="button" onClick={() => map.current?.zoomIn({ duration: 250 })} aria-label="Inzoomen op kaart">+</button>
+            <button type="button" onClick={() => map.current?.zoomOut({ duration: 250 })} aria-label="Uitzoomen op kaart">−</button>
           </div>
           <div className="mapLegendCompact" aria-label="Legenda">
             <strong>Legenda</strong>

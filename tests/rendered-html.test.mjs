@@ -32,6 +32,8 @@ test("server-renders uitsluitend de fullscreen livekaart met contextuele lagen",
   assert.match(html, /Standaard/);
   assert.match(html, /Licht/);
   assert.match(html, /Satelliet/);
+  assert.match(html, /Inzoomen op kaart/);
+  assert.match(html, /Uitzoomen op kaart/);
   assert.match(html, /Kaartbediening/);
   assert.match(html, /Sluit kaartlagen/);
   assert.match(html, /Zoek trein, station of materieel/);
