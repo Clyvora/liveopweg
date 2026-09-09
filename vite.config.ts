@@ -40,6 +40,23 @@ export default defineConfig(async () => {
   process.env.WRANGLER_LOG_PATH ??= ".wrangler/logs";
   process.env.MINIFLARE_REGISTRY_PATH ??= ".wrangler/registry";
 
+  // Vercel needs Nitro's Build Output API adapter. The default configuration
+  // stays on Cloudflare so local development and the Docker deployment keep
+  // using the existing worker bundle.
+  const isVercelBuild =
+    process.env.VERCEL === "1" || process.env.NITRO_PRESET === "vercel";
+
+  if (isVercelBuild) {
+    const { nitro } = await import("nitro/vite");
+    const { default: tailwindcss } = await import("@tailwindcss/postcss");
+
+    return {
+      optimizeDeps: { exclude: ["maplibre-gl"] },
+      css: { postcss: { plugins: [tailwindcss()] } },
+      plugins: [vinext(), sites(), nitro({ preset: "vercel" })],
+    };
+  }
+
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
