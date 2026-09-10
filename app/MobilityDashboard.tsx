@@ -6,7 +6,6 @@ import {
   DEFAULT_RENDER_DELAY_MS,
   renderMotion,
   type MotionSample,
-  type RenderedMotion,
 } from "../packages/domain-rail/client-motion";
 import { identifyRollingStock } from "../packages/domain-rail/rolling-stock";
 import {
@@ -30,6 +29,7 @@ import {
 import { realtimeHttpUrl, realtimeWebSocketUrl } from "./realtime-url";
 import { railStations, searchStations, stationMinZoom, stationsByCode, type RailStation } from "../packages/domain-rail/stations";
 import { StationPanel } from "./StationPanel";
+import { TrainPanel } from "./TrainPanel";
 
 type ConnectionState = "verbinden" | "live" | "herstellen" | "offline";
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
@@ -161,12 +161,6 @@ function roadEventBadge(event: RoadEvent): string {
   return event.status === "PLANNED" ? "Gepland" : "Actief";
 }
 
-function formatTime(value: string | null): string {
-  if (!value) return "Onbekend";
-  return new Intl.DateTimeFormat("nl-NL", {
-    hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short",
-  }).format(new Date(value));
-}
 
 function formatJourneyClock(value: string | null): string {
   if (!value) return "—";
@@ -177,19 +171,7 @@ function formatJourneyClock(value: string | null): string {
   }).format(new Date(value));
 }
 
-function formatAge(value: string | null, now: number): string {
-  if (!value) return "Onbekend";
-  const seconds = Math.max(0, Math.round((now - Date.parse(value)) / 1_000));
-  if (seconds < 60) return `${seconds} s`;
-  return `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
-}
 
-function formatDelay(seconds: number | null): string {
-  if (seconds === null) return "Onbekend";
-  if (seconds === 0) return "Op tijd";
-  const minutes = Math.round(Math.abs(seconds) / 60);
-  return seconds > 0 ? `+${minutes} min` : `−${minutes} min`;
-}
 
 function replaceSelectionUrl(selection: { train?: string; station?: string } = {}) {
   const url = new URL(window.location.href);
@@ -523,16 +505,12 @@ export function MobilityDashboard() {
   const [observation, setObservation] = useState<RailObservation | null>(null);
   const [journey, setJourney] = useState<RailJourney | null>(null);
   const [expectedRoute, setExpectedRoute] = useState<ExpectedRoute | null>(null);
-  const [routeLoading, setRouteLoading] = useState(false);
-  const [trainShared, setTrainShared] = useState(false);
-  const [selectedMotion, setSelectedMotion] = useState<RenderedMotion | null>(null);
   const [trackMatchesByVehicle, setTrackMatchesByVehicle] = useState<Record<string, RailTrackMatch>>({});
   const [connection, setConnection] = useState<ConnectionState>("verbinden");
-  const [sequence, setSequence] = useState(0);
   const [mapReady, setMapReady] = useState(false);
   const [query, setQuery] = useState("");
   const [now, setNow] = useState(() => Date.now());
-  const [debugMatching, setDebugMatching] = useState(false);
+  const debugMatching = false;
   const [roadEventsById, setRoadEventsById] = useState<Record<string, RoadEvent>>({});
   const [selectedRoadEventId, setSelectedRoadEventId] = useState<string | null>(null);
   const [showLayers, setShowLayers] = useState(false);
@@ -629,10 +607,6 @@ export function MobilityDashboard() {
     ]
       .some((value) => value?.toLowerCase().includes(needle))).slice(0, 12);
   }, [query, vehicles]);
-  const selectedRollingStock = useMemo(
-    () => identifyRollingStock(observation?.materialNumber),
-    [observation?.materialNumber],
-  );
   const stationResults = useMemo(() => searchStations(query), [query]);
   const availableVehicleIds = useMemo(() => new Set(vehicles.map((vehicle) => vehicle.vehicleId)), [vehicles]);
   const roadEvents = useMemo(() => Object.values(roadEventsById), [roadEventsById]);
@@ -655,7 +629,6 @@ export function MobilityDashboard() {
     setObservation(selected);
     setJourney(null);
     setExpectedRoute(null);
-    setRouteLoading(true);
     setQuery("");
     setShowAlerts(false);
     setShowLayers(false);
@@ -679,7 +652,6 @@ export function MobilityDashboard() {
     setObservation(null);
     setJourney(null);
     setExpectedRoute(null);
-    setRouteLoading(false);
     setQuery("");
     replaceSelectionUrl();
   }, []);
@@ -1076,7 +1048,6 @@ export function MobilityDashboard() {
     if (!mapReady || !map.current) return;
     let animationFrame = 0;
     let lastMapFrame = 0;
-    let lastUiFrame = 0;
 
     const renderFrame = (frameTime: number) => {
       const instance = map.current;
@@ -1088,7 +1059,6 @@ export function MobilityDashboard() {
         const nowMs = Date.now();
         const selectedId = selectedVehicleIdRef.current;
         const selectedSample = selectedId ? motionSamplesRef.current.get(selectedId) ?? null : null;
-        const selected = selectedSample ? renderMotion(selectedSample, nowMs, renderDelayMs) : null;
         const overlay = trainOverlayElement.current;
         const mapContainer = mapElement.current;
         if (overlay && mapContainer) {
@@ -1185,10 +1155,6 @@ export function MobilityDashboard() {
           }] : [],
         });
 
-        if (frameTime - lastUiFrame >= 250) {
-          lastUiFrame = frameTime;
-          setSelectedMotion(selected);
-        }
       }
       animationFrame = window.requestAnimationFrame(renderFrame);
     };
@@ -1320,7 +1286,6 @@ export function MobilityDashboard() {
         const fleetSnapshot = railFleetSnapshotMessageSchema.safeParse(decoded);
         if (fleetSnapshot.success) {
           latestSequence = fleetSnapshot.data.sequence;
-          setSequence(latestSequence);
           setVehiclesById(toRecord(fleetSnapshot.data.data));
           const previousSamples = motionSamplesRef.current;
           const restoredSamples = new Map<string, MotionSample>();
@@ -1342,7 +1307,6 @@ export function MobilityDashboard() {
             return;
           }
           latestSequence = fleetBatch.data.sequence;
-          setSequence(latestSequence);
           setVehiclesById((current) => {
             const next = { ...current };
             for (const vehicleId of fleetBatch.data.removedVehicleIds) delete next[vehicleId];
@@ -1474,72 +1438,12 @@ export function MobilityDashboard() {
         if (value.method !== "EXPECTED_SHORTEST_TRACK_PATH" || value.geometry?.type !== "MultiLineString" || !Array.isArray(value.stops)) throw new Error("Invalid route");
         setExpectedRoute(value);
       })
-      .catch(() => { if (!controller.signal.aborted) setExpectedRoute(null); })
-      .finally(() => { if (!controller.signal.aborted) setRouteLoading(false); });
+      .catch(() => { if (!controller.signal.aborted) setExpectedRoute(null); });
     return () => controller.abort();
   }, [journey, selectedVehicleId]);
 
-  const measuredAge = selectedMotion
-    ? `${Math.round(selectedMotion.sourceAgeSeconds)} s`
-    : formatAge(observation?.time.sourceMeasuredAt ?? null, now);
-  const computedState = useMemo(() => {
-    if (!observation?.time.sourceMeasuredAt) return "UNKNOWN";
-    if (selectedMotion?.stale) return "STALE";
-    const ageSeconds = (now - Date.parse(observation.time.sourceMeasuredAt)) / 1_000;
-    return ageSeconds <= observation.quality.freshnessThresholdSeconds ? observation.quality.state : "STALE";
-  }, [now, observation, selectedMotion]);
-  const confidencePercent = selectedMotion ? Math.round(selectedMotion.confidence.final * 100) : null;
-  const motionLabel = selectedMotion?.mode === "INTERPOLATED"
-    ? "INTERPOLATED"
-    : selectedMotion?.mode === "EXTRAPOLATED"
-      ? "EXTRAPOLATED · vloeiend door"
-    : selectedMotion?.mode === "STALE_HOLD"
-      ? "STALE · beweging gestopt"
-      : "SOURCE HOLD";
-  const nextStop = useMemo(() => {
-    if (!journey) return null;
-    return journey.stops.find((stop) => {
-      if (stop.calls.actual === false) return false;
-      const relevantTime = stop.departure.actualAt ?? stop.arrival.actualAt ?? stop.departure.plannedAt ?? stop.arrival.plannedAt;
-      return relevantTime ? Date.parse(relevantTime) >= now - 60_000 : false;
-    }) ?? null;
-  }, [journey, now]);
-  const currentDelay = nextStop?.departure.exactDelaySeconds ?? nextStop?.arrival.exactDelaySeconds ?? null;
-  const nextStopArrivalTime = nextStop?.arrival.actualAt
-    ?? nextStop?.arrival.plannedAt
-    ?? nextStop?.departure.actualAt
-    ?? nextStop?.departure.plannedAt
-    ?? null;
-  const nextStopTrack = nextStop?.arrival.actualTrack
-    ?? nextStop?.departure.actualTrack
-    ?? nextStop?.arrival.plannedTrack
-    ?? nextStop?.departure.plannedTrack
-    ?? null;
-  const operatorName = journey?.operator ?? "Onbekend";
   const strikeIsActive = now <= Date.parse(nationalStrikeAlert.validUntil);
-  const selectedTrackMatch = selectedVehicleId ? trackMatchesByVehicle[selectedVehicleId] ?? null : null;
-  const acceptedSelectedMatch = selectedTrackMatch?.snappedPosition && selectedTrackMatch.status.startsWith("MATCHED")
-    ? selectedTrackMatch
-    : null;
-  const displayedPosition = acceptedSelectedMatch?.snappedPosition ?? (selectedMotion
-    ? { longitude: selectedMotion.longitude, latitude: selectedMotion.latitude }
-    : null);
   const staleRoadEvents = roadEvents.filter((event) => event.status === "STALE").length;
-  const firstJourneyStop = journey?.stops.at(0) ?? null;
-  const lastJourneyStop = journey?.stops.at(-1) ?? null;
-  const selectedTrainSprite = selectedRollingStock.family === "unknown"
-    ? "/train-intercity-real.png"
-    : `/train-${selectedRollingStock.family}-v1.png`;
-  async function shareTrain() {
-    if (!observation) return;
-    const url = new URL(window.location.href);
-    url.search = `?train=${encodeURIComponent(observation.trainNumber)}`;
-    const data = { title: `Trein ${observation.trainNumber} · Liveopweg`, text: `Volg trein ${observation.trainNumber} live op Liveopweg`, url: url.toString() };
-    try {
-      if (navigator.share) await navigator.share(data); else await navigator.clipboard.writeText(data.url);
-      setTrainShared(true); window.setTimeout(() => setTrainShared(false), 1800);
-    } catch { /* Delen geannuleerd. */ }
-  }
 
   return (
     <main className="shell">
@@ -1550,8 +1454,8 @@ export function MobilityDashboard() {
         </a>
         <nav className="sideNav" aria-label="Hoofdnavigatie">
           <button className={!showAlerts && !showLayers && !observation && !selectedStation ? "active" : ""} type="button" onClick={resetMap}><UiIcon name="map" /><span>Kaart</span></button>
-          <button className={Boolean(observation) ? "active" : ""} type="button" onClick={() => searchInputRef.current?.focus()}><UiIcon name="train" /><span>Treinen</span></button>
-          <button className={Boolean(selectedStation) ? "active" : ""} type="button" onClick={() => { setMapLayers((current) => ({ ...current, stations: true })); searchInputRef.current?.focus(); }}><UiIcon name="clock" /><span>Stations</span></button>
+          <button className={observation ? "active" : ""} type="button" onClick={() => searchInputRef.current?.focus()}><UiIcon name="train" /><span>Treinen</span></button>
+          <button className={selectedStation ? "active" : ""} type="button" onClick={() => { setMapLayers((current) => ({ ...current, stations: true })); searchInputRef.current?.focus(); }}><UiIcon name="clock" /><span>Stations</span></button>
           <button className={showAlerts ? "active" : ""} type="button" onClick={() => { setSelectedStation(null); clearVehicleSelection(); setShowLayers(false); setShowAlerts((current) => !current); }}><span className="navIconWrap"><UiIcon name="bell" />{roadCounts.incidents + roadCounts.closures > 0 && <b>{Math.min(99, roadCounts.incidents + roadCounts.closures)}</b>}</span><span>Meldingen</span></button>
           <button className={showLayers ? "active" : ""} type="button" onClick={() => { setShowAlerts(false); setShowLayers(true); }}><UiIcon name="settings" /><span>Instellingen</span></button>
         </nav>
@@ -1700,103 +1604,7 @@ export function MobilityDashboard() {
           <div className="mapAttribution">{baseMap === "satellite" ? "Tiles © Esri" : "© OpenStreetMap-bijdragers"} · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
         </div>
         {selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
-        {observation && !selectedStation && <aside className="observationPanel" aria-live="polite">
-          <div className="selectedTrainHeader">
-            <div className="selectedTrainIdentity">
-              <p className="selectedTrainEyebrow"><i className={computedState === "FRESH_SOURCE" ? "fresh" : "stale"} /> Trein {observation.trainNumber} · {computedState === "FRESH_SOURCE" ? "live" : "verouderd"}</p>
-              <h2>{journey?.trainCategory.name ?? "Trein"} {observation.trainNumber}</h2>
-              <p className="selectedTrainMeta"><span>{operatorName}</span><span>{selectedRollingStock.label}</span></p>
-            </div>
-            <div className="panelHeaderActions"><button type="button" className="panelShare" onClick={() => void shareTrain()}>{trainShared ? "Gekopieerd" : "Delen"}</button><button type="button" onClick={clearVehicleSelection} aria-label="Sluit treininformatie">×</button></div>
-          </div>
-          <div className="trainHero" aria-hidden="true"><img src={selectedTrainSprite} alt="" /></div>
-          <section className="routeOverview" aria-label="Treinroute">
-            <div><i /><strong>{firstJourneyStop?.station.longName ?? "Vertrekstation onbekend"}</strong><time>{formatJourneyClock(firstJourneyStop?.departure.actualAt ?? firstJourneyStop?.departure.plannedAt ?? null)}</time></div>
-            <div><i /><strong>{lastJourneyStop?.station.longName ?? journey?.destination.actual ?? journey?.destination.planned ?? "Eindbestemming onbekend"}</strong><time>{formatJourneyClock(lastJourneyStop?.arrival.actualAt ?? lastJourneyStop?.arrival.plannedAt ?? null)}</time></div>
-          </section>
-          <div className="trainQuickFacts">
-            <div><span>Snelheid</span><strong>{observation.speed ? `${Math.round(observation.speed.valueKmh)} km/u` : "—"}</strong></div>
-            <div><span>Vertraging</span><strong className={currentDelay && currentDelay > 0 ? "delayLate" : "delayOnTime"}>{formatDelay(currentDelay)}</strong></div>
-            <div><span>Volgende halte</span><strong>{nextStop?.station.shortName ?? nextStop?.station.longName ?? "—"}</strong></div>
-          </div>
-          <div className="nextStopCard">
-            <div className="nextStopName">
-              <span>Volgende halte</span>
-              <strong>{nextStop?.station.longName ?? nextStop?.station.shortName ?? "Nog niet bekend"}</strong>
-            </div>
-            <div className="nextStopArrival">
-              <span>Aankomst</span>
-              <strong>{formatJourneyClock(nextStopArrivalTime)}</strong>
-            </div>
-            <div className="nextStopTrack">
-              <span>Spoor</span>
-              <strong>{nextStopTrack ?? "—"}</strong>
-            </div>
-          </div>
-          <section className="routeTimeline" aria-label="Verwachte route">
-            <div className="routeTimelineHeading"><strong>Ritdetails</strong><span>{routeLoading ? "Laden…" : expectedRoute ? `${expectedRoute.routedStops}/${expectedRoute.stops.length} op kaart` : "Nog niet beschikbaar"}</span></div>
-            {expectedRoute?.stops.slice(0, 5).map((stop, index) => <div className={`routeStop ${index === 0 ? "next" : ""}`} key={`${stop.code}-${index}`}>
-              <i /><span>{stop.name}</span><time dateTime={stop.arrivalAt ?? stop.departureAt ?? undefined}>{formatJourneyClock(stop.arrivalAt ?? stop.departureAt)}</time>
-            </div>)}
-            {expectedRoute && <small>Route volgt ProRail-spoorcurves; actuele wisselstanden zijn niet beschikbaar.</small>}
-          </section>
-          <p className="selectedTrainState">Bijgewerkt {measuredAge} geleden</p>
-          <details className="observationDetails">
-            <summary>Meer details</summary>
-            <div className="observationDetailsBody">
-            <div className="timestampGrid">
-            <span>Brontijd</span><strong>{formatTime(observation?.time.sourceMeasuredAt ?? null)}</strong>
-            <span>Ontvangsttijd</span><strong>{formatTime(observation?.time.receivedAt ?? null)}</strong>
-            <span>Bronleeftijd</span><strong>{measuredAge}</strong>
-            <span>Snelheid</span><strong>{observation?.speed ? `${Math.round(observation.speed.valueKmh)} km/h · GPS` : "Onbekend"}</strong>
-            <span>Materieeltype</span><strong>{selectedRollingStock.label} · {selectedRollingStock.confidence}</strong>
-            <span>Status</span><strong className={computedState === "FRESH_SOURCE" ? "freshText" : "staleText"}>{computedState}</strong>
-            <span>Rendering</span><strong>{acceptedSelectedMatch ? "MAP_MATCHED · bronhold" : motionLabel}</strong>
-            <span>Renderconfidence</span><strong>{confidencePercent === null ? "Onbekend" : `${confidencePercent}% · ${selectedMotion?.confidence.band}`}</strong>
-          </div>
-          <div className="positionComparison">
-            <div><span>Displayed position</span><strong>{displayedPosition ? `${displayedPosition.latitude.toFixed(7)}, ${displayedPosition.longitude.toFixed(7)}` : "Onbekend"}</strong><small>{acceptedSelectedMatch ? `${acceptedSelectedMatch.status} · DERIVED` : `${motionLabel} · clientweergave`}</small></div>
-            <div><span>Last source position</span><strong>{observation ? `${observation.position.latitude.toFixed(7)}, ${observation.position.longitude.toFixed(7)}` : "Onbekend"}</strong><small>SOURCE · {measuredAge} geleden</small></div>
-          </div>
-          <section className={`matchPanel ${selectedTrackMatch?.confidenceClass.toLowerCase() ?? "unknown"}`} aria-label="Landelijk map-matchresultaat">
-            <div className="matchPanelHeader">
-              <div><span>Landelijke track match</span><strong>{selectedTrackMatch?.status ?? "Buiten Nederland / niet beschikbaar"}</strong></div>
-              <button type="button" onClick={() => setDebugMatching((value) => !value)}>{debugMatching ? "Verberg debug" : "Toon debug"}</button>
-            </div>
-            <p>De interne score is geen kanspercentage. Route naar de volgende halte, actuele wisselstand en rijrichting zijn nog niet beschikbaar als matchbewijs.</p>
-            {selectedTrackMatch && <>
-              <div className="matchFacts">
-                <div><span>Afstand tot spoor</span><strong>{selectedTrackMatch.distanceMeters === null ? "Onbekend" : `${selectedTrackMatch.distanceMeters.toFixed(1)} m`}</strong></div>
-                <div><span>Kandidaten</span><strong>{selectedTrackMatch.candidateCount}</strong></div>
-                <div><span>Klasse</span><strong>{selectedTrackMatch.confidenceClass}</strong></div>
-                <div><span>Interne score</span><strong>{selectedTrackMatch.internalScore === null ? "Onbekend" : selectedTrackMatch.internalScore.toFixed(3)}</strong></div>
-                <div><span>Graphzone</span><strong>{selectedTrackMatch.zone ? `${selectedTrackMatch.zone.quality} · ${selectedTrackMatch.zone.id}` : "Onbekend"}</strong></div>
-                <div><span>Zoekstraal</span><strong>{selectedTrackMatch.searchRadiusMeters} m</strong></div>
-                <div><span>Regionale fallback</span><strong>{selectedTrackMatch.fallback?.applied ? "Toegepast · LOW" : "Niet toegepast"}</strong></div>
-                <div><span>Graphkwaliteit</span><strong>{selectedTrackMatch.zone?.fallbackAllowed ? "fallback toegestaan" : "fallback geblokkeerd"}</strong></div>
-              </div>
-              {debugMatching && <div className="matchDebug">
-                <strong>Beste kandidaatsporen</strong>
-                {selectedTrackMatch.zone?.reasons.map((reason) => <div key={reason}><code>ZONE</code><span>{reason}</span></div>)}
-                {selectedTrackMatch.fallback && <div><code>FALLBACK</code><span>{selectedTrackMatch.fallback.reason} · {selectedTrackMatch.fallback.effectiveRadiusMeters} m</span></div>}
-                {selectedTrackMatch.candidates.map((candidate) => <div key={candidate.edgeId}>
-                  <code>{candidate.edgeId.slice(-10)}</code>
-                  <span>{candidate.distanceMeters.toFixed(1)} m · score {candidate.internalScore.toFixed(3)} · {candidate.continuity}</span>
-                </div>)}
-              </div>}
-            </>}
-          </section>
-          {selectedMotion && <details className="confidenceDetails">
-            <summary>Renderconfidence-opbouw</summary>
-            <div><span>Positieleeftijd</span><strong>{Math.round(selectedMotion.confidence.positionAge * 100)}%</strong></div>
-            <div><span>GPS-kwaliteit</span><strong>{selectedMotion.confidence.gpsQuality === null ? "Onbekend" : `${Math.round(selectedMotion.confidence.gpsQuality * 100)}%`}</strong></div>
-            <div><span>Bewegingsplausibiliteit</span><strong>{Math.round(selectedMotion.confidence.movementPlausibility * 100)}%</strong></div>
-            <div><span>Rendermethode</span><strong>{Math.round(selectedMotion.confidence.renderMethod * 100)}%</strong></div>
-          </details>}
-          <div className="provenance">SOURCE + CLIENT RENDER{selectedTrackMatch ? " + DERIVED MATCH" : ""} · WS · seq {sequence}</div>
-            </div>
-          </details>
-        </aside>}
+        {observation && !selectedStation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} onClose={clearVehicleSelection} />}
       </section>
 
     </main>
