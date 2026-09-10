@@ -643,7 +643,7 @@ export function MobilityDashboard() {
     // Trigger train switch animation if selecting a different train
     if (selectedVehicleIdRef.current && selectedVehicleIdRef.current !== vehicleId) {
       previousVehicleIdRef.current = selectedVehicleIdRef.current;
-      trainSwitchAnimationRef.current = { startTime: performance.now(), duration: 400 };
+      trainSwitchAnimationRef.current = { startTime: Date.now(), duration: 400 };
     }
     setSelectedVehicleId(vehicleId);
     selectedVehicleIdRef.current = vehicleId;
@@ -1151,11 +1151,10 @@ export function MobilityDashboard() {
               );
               const matched = Boolean(position);
               const renderedPosition = position ?? motion;
-              const projected = instance.project([renderedPosition.longitude, renderedPosition.latitude]);
-              const projX = projected.x;
-              const projY = projected.y;
-              if (projX < -16 || projX > width + 16 || projY < -16 || projY > height + 16) continue;
-              // Apply animation offset to the new selected train
+              const projectedPos = instance.project([renderedPosition.longitude, renderedPosition.latitude]);
+              const projX = projectedPos.x;
+              const projY = projectedPos.y;
+              // Apply animation offset to determine effective position
               const isSelected = vehicleId === selectedId;
               const isPreviousVehicle = vehicleId === previousVehicleIdRef.current;
               let offsetX = 0;
@@ -1164,13 +1163,15 @@ export function MobilityDashboard() {
                 offsetX = trainAnimationOffsetX;
                 opacity = trainAnimationOpacity;
               } else if (switchAnim && isPreviousVehicle) {
-                // Old train slides out to the right
                 const elapsed = nowMs - switchAnim.startTime;
                 const progress = Math.min(1, elapsed / switchAnim.duration);
                 const eased = 1 - Math.pow(1 - progress, 3);
                 offsetX = eased * (width + 100);
                 opacity = 1 - eased;
               }
+              // Check visibility with offset applied
+              const effectiveX = projX + offsetX;
+              if (effectiveX < -50 || effectiveX > width + 50 || projY < -50 || projY > height + 50) continue;
               const heading = sample.current.headingDegrees;
               const derivedHeading = heading ?? (sample.previous
                 ? Math.atan2(
