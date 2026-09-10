@@ -30,6 +30,8 @@ import { realtimeHttpUrl, realtimeWebSocketUrl } from "./realtime-url";
 import { railStations, searchStations, stationMinZoom, stationsByCode, type RailStation } from "../packages/domain-rail/stations";
 import { StationPanel } from "./StationPanel";
 import { TrainPanel } from "./TrainPanel";
+import { useTheme } from "./ThemeContext";
+import { useLanguage } from "./LanguageContext";
 
 type ConnectionState = "verbinden" | "live" | "herstellen" | "offline";
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
@@ -486,6 +488,8 @@ function drawTrainIcon(
 }
 
 export function MobilityDashboard() {
+  const { theme, toggleTheme } = useTheme();
+  const { language, setLanguage, t } = useLanguage();
   const mapElement = useRef<HTMLDivElement>(null);
   const trainOverlayElement = useRef<HTMLCanvasElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -1649,8 +1653,8 @@ export function MobilityDashboard() {
 
       <section className="fleetTools" aria-label="Treinselectie">
         <label>
-          <span>Zoek trein, station of materieel</span>
-          <input ref={searchInputRef} aria-label="Zoek trein, station of materieel" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek trein of station" />
+          <span>{t("search.placeholder")}</span>
+          <input ref={searchInputRef} aria-label={t("search.label")} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("search.placeholder")} />
         </label>
         {query.trim() && <div className="trainResults">
           {stationResults.length > 0 && <p className="searchGroupLabel">Stations</p>}
@@ -1692,13 +1696,21 @@ export function MobilityDashboard() {
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4-8 4-8-4 8-4Zm-8 9 8 4 8-4M4 17l8 4 8-4" /></svg>
               <span>Lagen</span>
             </button>
+            <button type="button" onClick={toggleTheme} aria-label={theme === "dark" ? "Licht thema" : "Donker thema"}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">{theme === "dark" ? <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.36 6.36l-.71-.71M6.34 6.34l-.71-.71m12.72 0l-.71.71M6.34 17.66l-.71.71M12 7a5 5 0 100 10 5 5 0 000-10z" /> : <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />}</svg>
+              <span>{theme === "dark" ? "Licht" : "Donker"}</span>
+            </button>
+            <button type="button" onClick={() => setLanguage(language === "nl" ? "en" : "nl")} aria-label={language === "nl" ? "Switch to English" : "Schakel over naar Nederlands"}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15 15 0 014 10 15 15 0 01-4 10 15 15 0 01-4-10 15 15 0 014-10z" /></svg>
+              <span>{language === "nl" ? "EN" : "NL"}</span>
+            </button>
           </div>
           <div className="mapZoomControls" aria-label="Kaartzoom">
-            <button type="button" onClick={() => map.current?.zoomIn({ duration: 250 })} aria-label="Inzoomen op kaart">+</button>
-            <button type="button" onClick={() => map.current?.zoomOut({ duration: 250 })} aria-label="Uitzoomen op kaart">−</button>
+            <button type="button" onClick={() => map.current?.zoomIn({ duration: 250 })} aria-label={t("map.zoomIn")}>+</button>
+            <button type="button" onClick={() => map.current?.zoomOut({ duration: 250 })} aria-label={t("map.zoomOut")}>−</button>
           </div>
           <div className={`mapStylePicker ${showMapStyles ? "open" : ""}`}>
-            <div className="mapStyleMenu" role="menu" aria-label="Kies kaartweergave" aria-hidden={!showMapStyles}>
+            <div className="mapStyleMenu" role="menu" aria-label={t("map.style")} aria-hidden={!showMapStyles}>
               {baseMapDefinitions.map((definition) => <button role="menuitemradio" aria-checked={baseMap === definition.key} type="button" key={definition.key} onClick={() => { setBaseMap(definition.key); setShowMapStyles(false); }}>
                 <span className={`mapStylePreview ${definition.key}`} /><span>{definition.label}</span>{baseMap === definition.key && <b>✓</b>}
               </button>)}

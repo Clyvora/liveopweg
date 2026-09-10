@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { TrainPanel, nextTrainStop, trainClock, trainDelay } from "./TrainPanel";
 import type { RailJourney } from "../packages/protocol/journey";
 import type { RailObservation } from "../packages/protocol/rail";
+import { LanguageProvider } from "./LanguageContext";
 
 const now = Date.parse("2026-09-09T12:30:00Z");
 function stop(order: number, name: string, time: string, cancelled = false): RailJourney["stops"][number] {
@@ -13,7 +14,13 @@ function stop(order: number, name: string, time: string, cancelled = false): Rai
 const stops = [stop(0,"Amsterdam Centraal","2026-09-09T12:22:00Z"),stop(1,"Amsterdam Amstel","2026-09-09T12:28:00Z"),stop(2,"Hilversum","2026-09-09T12:38:00Z"),stop(3,"Baarn","2026-09-09T12:45:00Z",true),stop(4,"Utrecht Centraal","2026-09-09T13:01:00Z")];
 const observation = { vehicleId: "test", trainNumber: "1735", materialNumber: "8601", speed: { valueKmh:132 } } as RailObservation;
 const journey = { stops, operator:"NS", trainCategory:{name:"Intercity",code:"IC"}, destination:{actual:"Utrecht Centraal",planned:"Utrecht Centraal"} } as RailJourney;
-function render(j: RailJourney | null = journey, o = observation) { return renderToStaticMarkup(createElement(TrainPanel, { observation:o, journey:j, now, onClose() {} })); }
+function render(j: RailJourney | null = journey, o = observation) { 
+  return renderToStaticMarkup(
+    createElement(LanguageProvider, null, 
+      createElement(TrainPanel, { observation:o, journey:j, now, onClose() {} })
+    )
+  );
+}
 
 describe("train passenger panel", () => {
   it("selects the next served stop and skips passed and cancelled stops", () => {

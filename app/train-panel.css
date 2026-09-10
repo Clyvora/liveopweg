@@ -47,8 +47,30 @@
 .tpJourney li.cancelled small { color:#bd695e; }
 .tpJourney .tpEmpty { margin-left:-24px; line-height:1.5; }
 .tpHeader button:focus-visible,.tpJourneyToggle:focus-visible { outline:2px solid var(--tp-blue); outline-offset:3px; }
+.tpOccupancySection { display:flex; align-items:center; gap:8px; padding:12px 15px; background:#f0f4f8; border-radius:8px; margin-bottom:15px; font-size:12px; }
+.tpOccupancySection svg { width:20px; height:20px; fill:none; stroke:#253951; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+.tpOccupancy { padding:3px 10px; border-radius:12px; font-weight:700; font-size:11px; }
+.tpOccupancy-low { background:#d4edda; color:#155724; }
+.tpOccupancy-medium { background:#fff3cd; color:#856404; }
+.tpOccupancy-high { background:#f8d7da; color:#721c24; }
+.tpETA { color:#3375c4; font-weight:600; font-size:11px; }
+.tpStopETA { color:#3375c4; font-size:10px; margin-top:2px; }
 
-/* Train panel slide animation */
+@keyframes trainIllustrationSlideIn {
+  from {
+    transform: translateX(60%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.tpIllustration {
+  animation: trainIllustrationSlideIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
 @keyframes trainPanelSlideIn {
   from {
     transform: translateX(100%);
