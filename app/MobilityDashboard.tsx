@@ -508,6 +508,8 @@ export function MobilityDashboard() {
   const trackGeometriesRef = useRef(new Map<string, TrackGeometry>());
   const trackGeometryRequestsRef = useRef(new Set<string>());
   const selectedVehicleIdRef = useRef<string | null>(null);
+  const previousVehicleIdRef = useRef<string | null>(null);
+  const trainSwitchAnimationRef = useRef<{ startTime: number; duration: number } | null>(null);
   const pendingTrainNumberRef = useRef<string | null>(null);
   const deepLinkHandledRef = useRef(false);
   const selectRoadFromMapRef = useRef<(eventId: string) => void>(() => undefined);
@@ -531,7 +533,6 @@ export function MobilityDashboard() {
   const [showAlerts, setShowAlerts] = useState(false);
   const [baseMap, setBaseMap] = useState<BaseMapKey>("standard");
   const [showMapStyles, setShowMapStyles] = useState(false);
-  const [trainPanelAnimation, setTrainPanelAnimation] = useState<string>("");
   const [mapLayers, setMapLayers] = useState<Record<MapLayerKey, boolean>>({
     trains: true, stations: true, railways: true,
   });
@@ -639,6 +640,11 @@ export function MobilityDashboard() {
     const selected = vehiclesById[vehicleId];
     if (!selected) return;
     setSelectedStation(null);
+    // Trigger train switch animation if selecting a different train
+    if (selectedVehicleIdRef.current && selectedVehicleIdRef.current !== vehicleId) {
+      previousVehicleIdRef.current = selectedVehicleIdRef.current;
+      trainSwitchAnimationRef.current = { startTime: performance.now(), duration: 400 };
+    }
     setSelectedVehicleId(vehicleId);
     selectedVehicleIdRef.current = vehicleId;
     setObservation(selected);
@@ -647,8 +653,6 @@ export function MobilityDashboard() {
     setQuery("");
     setShowAlerts(false);
     setShowLayers(false);
-    // Trigger slide-in animation when switching trains
-    setTrainPanelAnimation("trainPanel-enter");
     replaceSelectionUrl({ train: selected.trainNumber });
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ protocolVersion: 2, type: "select", vehicleId }));
     if (focusMap && map.current) {
@@ -724,13 +728,6 @@ export function MobilityDashboard() {
   useEffect(() => {
     selectedStationRef.current = selectedStation;
   }, [selectedStation]);
-
-  useEffect(() => {
-    if (trainPanelAnimation) {
-      const timeout = setTimeout(() => setTrainPanelAnimation(""), 400);
-      return () => clearTimeout(timeout);
-    }
-  }, [trainPanelAnimation]);
 
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
@@ -1125,6 +1122,25 @@ export function MobilityDashboard() {
               }
             }
             context.restore();
+            // Calculate train switch animation offset
+            let trainAnimationOffsetX = 0;
+            let trainAnimationOpacity = 1;
+            const switchAnim = trainSwitchAnimationRef.current;
+            if (switchAnim) {
+              const elapsed = nowMs - switchAnim.startTime;
+              const progress = Math.min(1, elapsed / switchAnim.duration);
+              // Ease out cubic
+              const eased = 1 - Math.pow(1 - progress, 3);
+              if (progress >= 1) {
+                trainSwitchAnimationRef.current = null;
+                previousVehicleIdRef.current = null;
+              } else {
+                // New train slides in from left (negative x offset that decreases)
+                // Old train slides out to right (positive x offset that increases)
+                trainAnimationOffsetX = (1 - eased) * -width;
+                trainAnimationOpacity = eased;
+              }
+            }
             for (const [vehicleId, sample] of mapLayers.trains ? motionSamplesRef.current : []) {
               const motion = renderMotion(sample, nowMs, renderDelayMs);
               const position = trackMotionPosition(
@@ -1136,8 +1152,25 @@ export function MobilityDashboard() {
               const matched = Boolean(position);
               const renderedPosition = position ?? motion;
               const projected = instance.project([renderedPosition.longitude, renderedPosition.latitude]);
-              if (projected.x < -16 || projected.x > width + 16 || projected.y < -16 || projected.y > height + 16) continue;
+              const projX = projected.x;
+              const projY = projected.y;
+              if (projX < -16 || projX > width + 16 || projY < -16 || projY > height + 16) continue;
+              // Apply animation offset to the new selected train
               const isSelected = vehicleId === selectedId;
+              const isPreviousVehicle = vehicleId === previousVehicleIdRef.current;
+              let offsetX = 0;
+              let opacity = 1;
+              if (switchAnim && isSelected) {
+                offsetX = trainAnimationOffsetX;
+                opacity = trainAnimationOpacity;
+              } else if (switchAnim && isPreviousVehicle) {
+                // Old train slides out to the right
+                const elapsed = nowMs - switchAnim.startTime;
+                const progress = Math.min(1, elapsed / switchAnim.duration);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                offsetX = eased * (width + 100);
+                opacity = 1 - eased;
+              }
               const heading = sample.current.headingDegrees;
               const derivedHeading = heading ?? (sample.previous
                 ? Math.atan2(
@@ -1153,16 +1186,20 @@ export function MobilityDashboard() {
               const responsiveMarkerScale = zoom < 7
                 ? (window.innerWidth >= 2200 ? 1.05 : window.innerWidth >= 1400 ? 0.84 : 0.68)
                 : markerScale;
-              drawTrainIcon(
-                context,
-                projected.x,
-                projected.y,
-                derivedHeading * Math.PI / 180,
-                sprite,
-                isSelected,
-                matched,
-                responsiveMarkerScale,
-              );
+              if (opacity > 0) {
+                context.globalAlpha = opacity;
+                drawTrainIcon(
+                  context,
+                  projX + offsetX,
+                  projY,
+                  derivedHeading * Math.PI / 180,
+                  sprite,
+                  isSelected,
+                  matched,
+                  responsiveMarkerScale,
+                );
+                context.globalAlpha = 1;
+              }
             }
           }
         }
@@ -1672,7 +1709,7 @@ export function MobilityDashboard() {
           <div className="mapAttribution">{baseMap === "satellite" ? "Tiles © Esri" : "© OpenStreetMap-bijdragers"} · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
         </div>
         {selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
-        {observation && !selectedStation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} onClose={clearVehicleSelection} animationClass={trainPanelAnimation} />}
+        {observation && !selectedStation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} onClose={clearVehicleSelection} />}
       </section>
 
     </main>
