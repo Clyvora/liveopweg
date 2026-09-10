@@ -44,8 +44,8 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
         const result = stationBoardSchema.parse(await response.json());
         if (result.stationCode !== station.code) throw new Error("Onverwacht station");
         if (!disposed) { setBoard(result); setError(false); }
-      } catch {
-        if (!disposed) setError(true);
+      } catch (error) {
+        if (!disposed && !(error instanceof DOMException && error.name === "AbortError")) setError(true);
       } finally { window.clearTimeout(timeout); }
     }
     void refresh();

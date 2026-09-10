@@ -66,6 +66,10 @@ export function Utrecht3DView({ vehicles, matchesByVehicle, selectedVehicleId }:
   useEffect(() => {
     if (!active || !mapElement.current || map.current) return;
     let disposed = false;
+    let instance: MapLibreMap | null = null;
+    let terrainLayer: InstanceType<typeof import("./pdok-3d-tiles-layer").Pdok3dTilesLayer> | null = null;
+    let buildingsLayer: InstanceType<typeof import("./pdok-3d-tiles-layer").Pdok3dTilesLayer> | null = null;
+    let detailLayer: UtrechtStationLayer | null = null;
     setState("BUNDLE");
     const initialize = async () => {
       const [{ Map, NavigationControl }, { UtrechtStationLayer: StationLayer }, { Pdok3dTilesLayer }] = await Promise.all([
@@ -83,7 +87,7 @@ export function Utrecht3DView({ vehicles, matchesByVehicle, selectedVehicleId }:
       if (disposed) return;
       bundleRef.current = stationBundle;
       setBundle(stationBundle);
-      const instance = new Map({
+      instance = new Map({
         container: mapElement.current,
         center: [stationBundle.station.origin[0], stationBundle.station.origin[1]],
         zoom: 16.15,
@@ -119,11 +123,11 @@ export function Utrecht3DView({ vehicles, matchesByVehicle, selectedVehicleId }:
       map.current = instance;
       instance.addControl(new NavigationControl({ visualizePitch: true }), "bottom-right");
       instance.on("load", () => {
-        if (disposed) return;
+        if (disposed || !instance) return;
         const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
         const profile = deviceMemory < 4 ? "low" : deviceMemory >= 8 ? "high" : "standard";
         const totalMemoryBudget = stationBundle.renderBudget.memoryBudgetMb[profile];
-        const terrainLayer = new Pdok3dTilesLayer(
+        terrainLayer = new Pdok3dTilesLayer(
           "pdok-3d-terrain-2025",
           stationBundle.pdok3d.terrainTilesetUrl,
           Math.round(totalMemoryBudget * 0.38),
@@ -131,7 +135,7 @@ export function Utrecht3DView({ vehicles, matchesByVehicle, selectedVehicleId }:
           stationBundle.renderBudget.maxConcurrentTileParses,
           setTerrain,
         );
-        const buildingsLayer = new Pdok3dTilesLayer(
+        buildingsLayer = new Pdok3dTilesLayer(
           "pdok-3d-buildings-2025",
           stationBundle.pdok3d.buildingsTilesetUrl,
           Math.round(totalMemoryBudget * 0.62),
@@ -139,7 +143,7 @@ export function Utrecht3DView({ vehicles, matchesByVehicle, selectedVehicleId }:
           stationBundle.renderBudget.maxConcurrentTileParses,
           setBuildings,
         );
-        const detailLayer = new StationLayer(stationBundle, setStats);
+        detailLayer = new StationLayer(stationBundle, setStats);
         stationLayer.current = detailLayer;
         detailLayer.setTrains(stationTrainsRef.current);
         instance.addLayer(terrainLayer);
@@ -151,9 +155,14 @@ export function Utrecht3DView({ vehicles, matchesByVehicle, selectedVehicleId }:
     void initialize().catch(() => { if (!disposed) setState("ERROR"); });
     return () => {
       disposed = true;
+      if (instance) {
+        if (terrainLayer) { try { terrainLayer.onRemove?.(); } catch { /* ignore cleanup errors */ } }
+        if (buildingsLayer) { try { buildingsLayer.onRemove?.(); } catch { /* ignore cleanup errors */ } }
+        if (detailLayer) { try { detailLayer.onRemove?.(); } catch { /* ignore cleanup errors */ } }
+        instance.remove();
+      }
       stationLayer.current = null;
       bundleRef.current = null;
-      map.current?.remove();
       map.current = null;
       setBundle(null);
       setStats(null);

@@ -28,17 +28,20 @@ function FactIcon({ kind }: { kind: "speed" | "clock" | "stop" }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true">{kind === "clock" ? <><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></> : kind === "stop" ? <path d="M5 19V13M10 19V9M15 19V5M20 19V2" /> : <><path d="M4 19a9 9 0 1 1 16 0M12 13l4-5M5 12h2M7 6l1 2M12 4v2M19 12h-2" /><circle cx="12" cy="14" r="1.5" /></>}</svg>;
 }
 
-export function TrainPanel({ observation, journey, now, onClose }: { observation: RailObservation; journey: RailJourney | null; now: number; onClose: () => void }) {
+export function TrainPanel({ observation, journey, now, onClose, animationClass }: { observation: RailObservation; journey: RailJourney | null; now: number; onClose: () => void; animationClass?: string }) {
   const [expanded, setExpanded] = useState(true);
   const stock = identifyRollingStock(observation.materialNumber);
-  const stops = journey?.stops.slice().sort((a, b) => a.order - b.order) ?? [];
+  // Only show stations where the train will actually stop (calls.planned === true)
+  const stops = journey?.stops
+    .filter(stop => stop.calls.planned === true)
+    .sort((a, b) => a.order - b.order) ?? [];
   const next = nextTrainStop(stops, now);
   const first = stops[0]; const last = stops.at(-1);
   const arrival = next?.arrival.actualAt ?? next?.departure.actualAt ?? next?.arrival.plannedAt ?? next?.departure.plannedAt;
   const delay = next?.arrival.exactDelaySeconds ?? next?.departure.exactDelaySeconds;
   const track = next?.arrival.actualTrack ?? next?.departure.actualTrack ?? next?.arrival.plannedTrack ?? next?.departure.plannedTrack;
   const category = journey?.trainCategory.name ?? journey?.trainCategory.code ?? "Trein";
-  return <aside className="observationPanel trainPanel" aria-label="Treininformatie">
+  return <aside className={`observationPanel trainPanel ${animationClass ?? ""}`} aria-label="Treininformatie">
     <header className="tpHeader"><div><h2>{category} {observation.trainNumber}</h2><p>{journey?.operator ?? "Vervoerder onbekend"}<span>·</span>{category}<span>·</span>Trein {observation.trainNumber}</p></div><button type="button" onClick={onClose} aria-label="Sluit treininformatie">×</button></header>
     <div className="tpScroll">
       <div className="tpIllustration"><img src={`/trains/side-${stock.family}.png`} alt={stock.family === "unknown" ? "Illustratief treinzijaanzicht; materieeltype onbekend" : `Zijaanzicht ${stock.label}`} /></div>

@@ -57,6 +57,12 @@ const fallbackMapStyle: StyleSpecification = {
       tileSize: 256,
       attribution: "© OpenStreetMap-bijdragers",
     },
+    "base-light": {
+      type: "raster",
+      tiles: ["https://{s}.basemaps.cartocdn.com/a/dark_matter/{z}/{x}/{y}{r}.png"],
+      tileSize: 256,
+      attribution: "© OpenStreetMap-bijdragers © CARTO",
+    },
     "base-satellite": {
       type: "raster",
       tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
@@ -66,14 +72,14 @@ const fallbackMapStyle: StyleSpecification = {
   },
   layers: [
     { id: "base-standard", type: "raster", source: "base-standard", paint: { "raster-saturation": -0.72, "raster-contrast": 0.12 } },
-    { id: "base-light", type: "raster", source: "base-standard", layout: { visibility: "none" }, paint: { "raster-saturation": -1, "raster-contrast": -0.28, "raster-brightness-min": 0.18, "raster-brightness-max": 1 } },
+    { id: "base-light", type: "raster", source: "base-light", layout: { visibility: "none" }, paint: { "raster-saturation": -0.5, "raster-contrast": 0, "raster-brightness-min": 0.2, "raster-brightness-max": 0.85 } },
     { id: "base-satellite", type: "raster", source: "base-satellite", layout: { visibility: "none" }, paint: { "raster-saturation": -0.12, "raster-brightness-max": 0.92 } },
   ],
 };
 
 const baseMapDefinitions: { key: BaseMapKey; label: string }[] = [
   { key: "standard", label: "Standaard" },
-  { key: "light", label: "Licht" },
+  { key: "light", label: "Donker" },
   { key: "satellite", label: "Satelliet" },
 ];
 
@@ -197,6 +203,12 @@ type TrackGeometry = {
   toNode: string;
   lengthMeters: number;
 };
+
+// Smooth easing function for more natural motion
+// Uses ease-in-out cubic bezier-like curve
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
 
 function coordinateDistanceMeters(left: [number, number], right: [number, number]): number {
   const latitudeRadians = ((left[1] + right[1]) / 2) * Math.PI / 180;
@@ -326,6 +338,8 @@ function trackMotionPosition(
     return currentTrackPosition ?? currentPosition;
   }
   const progress = (targetTime - previousTime) / (currentTime - previousTime);
+  // Apply easing for smoother motion
+  const easedProgress = easeInOutCubic(progress);
   if (
     currentGeometry
     && sample.current.edgeId === sample.previous?.edgeId
@@ -333,7 +347,7 @@ function trackMotionPosition(
     && sample.current.edgeProgress !== null
   ) {
     const edgeProgress = sample.previous.edgeProgress
-      + (sample.current.edgeProgress - sample.previous.edgeProgress) * progress;
+      + (sample.current.edgeProgress - sample.previous.edgeProgress) * easedProgress;
     return pointAlongTrack(currentGeometry.coordinates, edgeProgress) ?? currentPosition;
   }
   if (
@@ -348,7 +362,7 @@ function trackMotionPosition(
       sample.previous.edgeProgress,
       currentGeometry,
       sample.current.edgeProgress,
-      progress,
+      easedProgress,
     );
     if (connectedPosition) return connectedPosition;
   }
@@ -411,10 +425,10 @@ function drawTrainIcon(
   matched: boolean,
   scale: number,
 ): void {
-  const selectedScale = selected ? Math.max(0.92, scale) : scale;
+  const selectedScale = selected ? Math.max(1.2, scale) : scale;
   const hasSprite = Boolean(sprite?.complete && sprite.naturalWidth > 0);
-  const width = (hasSprite ? (selected ? 18 : 14) : (selected ? 14 : 11)) * selectedScale;
-  const height = (hasSprite ? (selected ? 40 : 32) : (selected ? 22 : 17)) * selectedScale;
+  const width = (hasSprite ? (selected ? 28 : 22) : (selected ? 20 : 16)) * selectedScale;
+  const height = (hasSprite ? (selected ? 60 : 48) : (selected ? 32 : 24)) * selectedScale;
   context.save();
   context.translate(x, y);
   context.rotate(rotation);
@@ -517,6 +531,7 @@ export function MobilityDashboard() {
   const [showAlerts, setShowAlerts] = useState(false);
   const [baseMap, setBaseMap] = useState<BaseMapKey>("standard");
   const [showMapStyles, setShowMapStyles] = useState(false);
+  const [trainPanelAnimation, setTrainPanelAnimation] = useState<string>("");
   const [mapLayers, setMapLayers] = useState<Record<MapLayerKey, boolean>>({
     trains: true, stations: true, railways: true,
   });
@@ -632,6 +647,8 @@ export function MobilityDashboard() {
     setQuery("");
     setShowAlerts(false);
     setShowLayers(false);
+    // Trigger slide-in animation when switching trains
+    setTrainPanelAnimation("trainPanel-enter");
     replaceSelectionUrl({ train: selected.trainNumber });
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ protocolVersion: 2, type: "select", vehicleId }));
     if (focusMap && map.current) {
@@ -707,6 +724,13 @@ export function MobilityDashboard() {
   useEffect(() => {
     selectedStationRef.current = selectedStation;
   }, [selectedStation]);
+
+  useEffect(() => {
+    if (trainPanelAnimation) {
+      const timeout = setTimeout(() => setTrainPanelAnimation(""), 400);
+      return () => clearTimeout(timeout);
+    }
+  }, [trainPanelAnimation]);
 
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
@@ -1271,11 +1295,11 @@ export function MobilityDashboard() {
     let socket: WebSocket | null = null;
     let reconnectTimer: number | null = null;
     let closed = false;
-    let latestSequence = 0;
-    let latestRoadSequence = 0;
+    let latestSequence: number | null = null;
+    let latestRoadSequence: number | null = null;
 
     const connect = () => {
-      setConnection(latestSequence ? "herstellen" : "verbinden");
+      setConnection(latestSequence !== null ? "herstellen" : "verbinden");
       socket = new WebSocket(realtimeWebSocketUrl());
       socketRef.current = socket;
       socket.onopen = () => setConnection("live");
@@ -1301,7 +1325,7 @@ export function MobilityDashboard() {
         }
         const fleetBatch = railFleetBatchMessageSchema.safeParse(decoded);
         if (fleetBatch.success) {
-          if (latestSequence && fleetBatch.data.sequence !== latestSequence + 1) {
+          if (latestSequence !== null && fleetBatch.data.sequence !== latestSequence + 1) {
             socket?.send(JSON.stringify({ protocolVersion: 2, type: "resync" }));
             setConnection("herstellen");
             return;
@@ -1320,8 +1344,26 @@ export function MobilityDashboard() {
           for (const vehicle of fleetBatch.data.upserts) {
             const currentSample = motionSamplesRef.current.get(vehicle.vehicleId);
             if (currentSample?.current.observationId === vehicle.observationId) continue;
+            // Use the current interpolated position as the new starting point
+            // to avoid "jumping back" when a new position arrives
+            const now = Date.now();
+            const rendered = currentSample ? renderMotion(currentSample, now, renderDelayMs) : null;
+            const effectivePrevious = rendered && currentSample
+              ? {
+                  ...currentSample.current,
+                  position: {
+                    ...currentSample.current.position,
+                    longitude: rendered.longitude,
+                    latitude: rendered.latitude,
+                  },
+                  time: {
+                    ...currentSample.current.time,
+                    sourceMeasuredAt: new Date(now - renderDelayMs).toISOString(),
+                  },
+                }
+              : currentSample?.current ?? null;
             motionSamplesRef.current.set(vehicle.vehicleId, {
-              previous: currentSample?.current ?? null,
+              previous: effectivePrevious,
               current: vehicle,
             });
           }
@@ -1332,11 +1374,23 @@ export function MobilityDashboard() {
         if (matchSnapshot.success) {
           const matches = new Map(matchSnapshot.data.data.map((match) => [match.vehicleId, match]));
           const trackMotionSamples = new Map<string, TrackMotionSample>();
+          const now = Date.now();
           for (const match of matchSnapshot.data.data) {
-            const previous = trackMotionSamplesRef.current.get(match.vehicleId)?.current
-              ?? trackMatchesRef.current.get(match.vehicleId)
-              ?? null;
-            trackMotionSamples.set(match.vehicleId, { previous, current: match });
+            const currentTrackSample = trackMotionSamplesRef.current.get(match.vehicleId);
+            const previousMatch = currentTrackSample?.current ?? trackMatchesRef.current.get(match.vehicleId) ?? null;
+            // Use the current interpolated position as the new starting point
+            // to avoid "jumping back" when a new position arrives
+            let effectivePrevious = previousMatch;
+            if (currentTrackSample && previousMatch?.snappedPosition) {
+              const interpolatedPos = trackMotionPosition(currentTrackSample, now, renderDelayMs, trackGeometriesRef.current);
+              if (interpolatedPos) {
+                effectivePrevious = {
+                  ...previousMatch,
+                  snappedPosition: interpolatedPos,
+                };
+              }
+            }
+            trackMotionSamples.set(match.vehicleId, { previous: effectivePrevious, current: match });
           }
           trackMotionSamplesRef.current = trackMotionSamples;
           trackMatchesRef.current = matches;
@@ -1352,10 +1406,24 @@ export function MobilityDashboard() {
             matches.delete(vehicleId);
             trackMotionSamples.delete(vehicleId);
           }
+          const now = Date.now();
           for (const match of matchBatch.data.upserts) {
-            const previous = trackMotionSamples.get(match.vehicleId)?.current ?? matches.get(match.vehicleId) ?? null;
+            const currentTrackSample = trackMotionSamples.get(match.vehicleId);
+            const previousMatch = currentTrackSample?.current ?? matches.get(match.vehicleId) ?? null;
             matches.set(match.vehicleId, match);
-            trackMotionSamples.set(match.vehicleId, { previous, current: match });
+            // Use the current interpolated position as the new starting point
+            // to avoid "jumping back" when a new position arrives
+            let effectivePrevious = previousMatch;
+            if (currentTrackSample && previousMatch?.snappedPosition) {
+              const interpolatedPos = trackMotionPosition(currentTrackSample, now, renderDelayMs, trackGeometriesRef.current);
+              if (interpolatedPos) {
+                effectivePrevious = {
+                  ...previousMatch,
+                  snappedPosition: interpolatedPos,
+                };
+              }
+            }
+            trackMotionSamples.set(match.vehicleId, { previous: effectivePrevious, current: match });
           }
           trackMotionSamplesRef.current = trackMotionSamples;
           trackMatchesRef.current = matches;
@@ -1385,7 +1453,7 @@ export function MobilityDashboard() {
         }
         const roadBatch = roadBatchMessageSchema.safeParse(decoded);
         if (roadBatch.success) {
-          if (latestRoadSequence && roadBatch.data.sequence !== latestRoadSequence + 1) {
+          if (latestRoadSequence !== null && roadBatch.data.sequence !== latestRoadSequence + 1) {
             socket?.send(JSON.stringify({ protocolVersion: 2, type: "resync" }));
             return;
           }
@@ -1604,7 +1672,7 @@ export function MobilityDashboard() {
           <div className="mapAttribution">{baseMap === "satellite" ? "Tiles © Esri" : "© OpenStreetMap-bijdragers"} · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
         </div>
         {selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
-        {observation && !selectedStation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} onClose={clearVehicleSelection} />}
+        {observation && !selectedStation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} onClose={clearVehicleSelection} animationClass={trainPanelAnimation} />}
       </section>
 
     </main>
