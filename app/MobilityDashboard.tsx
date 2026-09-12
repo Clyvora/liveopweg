@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import type { GeoJSONSource, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 import {
   DEFAULT_RENDER_DELAY_MS,
@@ -41,7 +42,7 @@ type ConnectionState = "verbinden" | "live" | "herstellen" | "offline";
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
 type MapLayerKey = "trains" | "stations" | "railways";
 type BaseMapKey = "standard" | "light" | "satellite";
-type UiIconName = "map" | "train" | "car" | "bell" | "sliders" | "clock" | "settings" | "queue" | "warning" | "works" | "closure" | "shield" | "chevron";
+type UiIconName = "map" | "train" | "station" | "rail" | "car" | "bell" | "sliders" | "clock" | "settings" | "queue" | "warning" | "works" | "closure" | "shield" | "chevron";
 type ExpectedRoute = {
   method: "EXPECTED_SHORTEST_TRACK_PATH";
   exactSwitchPathKnown: false;
@@ -93,6 +94,8 @@ function UiIcon({ name }: { name: UiIconName }) {
   const paths: Record<UiIconName, React.ReactNode> = {
     map: <><path d="m3.5 6 5-2.5 7 3 5-2.5v14l-5 2.5-7-3-5 2.5V6Z" /><path d="M8.5 3.5v14M15.5 6.5v14" /></>,
     train: <><rect x="6" y="3" width="12" height="15" rx="4" /><path d="M8 21l2-3m6 0 2 3M9 7h6M8 13h8" /><circle cx="9" cy="16" r=".7" /><circle cx="15" cy="16" r=".7" /></>,
+    station: <><path d="M3 20h18M5 17V8l7-5 7 5v9M3 8h18M9 12h6M9 16h6" /></>,
+    rail: <><path d="M8 3 5 21M16 3l3 18M7 7h10M6 12h12M5 17h14" /></>,
     car: <><path d="m5 11 1.6-4h10.8l1.6 4 1.5 1.5V18h-2v-2H5v2H3v-5.5L5 11Z" /><path d="M5 11h14" /><circle cx="7" cy="14" r="1" /><circle cx="17" cy="14" r="1" /></>,
     bell: <><path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7Z" /><path d="M10 20h4" /></>,
     sliders: <><path d="M4 7h10M18 7h2M4 17h3M11 17h9" /><circle cx="16" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></>,
@@ -491,7 +494,8 @@ function drawTrainIcon(
   context.restore();
 }
 
-export function MobilityDashboard() {
+export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "alerts" }) {
+  const isAlertsPage = mode === "alerts";
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const mapElement = useRef<HTMLDivElement>(null);
@@ -539,18 +543,16 @@ export function MobilityDashboard() {
   const [roadEventsById, setRoadEventsById] = useState<Record<string, RoadEvent>>({});
   const [selectedRoadEventId, setSelectedRoadEventId] = useState<string | null>(null);
   const [showLayers, setShowLayers] = useState(false);
-  const [showAlerts, setShowAlerts] = useState(false);
   const [showJourneyPlanner, setShowJourneyPlanner] = useState(false);
   const [showDelayStats, setShowDelayStats] = useState(false);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationsEnabled] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("liveopweg-notifications") === "on");
   const [baseMap, setBaseMap] = useState<BaseMapKey>("standard");
   const [showMapStyles, setShowMapStyles] = useState(false);
   const [mapLayers, setMapLayers] = useState<Record<MapLayerKey, boolean>>({
-    trains: true, stations: true, railways: true,
+    trains: !isAlertsPage, stations: !isAlertsPage, railways: !isAlertsPage,
   });
   const [roadLayers, setRoadLayers] = useState<Record<RoadLayerKey, boolean>>({
-    congestion: true, incidents: true, roadworks: true, closures: true, safety: true,
+    congestion: isAlertsPage, incidents: isAlertsPage, roadworks: isAlertsPage, closures: isAlertsPage, safety: isAlertsPage,
   });
 
   useEffect(() => {
@@ -645,12 +647,20 @@ export function MobilityDashboard() {
   const stationResults = useMemo(() => searchStations(query), [query]);
   const availableVehicleIds = useMemo(() => new Set(vehicles.map((vehicle) => vehicle.vehicleId)), [vehicles]);
   const roadEvents = useMemo(() => Object.values(roadEventsById), [roadEventsById]);
-  const recentRoadEvents = useMemo(() => roadEvents.toSorted((left, right) => {
+  const recentRoadEvents = useMemo(() => roadEvents.filter((event) => roadLayers[roadLayerFor(event)]).toSorted((left, right) => {
     const leftTime = parseTimestamp(left.time.sourceUpdatedAt ?? left.time.publicationTime) ?? 0;
     const rightTime = parseTimestamp(right.time.sourceUpdatedAt ?? right.time.publicationTime) ?? 0;
     return rightTime - leftTime;
-  }).slice(0, 5), [roadEvents]);
+  }).slice(0, isAlertsPage ? 100 : 5), [roadEvents, roadLayers, isAlertsPage]);
   const selectedRoadEvent = selectedRoadEventId ? roadEventsById[selectedRoadEventId] ?? null : null;
+  useEffect(() => {
+    if (!isAlertsPage || !selectedRoadEvent || !map.current) return;
+    const geometry = selectedRoadEvent.geometry;
+    const coordinate = geometry.type === "Point" ? geometry.coordinates
+      : geometry.type === "LineString" ? geometry.coordinates[Math.floor(geometry.coordinates.length / 2)]
+        : geometry.coordinates[0][Math.floor(geometry.coordinates[0].length / 2)];
+    if (coordinate) map.current.flyTo({ center: coordinate, zoom: Math.max(map.current.getZoom(), 10), duration: 650, essential: true });
+  }, [isAlertsPage, selectedRoadEvent]);
   const roadCounts = useMemo(() => Object.fromEntries(roadLayerDefinitions.map(({ key }) => [
     key, roadEvents.filter((event) => roadLayerFor(event) === key).length,
   ])) as Record<RoadLayerKey, number>, [roadEvents]);
@@ -673,7 +683,6 @@ export function MobilityDashboard() {
     setJourney(null);
     setExpectedRoute(null);
     setQuery("");
-    setShowAlerts(false);
     setShowLayers(false);
     setShowJourneyPlanner(false);
     setShowDelayStats(false);
@@ -707,7 +716,6 @@ export function MobilityDashboard() {
     setSelectedStation(station);
     replaceSelectionUrl({ station: station.code });
     setShowLayers(false);
-    setShowAlerts(false);
     setShowJourneyPlanner(false);
     setShowDelayStats(false);
     setSelectedRoadEventId(null);
@@ -720,10 +728,8 @@ export function MobilityDashboard() {
 
   const resetMap = useCallback(() => {
     setShowLayers(false);
-    setShowAlerts(false);
     setShowJourneyPlanner(false);
     setShowDelayStats(false);
-    setShowMobileMenu(false);
     setSelectedRoadEventId(null);
     setSelectedStation(null);
     clearVehicleSelection();
@@ -765,10 +771,8 @@ export function MobilityDashboard() {
       if (event.key !== "Escape") return;
       setSelectedStation(null);
       setShowLayers(false);
-      setShowAlerts(false);
       setShowJourneyPlanner(false);
       setShowDelayStats(false);
-      setShowMobileMenu(false);
       setShowMapStyles(false);
       clearVehicleSelection();
     };
@@ -784,7 +788,6 @@ export function MobilityDashboard() {
     selectRoadFromMapRef.current = (eventId) => {
       setSelectedRoadEventId(eventId);
       setShowLayers(false);
-      setShowAlerts(true);
     };
   }, []);
 
@@ -855,22 +858,12 @@ export function MobilityDashboard() {
     return () => { instance.off("zoom", handleZoom); };
   }, [mapReady]);
 
-  const toggleNotifications = useCallback(async () => {
-    if (notificationsEnabled) { setNotificationsEnabled(false); return; }
-    if (!("Notification" in window)) return;
-    const permission = Notification.permission === "default"
-      ? await Notification.requestPermission()
-      : Notification.permission;
-    setNotificationsEnabled(permission === "granted");
-  }, [notificationsEnabled]);
-
   const openJourneyPlanner = useCallback(() => {
     clearVehicleSelection();
     setSelectedStation(null);
     setSelectedRoadEventId(null);
     setShowJourneyPlanner(true);
     setShowDelayStats(false);
-    setShowAlerts(false);
     setShowLayers(false);
   }, [clearVehicleSelection]);
 
@@ -880,7 +873,6 @@ export function MobilityDashboard() {
     setSelectedRoadEventId(null);
     setShowDelayStats(true);
     setShowJourneyPlanner(false);
-    setShowAlerts(false);
     setShowLayers(false);
   }, [clearVehicleSelection]);
   useEffect(() => {
@@ -911,6 +903,10 @@ export function MobilityDashboard() {
       map.current = instance;
       instance.on("load", () => {
         if (disposed) return;
+        if (isAlertsPage) {
+          instance.resize();
+          instance.fitBounds([[3.15, 50.7], [7.45, 53.7]], { padding: window.innerWidth <= 900 ? 18 : 40, duration: 0 });
+        }
         initialZoomRef.current = instance.getZoom();
         const initialCenter = instance.getCenter();
         initialCenterRef.current = [initialCenter.lng, initialCenter.lat];
@@ -1186,7 +1182,7 @@ export function MobilityDashboard() {
       map.current?.remove();
       map.current = null;
     };
-  }, []);
+  }, [isAlertsPage]);
 
   useEffect(() => {
     if (!mapReady || !map.current) return;
@@ -1689,45 +1685,48 @@ export function MobilityDashboard() {
 
   const strikeValidUntil = parseTimestamp(nationalStrikeAlert.validUntil);
   const strikeIsActive = strikeValidUntil !== null && now <= strikeValidUntil;
-  const staleRoadEvents = roadEvents.filter((event) => event.status === "STALE").length;
 
   return (
-    <main className="shell">
+    <main className={`shell ${isAlertsPage ? "alertsPage" : "trainPage"}`}>
       <header className="topbar">
-        <a className="railBrand" href="#map" aria-label="LiveOpWeg" onClick={resetMap}>
+        <Link className="railBrand" href="/" aria-label="LiveOpWeg startpagina" onClick={isAlertsPage ? undefined : resetMap}>
           <svg className="railBrandMark" viewBox="0 0 42 34" aria-hidden="true"><path d="M6 27h10V17h10V7h10" /><circle cx="6" cy="27" r="3.5" /><circle cx="16" cy="17" r="3.5" /><circle cx="26" cy="7" r="3.5" /><circle cx="36" cy="7" r="3.5" /></svg>
           <span className="railWordmark">Live<span>Op</span>Weg</span>
-        </a>
+        </Link>
         <nav className="sideNav" aria-label="Hoofdnavigatie">
-          <button className={!showAlerts && !showLayers && !observation && !selectedStation ? "active" : ""} type="button" onClick={resetMap}><UiIcon name="map" /><span>Kaart</span></button>
-          <button className={observation ? "active" : ""} type="button" onClick={() => { setShowMobileMenu(false); searchInputRef.current?.focus(); }}><UiIcon name="train" /><span>Treinen</span></button>
-          <button className={selectedStation ? "active" : ""} type="button" onClick={() => { setShowMobileMenu(false); setMapLayers((current) => ({ ...current, stations: true })); searchInputRef.current?.focus(); }}><UiIcon name="clock" /><span>Stations</span></button>
-          <button className={`secondaryNavItem ${showJourneyPlanner ? "active" : ""}`} type="button" onClick={openJourneyPlanner}><UiIcon name="queue" /><span>Reisplanner</span></button>
-          <button className={`secondaryNavItem ${showDelayStats ? "active" : ""}`} type="button" onClick={openDelayStats}><UiIcon name="settings" /><span>Statistieken</span></button>
-          <button className={showAlerts ? "active" : ""} type="button" onClick={() => { setShowMobileMenu(false); setSelectedStation(null); clearVehicleSelection(); setShowLayers(false); setShowJourneyPlanner(false); setShowDelayStats(false); setShowAlerts((current) => !current); }}><span className="navIconWrap"><UiIcon name="bell" />{roadCounts.incidents + roadCounts.closures > 0 && <b>{Math.min(99, roadCounts.incidents + roadCounts.closures)}</b>}</span><span>Meldingen</span></button>
-          <button className={`secondaryNavItem ${showLayers ? "active" : ""}`} type="button" onClick={() => { setShowAlerts(false); setShowJourneyPlanner(false); setShowDelayStats(false); setShowLayers(true); }}><UiIcon name="sliders" /><span>Instellingen</span></button>
-          <button className="mobileMoreButton" type="button" aria-expanded={showMobileMenu} aria-controls="mobileMoreMenu" onClick={() => setShowMobileMenu((current) => !current)}><UiIcon name="sliders" /><span>Meer</span></button>
-          {showMobileMenu && <div className="mobileMoreMenu" id="mobileMoreMenu">
-            <button type="button" onClick={() => { openJourneyPlanner(); setShowMobileMenu(false); }}>Reisplanner</button>
-            <button type="button" onClick={() => { openDelayStats(); setShowMobileMenu(false); }}>Statistieken</button>
-            <button type="button" onClick={() => { setShowAlerts(false); setShowJourneyPlanner(false); setShowDelayStats(false); setShowLayers(true); setShowMobileMenu(false); }}>Instellingen en lagen</button>
-          </div>}
+          <Link className={!isAlertsPage ? "active" : ""} href="/" aria-current={!isAlertsPage ? "page" : undefined} onClick={isAlertsPage ? undefined : resetMap}><UiIcon name="train" /><span>Treinen</span></Link>
+          <Link className={isAlertsPage ? "active" : ""} href="/meldingen" aria-current={isAlertsPage ? "page" : undefined}><span className="navIconWrap"><UiIcon name="bell" />{roadCounts.incidents + roadCounts.closures > 0 && <b>{Math.min(99, roadCounts.incidents + roadCounts.closures)}</b>}</span><span>Meldingen</span></Link>
+          <Link href="/instellingen"><UiIcon name="settings" /><span>Instellingen</span></Link>
+          {!isAlertsPage && <button className={`secondaryNavItem ${showJourneyPlanner ? "active" : ""}`} type="button" onClick={openJourneyPlanner}><UiIcon name="queue" /><span>Reisplanner</span></button>}
+          {!isAlertsPage && <button className={`secondaryNavItem ${showDelayStats ? "active" : ""}`} type="button" onClick={openDelayStats}><UiIcon name="clock" /><span>Statistieken</span></button>}
         </nav>
         <div className="sidebarLive"><div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live" : connection}</div></div>
       </header>
 
-      <aside className={`railAlertsPanel liveFeedPanel ${showAlerts || selectedRoadEvent ? "open" : ""} ${observation || selectedStation ? "contextOpen" : ""}`} aria-label="Actuele meldingen" aria-hidden={!showAlerts && !selectedRoadEvent}>
+      {isAlertsPage && <aside className="railAlertsPanel liveFeedPanel open" aria-label="Actuele meldingen">
         <div className="railAlertsHeader liveFeedHeader">
           <div><span className="railAlertsKicker">Live overzicht</span><strong>Actuele meldingen</strong></div>
-          <div className="liveFeedHeaderActions"><span className="railAlertCount">{roadEvents.length.toLocaleString("nl-NL")}</span><button type="button" onClick={() => { setShowAlerts(false); setSelectedRoadEventId(null); }} aria-label="Sluit meldingen">×</button></div>
+          <div className="liveFeedHeaderActions"><span className="railAlertCount">{roadEvents.length.toLocaleString("nl-NL")}</span></div>
+        </div>
+        <div className="alertFilterSection" aria-label="Filter meldingen">
+          <strong>Toon op de kaart</strong>
+          <div className="alertFilterGrid">
+            {roadLayerDefinitions.map((layer) => <label key={layer.key} className={roadLayers[layer.key] ? "selected" : ""} style={{ "--road-color": layer.color } as React.CSSProperties}>
+              <input type="checkbox" checked={roadLayers[layer.key]} onChange={(event) => setRoadLayers((current) => ({ ...current, [layer.key]: event.target.checked }))} />
+              <span className="alertFilterIcon"><UiIcon name={roadLayerIcon(layer.key)} /></span>
+              <span className="alertFilterName">{layer.label}</span>
+              <small>{roadCounts[layer.key]}</small>
+            </label>)}
+          </div>
         </div>
         <div className="networkSummary" aria-label="Landelijk live-overzicht">
-          <div><strong>{vehicles.length}</strong><span>treinen live</span></div>
+          <div><strong>{roadEvents.length}</strong><span>wegmeldingen</span></div>
           <div><strong>{roadCounts.incidents + roadCounts.closures}</strong><span>ernstige meldingen</span></div>
           <div><strong className={connection === "live" ? "statusLive" : ""}>{connection === "live" ? "Live" : "Wachten"}</strong><span>gegevensfeed</span></div>
         </div>
-        <div className="feedSectionTitle"><strong>Laatste updates</strong><span>Meest recent</span></div>
+        <div className="feedSectionTitle"><strong>Laatste updates</strong><span>{recentRoadEvents.length} zichtbaar</span></div>
         <div className="liveFeedList">
+          {!recentRoadEvents.length && <p className="alertFeedEmpty">Geen meldingen binnen de gekozen filters.</p>}
           {strikeIsActive && <a className="liveFeedItem strike" href={nationalStrikeAlert.url} target="_blank" rel="noreferrer">
             <span className="feedIcon"><UiIcon name="warning" /></span><span className="feedCopy"><strong>{nationalStrikeAlert.title}</strong><small>NS · heel Nederland</small></span><b>Vandaag</b><span className="feedArrow"><UiIcon name="chevron" /></span>
           </a>}
@@ -1750,18 +1749,18 @@ export function MobilityDashboard() {
           <p>{nationalStrikeAlert.body}</p>
           <div><span>Bijgewerkt {formatJourneyClock(nationalStrikeAlert.updatedAt)}</span><a href={nationalStrikeAlert.url} target="_blank" rel="noreferrer">Bekijk bij NS ↗</a></div>
         </article>}
-        <div className="railFeedSummary"><span><i className={connection === "live" ? "live" : ""} /> Live bronnen</span><strong>{vehicles.length} treinen zichtbaar</strong></div>
-      </aside>
+        <div className="railFeedSummary"><span><i className={connection === "live" ? "live" : ""} /> NDW live</span><strong>Geen treiniconen op deze kaart</strong></div>
+      </aside>}
 
-      <section className={`roadOverview mapDrawer ${showLayers ? "open" : ""}`} aria-label="NDW-weglagen en geselecteerde wegmelding" aria-hidden={!showLayers}>
+      {!isAlertsPage && <section className={`roadOverview mapDrawer ${showLayers ? "open" : ""}`} aria-label="Kaartlagen" aria-hidden={!showLayers}>
         <button className="drawerClose" type="button" onClick={() => setShowLayers(false)} aria-label="Sluit kaartlagen">×</button>
         <div className="roadLayerPanel">
           <div className="roadLayerHeading">
             <div>
-              <p className="panelKicker">NDW · DATEX II v3</p>
-              <h2>Actueel op de weg</h2>
+              <p className="panelKicker">Kaartweergave</p>
+              <h2>Treinenkaart</h2>
             </div>
-            <span>{roadEvents.length.toLocaleString("nl-NL")} zichtbaar{staleRoadEvents ? ` · ${staleRoadEvents} verouderd` : ""}</span>
+            <span>{vehicles.length.toLocaleString("nl-NL")} treinen</span>
           </div>
           <div className="layerToggleSection">
             <h3>Kaart</h3>
@@ -1769,33 +1768,16 @@ export function MobilityDashboard() {
               {mapLayerDefinitions.map((layer) => (
                 <label key={layer.key} style={{ "--road-color": layer.color } as React.CSSProperties}>
                   <input type="checkbox" checked={mapLayers[layer.key]} onChange={(event) => setMapLayers((current) => ({ ...current, [layer.key]: event.target.checked }))} />
-                  <i aria-hidden="true" /><span>{layer.label}</span>
+                  <span className={`trainLayerIcon ${layer.key}`}><UiIcon name={layer.key === "trains" ? "train" : layer.key === "stations" ? "station" : "rail"} /></span><span>{layer.label}</span>
                 </label>
               ))}
             </div>
           </div>
-          <div className="layerToggleSection">
-            <h3>Wegverkeer</h3>
-          <div className="roadToggles">
-            {roadLayerDefinitions.map((layer) => (
-              <label key={layer.key} style={{ "--road-color": layer.color } as React.CSSProperties}>
-                <input
-                  type="checkbox"
-                  checked={roadLayers[layer.key]}
-                  onChange={(event) => setRoadLayers((current) => ({ ...current, [layer.key]: event.target.checked }))}
-                />
-                <i aria-hidden="true" />
-                <span>{layer.label}</span>
-                <strong>{roadCounts[layer.key]}</strong>
-              </label>
-            ))}
-          </div>
-          </div>
-          <p className="roadSourceNote">Bron: NDW Actueel Beeld · leveranciersinformatie kan ongevalideerd zijn · volledige snapshot iedere 60 seconden.</p>
+          <p className="roadSourceNote">Kies welke spoorinformatie je ziet. Wegmeldingen staan op hun eigen kaart.</p>
         </div>
-      </section>
+      </section>}
 
-      <section className="fleetTools" aria-label="Treinselectie">
+      {!isAlertsPage && <section className="fleetTools" aria-label="Treinselectie">
         <label>
           <span>{t("search.placeholder")}</span>
           <input ref={searchInputRef} aria-label={t("search.label")} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("search.placeholder")} />
@@ -1822,24 +1804,22 @@ export function MobilityDashboard() {
           })}
           {!stationResults.length && !searchResults.length && <p className="searchGroupLabel">Geen trein of station gevonden.</p>}
         </div>}
-      </section>
+      </section>}
 
-      <section className="radarStatusBar" aria-label="Landelijke livestatus">
+      {!isAlertsPage && <section className="radarStatusBar" aria-label="Landelijke livestatus">
         <div><UiIcon name="train" /><strong>{vehicles.length.toLocaleString("nl-NL")}</strong><span>treinen live</span></div>
         <div><i className={connection === "live" ? "live" : ""} /><strong>{connection === "live" ? "Verbonden" : "Wachten"}</strong><span>gegevensfeed</span></div>
-        <button type="button" onClick={() => { setShowLayers(false); setShowAlerts(true); }}><UiIcon name="warning" /><strong>{roadCounts.incidents + roadCounts.closures}</strong><span>verstoringen</span></button>
-      </section>
+      </section>}
 
-      <section className="workspace" id="map" aria-label="Landelijk realtime treindashboard">
+      <section className="workspace" id="map" aria-label={isAlertsPage ? "Kaart met actuele wegmeldingen" : "Landelijk realtime treindashboard"}>
         <div className="mapWrap">
-          <div ref={mapElement} className="liveMap" aria-label="Kaart van Nederland met actuele bronposities" />
-          <canvas ref={trainOverlayElement} className="trainOverlay" aria-hidden="true" />
-          {!vehicles.length && <div className="waitingMarker"><span /> Wachten op eerste vlootbatch</div>}
+          <div ref={mapElement} className="liveMap" aria-label={isAlertsPage ? "Kaart van Nederland met wegmeldingen" : "Kaart van Nederland met actuele treinposities"} />
+          {!isAlertsPage && <canvas ref={trainOverlayElement} className="trainOverlay" aria-hidden="true" />}
+          {!isAlertsPage && !vehicles.length && <div className="waitingMarker"><span /> Wachten op eerste vlootbatch</div>}
+          {isAlertsPage && <div className="alertMapHeading"><span>Meldingenkaart</span><strong>Nederland onderweg</strong><small>Alleen wegmeldingen · geen treinen</small></div>}
           <div className="mapActions" aria-label="Kaartbediening">
-            <button type="button" onClick={() => setShowLayers(true)} aria-expanded={showLayers}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4-8 4-8-4 8-4Zm-8 9 8 4 8-4M4 17l8 4 8-4" /></svg>
-              <span>Lagen</span>
-            </button>
+            {!isAlertsPage && <button type="button" onClick={() => setShowLayers(true)} aria-expanded={showLayers}><UiIcon name="sliders" /><span>Kaartlagen</span></button>}
+            {isAlertsPage && <button type="button" onClick={() => map.current?.fitBounds([[3.15, 50.7], [7.45, 53.7]], { padding: 40, duration: 400 })}><UiIcon name="map" /><span>Heel Nederland</span></button>}
             <button type="button" onClick={toggleTheme} aria-label={theme === "dark" ? "Licht thema" : "Donker thema"}>
               <svg viewBox="0 0 24 24" aria-hidden="true">{theme === "dark" ? <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.36 6.36l-.71-.71M6.34 6.34l-.71-.71m12.72 0l-.71.71M6.34 17.66l-.71.71M12 7a5 5 0 100 10 5 5 0 000-10z" /> : <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />}</svg>
               <span>{theme === "dark" ? "Licht" : "Donker"}</span>
@@ -1863,19 +1843,13 @@ export function MobilityDashboard() {
               <span className={`mapStylePreview ${baseMap}`} /><span>{baseMapDefinitions.find((definition) => definition.key === baseMap)?.label}</span><UiIcon name="chevron" />
             </button>
           </div>
-          <div className="mapAttribution">{baseMap === "satellite" ? "Tiles © Esri" : "© OpenStreetMap-bijdragers"} · spoor: ProRail/PDOK (CC0) · wegmeldingen: NDW/leveranciers</div>
+          <div className="mapAttribution">{baseMap === "satellite" ? "Tiles © Esri" : "© OpenStreetMap-bijdragers"} · {isAlertsPage ? "wegmeldingen: NDW/leveranciers" : "spoor: ProRail/PDOK (CC0)"}</div>
         </div>
-        {selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
-        {observation && !selectedStation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} onClose={clearVehicleSelection} />}
-        {showJourneyPlanner && <JourneyPlanner onClose={() => setShowJourneyPlanner(false)} />}
-        {showDelayStats && <DelayStats vehicles={vehicles} onClose={() => setShowDelayStats(false)} />}
+        {!isAlertsPage && selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
+        {!isAlertsPage && observation && !selectedStation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} onClose={clearVehicleSelection} />}
+        {!isAlertsPage && showJourneyPlanner && <JourneyPlanner onClose={() => setShowJourneyPlanner(false)} />}
+        {!isAlertsPage && showDelayStats && <DelayStats vehicles={vehicles} onClose={() => setShowDelayStats(false)} />}
       </section>
-      <div className="notificationToggle">
-        <button type="button" onClick={toggleNotifications} aria-label={notificationsEnabled ? "Schakel meldingen uit" : t("notifications.enable")}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7Z" /><path d="M10 20h4" /></svg>
-          <span>{notificationsEnabled ? "Meldingen aan" : "Meldingen uit"}</span>
-        </button>
-      </div>
     </main>
   );
 }

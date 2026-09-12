@@ -1,0 +1,132 @@
+/* Separate map, alerts and settings workspaces. */
+.sideNav a { position:relative; width:100%; height:76px; padding:9px 4px; display:grid; place-items:center; align-content:center; gap:7px; border-left:3px solid transparent; color:#b7ccda; font:600 10px/1.1 var(--font-geist-sans); text-align:center; text-decoration:none; }
+.sideNav a:hover { background:rgba(255,255,255,.055); color:#fff; }
+.sideNav a.active { border-left-color:#2f84f5; background:rgba(45,127,232,.14); color:#fff; }
+.sideNav a > span:last-child { max-width:100%; line-height:1.2; overflow-wrap:anywhere; }
+.sideNav a .uiIcon { width:25px; height:25px; stroke-width:1.7; }
+.sideNav a:focus-visible,.settingsNav a:focus-visible,.settingsLinks a:focus-visible { outline:2px solid #83b8ff; outline-offset:-2px; }
+.trainPage .mapActions button:nth-child(n+2),.alertsPage .mapActions button:nth-child(n+2),.notificationToggle { display:none; }
+.trainPage .mapActions { bottom:22px; }
+.trainPage .radarStatusBar { max-width:calc(100% - var(--radar-sidebar) - 36px); }
+.trainPage .mapZoomControls,.trainPage .mapStylePicker { right:18px; }
+.trainPage .mapDrawer .mapLayerToggles { display:grid; grid-template-columns:1fr; gap:8px; }
+.trainPage .mapDrawer .mapLayerToggles label { min-height:54px; display:flex; align-items:center; gap:10px; border:1px solid #e2eaf0; border-radius:10px; background:#f8fafc; cursor:pointer; }
+.trainPage .mapDrawer .mapLayerToggles label:has(input:checked) { border-color:#bdd9fb; background:#eef6ff; }
+.trainPage .mapDrawer .mapLayerToggles input { width:16px; height:16px; order:3; margin-left:auto; accent-color:#1672e8; }
+.trainPage .mapDrawer .mapLayerToggles .trainLayerIcon { width:30px; height:30px; flex:none; display:grid; place-items:center; border-radius:8px; background:#dcecff; color:#1268d7; }
+.trainPage .mapDrawer .mapLayerToggles .trainLayerIcon .uiIcon { width:18px; height:18px; }
+.trainPage .mapDrawer .mapLayerToggles label > span:last-child { color:#244259; font-size:12px; font-weight:700; }
+
+.alertsPage .workspace { width:calc(100% - var(--radar-feed)); }
+.alertsPage .railAlertsPanel.liveFeedPanel { position:absolute; inset:0 0 0 auto; width:var(--radar-feed); max-height:none; border:0; border-left:1px solid #dce5eb; border-radius:0; box-shadow:none; background:#fff; opacity:1; visibility:visible; transform:none; pointer-events:auto; transition:none; }
+.alertsPage .mapZoomControls { right:18px; bottom:88px; }
+.alertsPage .mapStylePicker { right:18px; bottom:18px; }
+.alertsPage .mapAttribution { right:180px; }
+.alertsPage .mapActions { bottom:22px; }
+.alertMapHeading { position:absolute; z-index:21; top:22px; left:calc(var(--radar-sidebar) + 24px); min-width:245px; padding:15px 19px; display:grid; gap:3px; border:1px solid #e3eaf0; border-radius:12px; background:rgba(255,255,255,.97); box-shadow:0 8px 28px #15354d21; color:#18324a; pointer-events:none; }
+.alertMapHeading span { color:#1772dc; font-size:10px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; }
+.alertMapHeading strong { font-size:19px; line-height:1.15; }
+.alertMapHeading small { color:#647989; font-size:11px; }
+.alertsPage .liveFeedHeader { padding:23px 22px 17px; }
+.alertsPage .liveFeedHeader strong { font-size:20px; }
+.alertFilterSection { flex:none; padding:17px 20px; border-top:1px solid #edf1f4; border-bottom:1px solid #edf1f4; background:#f8fafc; }
+.alertFilterSection > strong { display:block; margin-bottom:12px; color:#435b6d; font-size:11px; letter-spacing:.05em; text-transform:uppercase; }
+.alertFilterGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.alertFilterGrid label { min-width:0; min-height:49px; padding:7px 9px; display:flex; align-items:center; gap:8px; border:1px solid #e0e8ee; border-radius:10px; background:#fff; color:#667a8a; cursor:pointer; }
+.alertFilterGrid label.selected { border-color:#b7d5fa; background:#f0f7ff; color:#193c5a; }
+.alertFilterGrid input { position:absolute; width:1px; height:1px; opacity:0; }
+.alertFilterGrid label:focus-within { outline:2px solid #337ee6; outline-offset:2px; }
+.alertFilterIcon { width:29px; height:29px; flex:none; display:grid; place-items:center; border-radius:8px; background:var(--road-color); color:#fff; }
+.alertFilterIcon .uiIcon { width:17px; height:17px; }
+.alertFilterName { min-width:0; flex:1; overflow:hidden; font-size:11px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+.alertFilterGrid small { color:#607688; font-size:10px; font-weight:800; }
+.alertsPage .networkSummary { flex:none; }
+.alertsPage .liveFeedList { flex:1; min-height:90px; }
+.alertFeedEmpty { padding:22px; color:#607486; font-size:12px; line-height:1.5; }
+.alertsPage .liveFeedDetail { max-height:34vh; overflow:auto; }
+.alertsPage .railFeedSummary { margin-top:auto; }
+.alertsPage .feedCopy strong { font-size:13px; }
+.alertsPage .feedCopy small { font-size:10px; }
+
+.settingsPage { min-height:100dvh; display:grid; grid-template-columns:var(--radar-sidebar) minmax(0,1fr); background:#f3f6f8; color:#18324a; font-family:var(--font-geist-sans); }
+.settingsSidebar { min-height:100dvh; padding:22px 12px; display:flex; flex-direction:column; background:linear-gradient(180deg,#0c2d49,#0a243b); color:#fff; }
+.settingsBrand { min-height:68px; display:grid; justify-items:center; align-content:center; gap:5px; border-bottom:1px solid #ffffff1b; color:#fff; text-decoration:none; }
+.settingsBrandMark .uiIcon { width:30px; height:30px; color:#68a8f9; }
+.settingsBrand strong { font-size:14px; letter-spacing:-.04em; }
+.settingsBrand strong span { color:#67a8ff; }
+.settingsNav { display:grid; gap:3px; margin:18px -12px 0; }
+.settingsNav a { min-height:76px; padding:8px 5px; display:grid; place-items:center; align-content:center; gap:7px; border-left:3px solid transparent; color:#b7ccda; font-size:10px; font-weight:700; text-align:center; text-decoration:none; }
+.settingsNav a:hover { background:#ffffff0e; color:#fff; }
+.settingsNav a.active { border-color:#2f84f5; background:#2d7fe823; color:#fff; }
+.settingsNav .uiIcon { width:25px; height:25px; }
+.settingsSidebar > small { margin-top:auto; color:#8faabd; font-size:9px; line-height:1.5; text-align:center; }
+.settingsMain { min-width:0; max-width:1330px; width:100%; padding:clamp(30px,4vw,68px); }
+.settingsIntro { max-width:710px; margin-bottom:35px; }
+.settingsIntro > span { color:#1268d7; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+.settingsIntro h1 { margin:6px 0 10px; color:#102b42; font-size:clamp(32px,2.3vw,46px); letter-spacing:-.04em; }
+.settingsIntro p { margin:0; color:#64798a; font-size:15px; line-height:1.6; }
+.settingsGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.settingsCard { min-width:0; padding:24px; border:1px solid #e2e9ee; border-radius:16px; background:#fff; box-shadow:0 12px 28px #15354d0a; }
+.settingsCardHeading { display:flex; align-items:center; gap:13px; padding-bottom:20px; border-bottom:1px solid #eaf0f3; }
+.settingsCardIcon { width:43px; height:43px; flex:none; display:grid; place-items:center; border-radius:12px; background:#eaf3ff; color:#1268d7; }
+.settingsCardIcon .uiIcon { width:22px; height:22px; }
+.settingsCard h2 { margin:0 0 4px; font-size:17px; }
+.settingsCard p { margin:0; color:#687d8d; font-size:12px; line-height:1.4; }
+.settingsRow { min-height:90px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.settingsRow > div:first-child { display:grid; gap:5px; }
+.settingsRow strong { font-size:13px; }
+.settingsRow small { color:#7b8b98; font-size:11px; line-height:1.4; }
+.settingsChoices { flex:none; padding:4px; display:flex; gap:3px; border:1px solid #e2eaf0; border-radius:10px; background:#f5f8fa; }
+.settingsChoices button { min-height:36px; padding:0 12px; border:0; border-radius:7px; background:transparent; color:#65798a; font:700 11px var(--font-geist-sans); cursor:pointer; }
+.settingsChoices button.selected { background:#fff; color:#1268d7; box-shadow:0 2px 8px #163c591e; }
+.settingsSwitch { width:48px; height:28px; flex:none; padding:3px; border:0; border-radius:20px; background:#cbd7df; cursor:pointer; }
+.settingsSwitch.on { background:#1672e8; }
+.settingsSwitch span { width:22px; height:22px; display:block; border-radius:50%; background:#fff; box-shadow:0 2px 4px #142b4433; transition:transform .2s; }
+.settingsSwitch.on span { transform:translateX(20px); }
+.settingsFeedback { padding:10px 12px; border-radius:8px; background:#f0f7ff; color:#246397!important; }
+.settingsLinks { display:grid; gap:8px; padding-top:17px; }
+.settingsLinks a { padding:13px 15px; display:flex; justify-content:space-between; gap:12px; border:1px solid #e3ebf0; border-radius:10px; color:#18324a; font-size:13px; font-weight:750; text-decoration:none; }
+.settingsLinks a:hover { border-color:#b8d7fb; background:#f5faff; }
+.settingsLinks span { color:#6c8191; font-size:11px; font-weight:500; }
+
+@media (min-width:2200px) { .sideNav a,.settingsNav a { height:94px; gap:9px; font-size:13px; } .sideNav a .uiIcon,.settingsNav .uiIcon { width:30px; height:30px; } .settingsBrand strong { font-size:18px; } }
+@media (max-width:900px) {
+  .sideNav { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .sideNav a { min-width:0; height:100%; padding:6px 1px; gap:5px; border-left:0; border-top:2px solid transparent; font-size:10px; }
+  .sideNav a.active { border-top-color:#5ca0fa; }
+  .sideNav a .uiIcon { width:20px; height:20px; }
+  .sideNav .secondaryNavItem { display:none; }
+  .trainPage .mapActions { bottom:78px; }
+  .alertsPage .workspace { width:100%; height:43dvh; min-height:0; }
+  .alertsPage .mapWrap,.alertsPage .liveMap { height:100%; min-height:0; }
+  .alertsPage .railAlertsPanel.liveFeedPanel { inset:43dvh 0 68px; width:100%; max-height:none; border-top:1px solid #dce5eb; border-left:0; overflow:auto; }
+  .alertsPage .liveFeedHeader { padding:14px 15px 11px; }
+  .alertsPage .liveFeedHeader strong { font-size:16px; }
+  .alertMapHeading { top:12px; left:12px; min-width:0; padding:10px 13px; }
+  .alertMapHeading strong { font-size:15px; }
+  .alertMapHeading small { font-size:9px; }
+  .alertsPage .mapActions { left:12px; bottom:12px; }
+  .alertsPage .mapActions button { height:38px; padding:0 12px; font-size:10px; }
+  .alertsPage .mapZoomControls { right:10px; bottom:66px; }
+  .alertsPage .mapStylePicker { right:10px; bottom:11px; }
+  .alertsPage .liveFeedList { flex:none; min-height:100px; max-height:240px; }
+  .alertsPage .liveFeedDetail { max-height:none; }
+  .alertFilterSection { padding:11px 13px; }
+  .alertFilterSection > strong { margin-bottom:8px; }
+  .alertFilterGrid { display:flex; gap:6px; overflow-x:auto; scrollbar-width:thin; }
+  .alertFilterGrid label { min-height:42px; min-width:125px; padding:5px 7px; gap:6px; }
+  .alertFilterIcon { width:25px; height:25px; }
+  .alertFilterName { font-size:10px; }
+  .settingsPage { display:block; padding-bottom:72px; }
+  .settingsSidebar { position:fixed; z-index:100; inset:auto 8px 8px; min-height:0; height:60px; padding:0; border-radius:14px; box-shadow:0 12px 34px #091f304d; }
+  .settingsBrand,.settingsSidebar > small { display:none; }
+  .settingsNav { height:100%; margin:0; display:grid; grid-template-columns:repeat(3,1fr); }
+  .settingsNav a { min-height:0; height:100%; padding:6px 2px; gap:4px; border-left:0; border-top:2px solid transparent; font-size:10px; }
+  .settingsNav a.active { border-top-color:#5ca0fa; }
+  .settingsNav .uiIcon { width:20px; height:20px; }
+  .settingsMain { padding:28px 18px; }
+  .settingsGrid { grid-template-columns:1fr; }
+  .settingsIntro { margin-bottom:24px; }
+  .settingsIntro p { font-size:13px; }
+}
+@media (max-width:500px) { .settingsCard { padding:17px; } .settingsRow { align-items:flex-start; flex-direction:column; justify-content:center; padding-top:14px; } .settingsChoices { width:100%; } .settingsChoices button { flex:1; } .settingsLinks a { flex-direction:column; gap:4px; } }
