@@ -62,9 +62,16 @@ export default defineConfig(async () => {
 
   return {
     optimizeDeps: { exclude: ["maplibre-gl"] },
-    server: isCodexSeatbeltSandbox
-      ? { watch: { useFsEvents: false, usePolling: true } }
-      : undefined,
+    server: {
+      ...(isCodexSeatbeltSandbox
+        ? { watch: { useFsEvents: false, usePolling: true } }
+        : {}),
+      // Fix CORS vulnerability: disable permissive CORS headers
+      // that esbuild sets by default (Access-Control-Allow-Origin: *).
+      // This prevents malicious websites from reading responses
+      // from the development server.
+      cors: false,
+    },
     plugins: [
       vinext(),
       sites(),
@@ -72,6 +79,22 @@ export default defineConfig(async () => {
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: localBindingConfig,
       }),
+      // Additional security: remove permissive CORS headers from esbuild SSE endpoint
+      {
+        name: "fix-cors-headers",
+        configureServer(server: import("vite").ViteDevServer) {
+          server.middlewares.use(
+            (
+              _req: import("http").IncomingMessage,
+              res: import("http").ServerResponse,
+              next: () => void
+            ) => {
+              res.removeHeader("Access-Control-Allow-Origin");
+              next();
+            }
+          );
+        },
+      },
     ],
   };
 });
