@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useLanguage } from "../LanguageContext";
 import { useTheme } from "../ThemeContext";
 
@@ -48,7 +49,7 @@ export function SettingsScreen() {
 
   return <main className="settingsPage">
     <aside className="settingsSidebar" aria-label="Hoofdnavigatie">
-      <Link className="settingsBrand" href="/"><span className="settingsBrandMark"><Icon name="train" /></span><strong>Live<span>Op</span>Weg</strong></Link>
+      <Link className="settingsBrand" href="/" aria-label="LiveOpWeg startpagina"><Image src="/liveopweg-logo.png" alt="LiveOpWeg" width={925} height={195} priority /></Link>
       <nav className="settingsNav">
         <Link href="/"><Icon name="train" /><span>Treinen</span></Link>
         <Link href="/meldingen"><Icon name="bell" /><span>Meldingen</span></Link>

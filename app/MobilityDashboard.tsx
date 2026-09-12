@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import NextImage from "next/image";
 import type { GeoJSONSource, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 import {
   DEFAULT_RENDER_DELAY_MS,
@@ -66,9 +67,9 @@ const fallbackMapStyle: StyleSpecification = {
     },
     "base-light": {
       type: "raster",
-      tiles: ["https://{s}.basemaps.cartocdn.com/a/dark_matter/{z}/{x}/{y}{r}.png"],
+      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
       tileSize: 256,
-      attribution: "© OpenStreetMap-bijdragers © CARTO",
+      attribution: "© OpenStreetMap-bijdragers",
     },
     "base-satellite": {
       type: "raster",
@@ -79,14 +80,14 @@ const fallbackMapStyle: StyleSpecification = {
   },
   layers: [
     { id: "base-standard", type: "raster", source: "base-standard", paint: { "raster-saturation": -0.72, "raster-contrast": 0.12 } },
-    { id: "base-light", type: "raster", source: "base-light", layout: { visibility: "none" }, paint: { "raster-saturation": -0.5, "raster-contrast": 0, "raster-brightness-min": 0.2, "raster-brightness-max": 0.85 } },
+    { id: "base-light", type: "raster", source: "base-light", layout: { visibility: "none" }, paint: { "raster-saturation": -0.9, "raster-contrast": 0.18, "raster-brightness-min": 0.04, "raster-brightness-max": 0.45 } },
     { id: "base-satellite", type: "raster", source: "base-satellite", layout: { visibility: "none" }, paint: { "raster-saturation": -0.12, "raster-brightness-max": 0.92 } },
   ],
 };
 
 const baseMapDefinitions: { key: BaseMapKey; label: string }[] = [
   { key: "standard", label: "Standaard" },
-  { key: "light", label: "Licht" },
+  { key: "light", label: "Nacht" },
   { key: "satellite", label: "Satelliet" },
 ];
 
@@ -1690,12 +1691,13 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     <main className={`shell ${isAlertsPage ? "alertsPage" : "trainPage"}`}>
       <header className="topbar">
         <Link className="railBrand" href="/" aria-label="LiveOpWeg startpagina" onClick={isAlertsPage ? undefined : resetMap}>
-          <svg className="railBrandMark" viewBox="0 0 42 34" aria-hidden="true"><path d="M6 27h10V17h10V7h10" /><circle cx="6" cy="27" r="3.5" /><circle cx="16" cy="17" r="3.5" /><circle cx="26" cy="7" r="3.5" /><circle cx="36" cy="7" r="3.5" /></svg>
-          <span className="railWordmark">Live<span>Op</span>Weg</span>
+          <NextImage className="railBrandLogo" src="/liveopweg-logo.png" alt="LiveOpWeg" width={925} height={195} priority />
         </Link>
         <nav className="sideNav" aria-label="Hoofdnavigatie">
+          <p className="navSectionLabel">Kaarten</p>
           <Link className={!isAlertsPage ? "active" : ""} href="/" aria-current={!isAlertsPage ? "page" : undefined} onClick={isAlertsPage ? undefined : resetMap}><UiIcon name="train" /><span>Treinen</span></Link>
           <Link className={isAlertsPage ? "active" : ""} href="/meldingen" aria-current={isAlertsPage ? "page" : undefined}><span className="navIconWrap"><UiIcon name="bell" />{roadCounts.incidents + roadCounts.closures > 0 && <b>{Math.min(99, roadCounts.incidents + roadCounts.closures)}</b>}</span><span>Meldingen</span></Link>
+          <p className="navSectionLabel secondaryNavItem">Overig</p>
           <Link href="/instellingen"><UiIcon name="settings" /><span>Instellingen</span></Link>
           {!isAlertsPage && <button className={`secondaryNavItem ${showJourneyPlanner ? "active" : ""}`} type="button" onClick={openJourneyPlanner}><UiIcon name="queue" /><span>Reisplanner</span></button>}
           {!isAlertsPage && <button className={`secondaryNavItem ${showDelayStats ? "active" : ""}`} type="button" onClick={openDelayStats}><UiIcon name="clock" /><span>Statistieken</span></button>}
@@ -1726,7 +1728,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         </div>
         <div className="feedSectionTitle"><strong>Laatste updates</strong><span>{recentRoadEvents.length} zichtbaar</span></div>
         <div className="liveFeedList">
-          {!recentRoadEvents.length && <p className="alertFeedEmpty">Geen meldingen binnen de gekozen filters.</p>}
+          {!recentRoadEvents.length && <p className="alertFeedEmpty">{connection === "live" ? "Geen meldingen binnen de gekozen filters." : "Wachten op de live meldingenfeed. De kaart wordt automatisch bijgewerkt zodra de verbinding er is."}</p>}
           {strikeIsActive && <a className="liveFeedItem strike" href={nationalStrikeAlert.url} target="_blank" rel="noreferrer">
             <span className="feedIcon"><UiIcon name="warning" /></span><span className="feedCopy"><strong>{nationalStrikeAlert.title}</strong><small>NS · heel Nederland</small></span><b>Vandaag</b><span className="feedArrow"><UiIcon name="chevron" /></span>
           </a>}
@@ -1749,7 +1751,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           <p>{nationalStrikeAlert.body}</p>
           <div><span>Bijgewerkt {formatJourneyClock(nationalStrikeAlert.updatedAt)}</span><a href={nationalStrikeAlert.url} target="_blank" rel="noreferrer">Bekijk bij NS ↗</a></div>
         </article>}
-        <div className="railFeedSummary"><span><i className={connection === "live" ? "live" : ""} /> NDW live</span><strong>Geen treiniconen op deze kaart</strong></div>
+        <div className="railFeedSummary"><span><i className={connection === "live" ? "live" : ""} /> {connection === "live" ? "NDW live" : "NDW verbinden"}</span><strong>Geen treiniconen op deze kaart</strong></div>
       </aside>}
 
       {!isAlertsPage && <section className={`roadOverview mapDrawer ${showLayers ? "open" : ""}`} aria-label="Kaartlagen" aria-hidden={!showLayers}>

@@ -28,7 +28,7 @@ test("server-renders de treinenkaart zonder overlappend meldingenpaneel", async 
   assert.match(html, /Stations/);
   assert.match(html, /Kies kaartweergave/);
   assert.match(html, /Standaard/);
-  assert.match(html, /Licht/);
+  assert.match(html, /Nacht/);
   assert.match(html, /Satelliet/);
   assert.match(html, /Inzoomen op kaart/);
   assert.match(html, /Uitzoomen op kaart/);

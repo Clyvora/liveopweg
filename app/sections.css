@@ -31,7 +31,7 @@
 .alertsPage .liveFeedHeader strong { font-size:20px; }
 .alertFilterSection { flex:none; padding:17px 20px; border-top:1px solid #edf1f4; border-bottom:1px solid #edf1f4; background:#f8fafc; }
 .alertFilterSection > strong { display:block; margin-bottom:12px; color:#435b6d; font-size:11px; letter-spacing:.05em; text-transform:uppercase; }
-.alertFilterGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.alertFilterGrid { display:grid; grid-template-columns:1fr; gap:8px; }
 .alertFilterGrid label { min-width:0; min-height:49px; padding:7px 9px; display:flex; align-items:center; gap:8px; border:1px solid #e0e8ee; border-radius:10px; background:#fff; color:#667a8a; cursor:pointer; }
 .alertFilterGrid label.selected { border-color:#b7d5fa; background:#f0f7ff; color:#193c5a; }
 .alertFilterGrid input { position:absolute; width:1px; height:1px; opacity:0; }
@@ -114,9 +114,9 @@
   .alertFilterSection { padding:11px 13px; }
   .alertFilterSection > strong { margin-bottom:8px; }
   .alertFilterGrid { display:flex; gap:6px; overflow-x:auto; scrollbar-width:thin; }
-  .alertFilterGrid label { min-height:42px; min-width:125px; padding:5px 7px; gap:6px; }
+  .alertFilterGrid label { min-height:42px; min-width:max-content; padding:5px 9px; gap:6px; }
   .alertFilterIcon { width:25px; height:25px; }
-  .alertFilterName { font-size:10px; }
+  .alertFilterName { overflow:visible; font-size:10px; text-overflow:clip; }
   .settingsPage { display:block; padding-bottom:72px; }
   .settingsSidebar { position:fixed; z-index:100; inset:auto 8px 8px; min-height:0; height:60px; padding:0; border-radius:14px; box-shadow:0 12px 34px #091f304d; }
   .settingsBrand,.settingsSidebar > small { display:none; }
@@ -130,3 +130,124 @@
   .settingsIntro p { font-size:13px; }
 }
 @media (max-width:500px) { .settingsCard { padding:17px; } .settingsRow { align-items:flex-start; flex-direction:column; justify-content:center; padding-top:14px; } .settingsChoices { width:100%; } .settingsChoices button { flex:1; } .settingsLinks a { flex-direction:column; gap:4px; } }
+
+/* A calmer, editorial navigation system. The map remains the primary surface. */
+@media (min-width:901px) {
+  :root { --radar-sidebar:184px; }
+  .topbar,.settingsSidebar { background:#fff; border-right:1px solid #dfe7ed; box-shadow:4px 0 24px #193c5510; }
+  .topbar { padding:17px 0; }
+  .railBrand { height:88px; padding:0 17px 18px; border-bottom:1px solid #e8eef2; }
+  .railBrandLogo { width:100%; height:auto; object-fit:contain; }
+  .sideNav { margin-top:20px; gap:3px; }
+  .navSectionLabel { margin:10px 0 5px; padding:0 19px; color:#8b9aa7; font:800 9px/1.2 var(--font-geist-sans); letter-spacing:.12em; text-transform:uppercase; }
+  .sideNav a,.sideNav button { width:calc(100% - 18px); height:48px; min-height:48px; margin:0 9px; padding:0 12px; display:flex; flex-direction:row; justify-content:flex-start; align-items:center; gap:11px; border:0; border-radius:9px; color:#4a6174; font:700 12px/1.2 var(--font-geist-sans); text-align:left; }
+  .sideNav a:hover,.sideNav button:hover { background:#f2f6f9; color:#17364d; }
+  .sideNav a.active,.sideNav button.active { background:#eaf3ff; color:#1268d7; }
+  .sideNav a .uiIcon,.sideNav button .uiIcon { width:19px; height:19px; flex:none; }
+  .sideNav a > span:last-child,.sideNav button > span:last-child { width:auto; font-size:12px; }
+  .sideNav .navIconWrap { width:19px; flex:none; }
+  .navIconWrap b { top:-10px; right:-10px; border-color:#fff; }
+  .sidebarLive { width:calc(100% - 22px); margin: auto 11px 0; padding:10px; border:1px solid #e2ebf0; border-radius:10px; background:#f7fafb; }
+  .sidebarLive .sourcePill { min-height:26px; border:0; background:transparent; color:#4d6475; font-size:10px; }
+  .settingsSidebar { padding:17px 0; }
+  .settingsBrand { min-height:88px; padding:0 17px 18px; border-bottom-color:#e8eef2; }
+  .settingsBrand img { width:100%; max-width:170px; height:auto; }
+  .settingsNav { margin:22px 0 0; gap:3px; }
+  .settingsNav a { width:calc(100% - 18px); height:48px; min-height:48px; margin:0 9px; padding:0 12px; display:flex; justify-content:flex-start; align-items:center; gap:11px; border:0; border-radius:9px; color:#4a6174; font-size:12px; text-align:left; }
+  .settingsNav a:hover { background:#f2f6f9; color:#17364d; }
+  .settingsNav a.active { background:#eaf3ff; color:#1268d7; }
+  .settingsNav .uiIcon { width:19px; height:19px; }
+  .settingsSidebar > small { padding:12px; color:#8192a0; font-size:10px; }
+}
+@media (min-width:2200px) { :root { --radar-sidebar:220px; --radar-feed:540px; } .sideNav a,.sideNav button,.settingsNav a { height:58px; min-height:58px; font-size:15px; } .sideNav a > span:last-child,.sideNav button > span:last-child { font-size:15px; } .sideNav a .uiIcon,.sideNav button .uiIcon,.settingsNav .uiIcon { width:23px; height:23px; } .navSectionLabel { font-size:11px; } .railBrand,.settingsBrand { height:105px; } }
+.trainPage .fleetTools input { border:1px solid #dce6ec; box-shadow:0 8px 24px #163a511c; }
+.trainPage .radarStatusBar { border:1px solid #dce6ec; background:#fff; box-shadow:0 8px 24px #163a511c; color:#17374e; }
+.trainPage .radarStatusBar > div { border-color:#e7edf1; }
+.trainPage .radarStatusBar strong { color:#1d3c53; }
+.trainPage .radarStatusBar span { color:#758895; }
+.trainPage .radarStatusBar .uiIcon { color:#1c76d7; }
+.trainPage .mapActions button,.alertsPage .mapActions button { border:1px solid #dce6ec; background:#fff; box-shadow:0 8px 24px #163a511b; color:#183850; }
+.trainPage .mapActions button:hover,.alertsPage .mapActions button:hover { background:#eef6ff; color:#1268d7; }
+.waitingMarker { border:1px solid #dae7ee; background:#fff; box-shadow:0 8px 24px #163a511c; color:#3a556a; }
+.waitingMarker span { border-color:#1b82dc; }
+.mapStylePreview.light { background:linear-gradient(140deg,#11263b,#253e54 48%,#355763 49% 58%,#11263b 59%); }
+
+.alertsPage .liveFeedHeader { background:#fff; }
+.alertsPage .railAlertsKicker { color:#1c70c7; }
+.alertsPage .liveFeedHeader strong { color:#16344b; letter-spacing:-.025em; }
+.alertsPage .alertFilterSection { background:#f7f9fb; }
+.alertsPage .alertFilterGrid label { border-color:#e3eaf0; box-shadow:0 1px 2px #173d570a; }
+.alertsPage .alertFilterGrid label.selected { border-color:#a9d0ff; background:#edf5ff; }
+.alertsPage .networkSummary { margin:0; padding:12px 18px; gap:0; border-bottom:1px solid #e9eff3; background:#fff; }
+.alertsPage .networkSummary div { border-right:1px solid #e6edf1; background:transparent; }
+.alertsPage .networkSummary div:last-child { border-right:0; }
+.alertsPage .networkSummary strong { font-size:18px; }
+.alertsPage .networkSummary span { font-size:10px; }
+.alertsPage .feedSectionTitle { padding:15px 19px 12px; background:#fff; }
+.alertsPage .feedSectionTitle strong { font-size:12px; }
+.alertsPage .liveFeedItem { min-height:78px; padding:12px 19px; gap:12px; }
+.alertsPage .liveFeedItem .feedIcon { width:38px; height:38px; border-radius:11px; }
+.alertsPage .liveFeedItem .feedCopy { gap:5px; }
+.alertsPage .liveFeedItem .feedCopy strong { font-size:13px; }
+.alertsPage .liveFeedItem .feedCopy small { font-size:10px; }
+.alertsPage .railFeedSummary { background:#fafcfd; color:#68808e; }
+
+@media (max-width:900px) {
+  :root { --radar-sidebar:0px; }
+  .topbar,.settingsSidebar { background:#fff; border:1px solid #dce7ee; box-shadow:0 8px 30px #102f4529; }
+  .sideNav a,.settingsNav a { color:#6e8290; }
+  .sideNav a.active,.settingsNav a.active { border-top-color:#237ce7; background:#eef6ff; color:#146ed0; }
+  .sideNav a:hover,.settingsNav a:hover { color:#146ed0; }
+  .sideNav .navSectionLabel { display:none; }
+  .sideNav .uiIcon,.settingsNav .uiIcon { stroke-width:1.9; }
+  .alertsPage .networkSummary { padding:8px 10px; }
+  .alertsPage .networkSummary strong { font-size:15px; }
+  .alertsPage .networkSummary span { font-size:9px; }
+  .alertsPage .feedSectionTitle { padding:10px 14px; }
+  .alertsPage .liveFeedItem { min-height:70px; padding:9px 13px; }
+}
+
+[data-theme="dark"] .settingsPage { background:#0f1e2b; color:#e8f0f5; }
+[data-theme="dark"] .settingsIntro h1,[data-theme="dark"] .settingsCard h2,[data-theme="dark"] .settingsRow strong { color:#edf4f9; }
+[data-theme="dark"] .settingsIntro p,[data-theme="dark"] .settingsCard p,[data-theme="dark"] .settingsRow small { color:#9bb0bd; }
+[data-theme="dark"] .settingsCard { border-color:#304658; background:#1b3040; box-shadow:none; }
+[data-theme="dark"] .settingsCardHeading { border-color:#354b5c; }
+[data-theme="dark"] .settingsCardIcon { background:#20476c; color:#9ac7ff; }
+[data-theme="dark"] .settingsChoices { border-color:#344c5e; background:#132836; }
+[data-theme="dark"] .settingsChoices button { color:#a8bcc8; }
+[data-theme="dark"] .settingsChoices button.selected { background:#315477; color:#fff; box-shadow:none; }
+[data-theme="dark"] .settingsLinks a { border-color:#3a5263; color:#eef5f9; }
+[data-theme="dark"] .settingsLinks a:hover { background:#233d50; }
+[data-theme="dark"] .settingsLinks span { color:#a1b3c0; }
+[data-theme="dark"] .settingsSidebar { background:#142a3a; border-color:#2c4252; }
+[data-theme="dark"] .settingsNav a { color:#aebfca; }
+[data-theme="dark"] .settingsNav a.active { background:#234d76; color:#fff; }
+[data-theme="dark"] .settingsBrand img,[data-theme="dark"] .railBrandLogo { filter:brightness(0) invert(1); }
+[data-theme="dark"] .topbar { background:#142a3a; border-color:#2c4252; }
+[data-theme="dark"] .sideNav a,[data-theme="dark"] .sideNav button { color:#b9cbd6; }
+[data-theme="dark"] .sideNav a:hover,[data-theme="dark"] .sideNav button:hover { background:#203d50; color:#fff; }
+[data-theme="dark"] .sideNav a.active,[data-theme="dark"] .sideNav button.active { background:#234d76; color:#fff; }
+[data-theme="dark"] .navSectionLabel { color:#85a2b6; }
+[data-theme="dark"] .sidebarLive { border-color:#345063; background:#193648; }
+[data-theme="dark"] .sidebarLive .sourcePill { color:#d5e3ec; }
+[data-theme="dark"] .trainPage .fleetTools input { border-color:#335064; background-color:#1b3649; color:#f1f7fa; }
+[data-theme="dark"] .trainPage .radarStatusBar { border-color:#335064; background:#1b3649; color:#f1f7fa; }
+[data-theme="dark"] .trainPage .radarStatusBar strong { color:#f1f7fa; }
+[data-theme="dark"] .trainPage .radarStatusBar span { color:#a9bfcc; }
+[data-theme="dark"] .trainPage .radarStatusBar > div { border-color:#345064; }
+[data-theme="dark"] .trainPage .mapActions button,[data-theme="dark"] .alertsPage .mapActions button { border-color:#385064; background:#1b3649; color:#f0f7fb; }
+[data-theme="dark"] .waitingMarker { border-color:#365166; background:#1b3649; color:#e8f3fa; }
+[data-theme="dark"] .alertsPage .railAlertsPanel.liveFeedPanel { border-color:#2c4454; background:#182d3c; }
+[data-theme="dark"] .alertsPage .liveFeedHeader,[data-theme="dark"] .alertsPage .feedSectionTitle,[data-theme="dark"] .alertsPage .networkSummary { border-color:#2c4454; background:#182d3c; color:#ecf4f8; }
+[data-theme="dark"] .alertsPage .liveFeedHeader strong,[data-theme="dark"] .alertsPage .feedSectionTitle strong,[data-theme="dark"] .alertsPage .networkSummary strong { color:#ecf4f8; }
+[data-theme="dark"] .alertsPage .networkSummary div { border-color:#2c4454; }
+[data-theme="dark"] .alertsPage .alertFilterSection { border-color:#2c4454; background:#1d3545; }
+[data-theme="dark"] .alertsPage .alertFilterSection > strong { color:#b8cbd7; }
+[data-theme="dark"] .alertsPage .alertFilterGrid label { border-color:#3a5365; background:#244054; color:#dce8ef; }
+[data-theme="dark"] .alertsPage .alertFilterGrid label.selected { border-color:#4b88c6; background:#254d70; color:#fff; }
+[data-theme="dark"] .alertsPage .alertFilterGrid small { color:#c4d5df; }
+[data-theme="dark"] .alertsPage .liveFeedItem { border-color:#2c4454; background:#182d3c; }
+[data-theme="dark"] .alertsPage .liveFeedItem:hover,[data-theme="dark"] .alertsPage .liveFeedItem.selected { background:#244457; }
+[data-theme="dark"] .alertsPage .feedCopy strong { color:#edf5f9; }
+[data-theme="dark"] .alertsPage .feedCopy small,[data-theme="dark"] .alertsPage .networkSummary span { color:#a8bdc9; }
+[data-theme="dark"] .alertsPage .railFeedSummary { border-color:#2c4454; background:#1a3445; color:#abc0ca; }
