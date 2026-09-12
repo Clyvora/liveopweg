@@ -75,6 +75,60 @@ const translations: Translations = {
   // Time
   "time.minutes": { nl: "min", en: "min" },
   "time.seconds": { nl: "sec", en: "sec" },
+
+  // Journey Planner
+  "planner.title": { nl: "Reisplanner", en: "Journey Planner" },
+  "planner.close": { nl: "Sluit reisplanner", en: "Close journey planner" },
+  "planner.from": { nl: "Van", en: "From" },
+  "planner.to": { nl: "Naar", en: "To" },
+  "planner.from_placeholder": { nl: "Vertrekstation", en: "Departure station" },
+  "planner.to_placeholder": { nl: "Bestemming", en: "Destination" },
+  "planner.search": { nl: "Zoek reis", en: "Search journey" },
+  "planner.searching": { nl: "Zoeken...", en: "Searching..." },
+  "planner.results": { nl: "Reisopties", en: "Journey options" },
+
+  // Delay Statistics
+  "stats.title": { nl: "Vertragingstatistieken", en: "Delay Statistics" },
+  "stats.on_time": { nl: "Op tijd", en: "On time" },
+  "stats.delayed": { nl: "Vertraagd", en: "Delayed" },
+  "stats.avg_delay": { nl: "Gem. vertraging", en: "Avg delay" },
+  "stats.max_delay": { nl: "Max vertraging", en: "Max delay" },
+  "stats.distribution": { nl: "Verdeling", en: "Distribution" },
+
+  // Speed Profile
+  "speed.title": { nl: "Snelheidsprofiel", en: "Speed Profile" },
+  "speed.avg": { nl: "Gem", en: "Avg" },
+
+  // Train Composition
+  "composition.title": { nl: "Treinsamenstelling", en: "Train Composition" },
+  "composition.occupied": { nl: "bezet", en: "occupied" },
+  "composition.first_class": { nl: "1e klas", en: "1st class" },
+  "composition.second_class": { nl: "2e klas", en: "2nd class" },
+  "composition.locomotive": { nl: "Locomotief", en: "Locomotive" },
+
+  // Weather
+  "weather.title": { nl: "Weer", en: "Weather" },
+  "weather.temperature": { nl: "Temperatuur", en: "Temperature" },
+  "weather.humidity": { nl: "Luchtvochtigheid", en: "Humidity" },
+  "weather.wind": { nl: "Wind", en: "Wind" },
+
+  // Notifications
+  "notifications.enable": { nl: "Schakel meldingen in", en: "Enable notifications" },
+  "notifications.delay_alert": { nl: "Vertraging melding", en: "Delay alert" },
+  "notifications.delay_message": { nl: "Trein {train} heeft {delay} minuten vertraging", en: "Train {train} is delayed by {delay} minutes" },
+
+  // Station Details
+  "station.facilities": { nl: "Voorzieningen", en: "Facilities" },
+  "station.platforms": { nl: "Perrons", en: "Platforms" },
+  "station.accessible": { nl: "Toegankelijk", en: "Accessible" },
+  "station.bike_parking": { nl: "Fietsenstalling", en: "Bike parking" },
+  "station.car_parking": { nl: "Parkeerplaats", en: "Car parking" },
+  "station.elevator": { nl: "Lift", en: "Elevator" },
+  "station.escalator": { nl: "Roltrap", en: "Escalator" },
+  "station.toilet": { nl: "Toilet", en: "Toilet" },
+  "station.wifi": { nl: "WiFi", en: "WiFi" },
+  "station.ticket_machine": { nl: "Kaartautomaat", en: "Ticket machine" },
+  "station.opening_hours": { nl: "Openingstijden", en: "Opening hours" },
 };
 
 interface LanguageContextType {

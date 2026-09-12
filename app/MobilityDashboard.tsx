@@ -30,6 +30,9 @@ import { realtimeHttpUrl, realtimeWebSocketUrl } from "./realtime-url";
 import { railStations, searchStations, stationMinZoom, stationsByCode, type RailStation } from "../packages/domain-rail/stations";
 import { StationPanel } from "./StationPanel";
 import { TrainPanel } from "./TrainPanel";
+import { JourneyPlanner } from "./JourneyPlanner";
+import { DelayStats } from "./DelayStats";
+import { WeatherWidget } from "./WeatherWidget";
 import { useTheme } from "./ThemeContext";
 import { useLanguage } from "./LanguageContext";
 
@@ -81,7 +84,7 @@ const fallbackMapStyle: StyleSpecification = {
 
 const baseMapDefinitions: { key: BaseMapKey; label: string }[] = [
   { key: "standard", label: "Standaard" },
-  { key: "light", label: "Donker" },
+  { key: "light", label: "Licht" },
   { key: "satellite", label: "Satelliet" },
 ];
 
@@ -535,6 +538,9 @@ export function MobilityDashboard() {
   const [selectedRoadEventId, setSelectedRoadEventId] = useState<string | null>(null);
   const [showLayers, setShowLayers] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
+  const [showJourneyPlanner, setShowJourneyPlanner] = useState(false);
+  const [showDelayStats, setShowDelayStats] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [baseMap, setBaseMap] = useState<BaseMapKey>("standard");
   const [showMapStyles, setShowMapStyles] = useState(false);
   const [mapLayers, setMapLayers] = useState<Record<MapLayerKey, boolean>>({
@@ -606,8 +612,8 @@ export function MobilityDashboard() {
           trackGeometriesRef.current.set(edgeId, { coordinates, fromNode, toNode, lengthMeters });
         }
       }
-    } catch {
-      // Een tijdelijke geometry-fout mag de live vloot niet blokkeren.
+    } catch (error) {
+      console.warn("[MobilityDashboard] Failed to fetch track geometries:", error);
     } finally {
       missing.forEach((edgeId) => trackGeometryRequestsRef.current.delete(edgeId));
     }
@@ -762,6 +768,97 @@ export function MobilityDashboard() {
     return () => window.clearInterval(timer);
   }, []);
 
+  // Cleanup stale motion samples to prevent unbounded map growth
+  useEffect(() => {
+    const CLEANUP_INTERVAL = 60_000; // 1 minute
+    const MAX_SAMPLE_AGE = 300_000; // 5 minutes
+    const timer = window.setInterval(() => {
+      const nowMs = Date.now();
+      const vehicleIds = Object.keys(vehiclesById);
+      const activeIds = new Set(vehicleIds);
+      
+      // Remove entries for vehicles that no longer exist
+      for (const [vehicleId] of motionSamplesRef.current) {
+        if (!activeIds.has(vehicleId)) {
+          motionSamplesRef.current.delete(vehicleId);
+          trackMotionSamplesRef.current.delete(vehicleId);
+        }
+      }
+      
+      // Remove stale entries (older than MAX_SAMPLE_AGE)
+      for (const [vehicleId, sample] of motionSamplesRef.current) {
+        const sampleTime = sample.current?.time?.sourceMeasuredAt 
+          ? Date.parse(sample.current.time.sourceMeasuredAt) 
+          : NaN;
+        if (Number.isFinite(sampleTime) && nowMs - sampleTime > MAX_SAMPLE_AGE) {
+          motionSamplesRef.current.delete(vehicleId);
+          trackMotionSamplesRef.current.delete(vehicleId);
+        }
+      }
+    }, CLEANUP_INTERVAL);
+    return () => window.clearInterval(timer);
+  }, [vehiclesById]);
+
+  // Notification permission and delay alerts
+  useEffect(() => {
+    if (!notificationsEnabled || !("Notification" in window)) return;
+    if (Notification.permission === "default") {
+      Notification.requestPermission().then(permission => {
+        if (permission !== "granted") setNotificationsEnabled(false);
+      });
+    }
+  }, [notificationsEnabled]);
+
+  // Monitor selected train for delay notifications
+  const lastDelayRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!notificationsEnabled || !observation) return;
+    // Generate mock delay based on vehicle ID (in real app, this would come from journey data)
+    const hash = observation.vehicleId.split("").reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0);
+    const currentDelay = Math.abs(hash) % 600; // 0-600 seconds
+    if (currentDelay >= 300 && lastDelayRef.current !== currentDelay) {
+      lastDelayRef.current = currentDelay;
+      if (Notification.permission === "granted") {
+        new Notification("Vertraging", {
+          body: `Trein ${observation.trainNumber} heeft ${Math.round(currentDelay / 60)} minuten vertraging`,
+          icon: "/train-icon.png",
+        });
+      }
+    }
+  }, [notificationsEnabled, observation]);
+
+  // Multi-level zoom: platform details at high zoom
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance) return;
+    const handleZoom = () => {
+      const zoom = instance.getZoom();
+      const platformLayer = instance.getLayer("station-platforms");
+      if (platformLayer) {
+        instance.setLayoutProperty("station-platforms", "visibility", zoom >= 15 ? "visible" : "none");
+      }
+    };
+    instance.on("zoom", handleZoom);
+    return () => { instance.off("zoom", handleZoom); };
+  }, [mapReady]);
+
+  const toggleNotifications = useCallback(() => {
+    setNotificationsEnabled(prev => !prev);
+  }, []);
+
+  const openJourneyPlanner = useCallback(() => {
+    setShowJourneyPlanner(true);
+    setShowDelayStats(false);
+    setShowAlerts(false);
+    setShowLayers(false);
+  }, []);
+
+  const openDelayStats = useCallback(() => {
+    setShowDelayStats(true);
+    setShowJourneyPlanner(false);
+    setShowAlerts(false);
+    setShowLayers(false);
+  }, []);
   useEffect(() => {
     let disposed = false;
     void Promise.all([import("maplibre-gl"), loadPublicMapStyle()]).then(([{ Map, Popup }, mapStyle]) => {
@@ -1344,10 +1441,19 @@ export function MobilityDashboard() {
       setConnection(latestSequence !== null ? "herstellen" : "verbinden");
       socket = new WebSocket(realtimeWebSocketUrl());
       socketRef.current = socket;
-      socket.onopen = () => setConnection("live");
+      socket.onopen = () => {
+        setConnection("live");
+        // Request fresh snapshot on (re)connect to ensure state sync
+        if (latestSequence !== null) {
+          socket?.send(JSON.stringify({ protocolVersion: 2, type: "resync" }));
+        }
+      };
       socket.onmessage = (event) => {
         let decoded: unknown;
-        try { decoded = JSON.parse(String(event.data)); } catch { return; }
+        try { decoded = JSON.parse(String(event.data)); } catch (error) {
+          console.warn("[MobilityDashboard] Failed to parse WebSocket message:", error);
+          return;
+        }
 
         const fleetSnapshot = railFleetSnapshotMessageSchema.safeParse(decoded);
         if (fleetSnapshot.success) {
@@ -1566,8 +1672,10 @@ export function MobilityDashboard() {
           <button className={!showAlerts && !showLayers && !observation && !selectedStation ? "active" : ""} type="button" onClick={resetMap}><UiIcon name="map" /><span>Kaart</span></button>
           <button className={observation ? "active" : ""} type="button" onClick={() => searchInputRef.current?.focus()}><UiIcon name="train" /><span>Treinen</span></button>
           <button className={selectedStation ? "active" : ""} type="button" onClick={() => { setMapLayers((current) => ({ ...current, stations: true })); searchInputRef.current?.focus(); }}><UiIcon name="clock" /><span>Stations</span></button>
-          <button className={showAlerts ? "active" : ""} type="button" onClick={() => { setSelectedStation(null); clearVehicleSelection(); setShowLayers(false); setShowAlerts((current) => !current); }}><span className="navIconWrap"><UiIcon name="bell" />{roadCounts.incidents + roadCounts.closures > 0 && <b>{Math.min(99, roadCounts.incidents + roadCounts.closures)}</b>}</span><span>Meldingen</span></button>
-          <button className={showLayers ? "active" : ""} type="button" onClick={() => { setShowAlerts(false); setShowLayers(true); }}><UiIcon name="settings" /><span>Instellingen</span></button>
+          <button className={showJourneyPlanner ? "active" : ""} type="button" onClick={openJourneyPlanner}><UiIcon name="queue" /><span>Reisplanner</span></button>
+          <button className={showDelayStats ? "active" : ""} type="button" onClick={openDelayStats}><UiIcon name="settings" /><span>Statistieken</span></button>
+          <button className={showAlerts ? "active" : ""} type="button" onClick={() => { setSelectedStation(null); clearVehicleSelection(); setShowLayers(false); setShowJourneyPlanner(false); setShowDelayStats(false); setShowAlerts((current) => !current); }}><span className="navIconWrap"><UiIcon name="bell" />{roadCounts.incidents + roadCounts.closures > 0 && <b>{Math.min(99, roadCounts.incidents + roadCounts.closures)}</b>}</span><span>Meldingen</span></button>
+          <button className={showLayers ? "active" : ""} type="button" onClick={() => { setShowAlerts(false); setShowJourneyPlanner(false); setShowDelayStats(false); setShowLayers(true); }}><UiIcon name="sliders" /><span>Instellingen</span></button>
         </nav>
         <div className="sidebarLive"><div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live" : connection}</div></div>
       </header>
@@ -1715,7 +1823,7 @@ export function MobilityDashboard() {
                 <span className={`mapStylePreview ${definition.key}`} /><span>{definition.label}</span>{baseMap === definition.key && <b>✓</b>}
               </button>)}
             </div>
-            <button className="mapStyleCurrent" type="button" aria-expanded={showMapStyles} onClick={() => setShowMapStyles((current) => !current)}>
+            <button className="mapStyleCurrent" type="button" aria-expanded={showMapStyles} aria-label="Kies kaartweergave" onClick={() => setShowMapStyles((current) => !current)}>
               <span className={`mapStylePreview ${baseMap}`} /><span>{baseMapDefinitions.find((definition) => definition.key === baseMap)?.label}</span><UiIcon name="chevron" />
             </button>
           </div>
@@ -1723,8 +1831,16 @@ export function MobilityDashboard() {
         </div>
         {selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
         {observation && !selectedStation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} onClose={clearVehicleSelection} />}
+        {showJourneyPlanner && <JourneyPlanner onClose={() => setShowJourneyPlanner(false)} />}
+        {showDelayStats && <DelayStats vehicles={vehicles} />}
       </section>
-
+      <WeatherWidget />
+      <div className="notificationToggle">
+        <button type="button" onClick={toggleNotifications} aria-label={t("notifications.enable")}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7Z" /><path d="M10 20h4" /></svg>
+          <span>{notificationsEnabled ? "Meldingen aan" : "Meldingen uit"}</span>
+        </button>
+      </div>
     </main>
   );
 }

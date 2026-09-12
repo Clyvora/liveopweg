@@ -5,6 +5,8 @@ import type { RailJourney } from "../packages/protocol/journey";
 import type { RailObservation } from "../packages/protocol/rail";
 import { identifyRollingStock } from "../packages/domain-rail/rolling-stock";
 import { useLanguage } from "./LanguageContext";
+import { SpeedProfile } from "./SpeedProfile";
+import { TrainComposition } from "./TrainComposition";
 
 type Stop = RailJourney["stops"][number];
 const clock = new Intl.DateTimeFormat("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" });
@@ -109,6 +111,8 @@ export function TrainPanel({ observation, journey, now, onClose }: { observation
           return <li key={`${stop.order}-${stop.station.code}`} className={`${active ? "next" : ""} ${cancelled ? "cancelled" : ""}`} aria-current={active ? "step" : undefined}><i /><div><strong>{stop.station.longName}</strong>{cancelled ? <small>{t("train.cancelled")}</small> : changedTrack && plannedTrack && changedTrack !== plannedTrack ? <small>{t("train.track_changed")} {changedTrack}</small> : null}{eta !== null && !cancelled && <small className="tpStopETA">{t("train.eta")}: {eta} min</small>}</div><time>{trainClock(time)}</time>{!cancelled && stopDelay != null && stopDelay > 0 && <Delay seconds={stopDelay} />}</li>;
         })}{!stops.length && <li className="tpEmpty">{t("train.no_route")}</li>}</ol>}
       </section>
+      <SpeedProfile vehicle={observation} />
+      <TrainComposition vehicle={observation} />
     </div>
   </aside>;
 }

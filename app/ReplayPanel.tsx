@@ -45,7 +45,10 @@ export function ReplayPanel({ vehicleId, trainNumber, onCursorChange }: ReplayPa
         setCatalog(value);
         setState("IDLE");
       })
-      .catch(() => { if (!disposed) setState("ERROR"); });
+      .catch((error) => {
+        console.warn("[ReplayPanel] Failed to fetch catalog:", error);
+        if (!disposed) setState("ERROR");
+      });
     return () => { disposed = true; };
   }, []);
 
@@ -64,6 +67,13 @@ export function ReplayPanel({ vehicleId, trainNumber, onCursorChange }: ReplayPa
     let disposed = false;
     const until = Date.parse(catalog.availableUntil);
     const from = Math.max(Date.parse(catalog.availableFrom), until - 20 * 60_000);
+    if (!Number.isFinite(until) || !Number.isFinite(from)) {
+      console.warn("[ReplayPanel] Invalid catalog timestamps:", catalog);
+      queueMicrotask(() => {
+        if (!disposed) setState("ERROR");
+      });
+      return;
+    }
     const query = new URLSearchParams({
       vehicleId,
       from: new Date(from).toISOString(),
@@ -85,7 +95,8 @@ export function ReplayPanel({ vehicleId, trainNumber, onCursorChange }: ReplayPa
         setClock(value.frames.length ? Date.parse(value.frames[0].eventTime) : null);
         setState("READY");
       })
-      .catch(() => {
+      .catch((error) => {
+        console.warn("[ReplayPanel] Failed to fetch replay:", error);
         if (disposed) return;
         setFrames([]);
         setClock(null);
@@ -97,7 +108,7 @@ export function ReplayPanel({ vehicleId, trainNumber, onCursorChange }: ReplayPa
   const firstTime = frames.length ? Date.parse(frames[0].eventTime) : null;
   const lastTime = frames.length ? Date.parse(frames.at(-1)!.eventTime) : null;
   const frameIndex = useMemo(() => {
-    if (clock === null) return -1;
+    if (clock === null || !Number.isFinite(clock)) return -1;
     let found = -1;
     for (let index = 0; index < frames.length; index += 1) {
       if (Date.parse(frames[index].eventTime) > clock) break;

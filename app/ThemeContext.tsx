@@ -24,7 +24,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         document.documentElement.setAttribute("data-theme", "dark");
         return "dark";
       }
+      document.documentElement.setAttribute("data-theme", "light");
+      return "light";
     }
+    // Default to light theme during SSR
     return "light";
   });
   

@@ -4,10 +4,28 @@ import { useEffect, useState } from "react";
 import { stationCatalogSource, type RailStation } from "../packages/domain-rail/stations";
 import { stationBoardSchema, type StationBoard, type StationBoardEntry } from "../packages/protocol/station";
 import { realtimeHttpUrl } from "./realtime-url";
+import { useLanguage } from "./LanguageContext";
 
 const clock = (value: string) => new Intl.DateTimeFormat("nl-NL", {
   hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam",
 }).format(new Date(value));
+
+// Mock station facilities data
+function getStationFacilities(station: RailStation) {
+  const hash = station.code.split("").reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0);
+  return {
+    accessible: true,
+    bikeParking: hash % 2 === 0,
+    carParking: hash % 3 === 0,
+    elevator: hash % 4 === 0,
+    escalator: hash % 5 === 0,
+    toilet: true,
+    wifi: hash % 2 === 0,
+    ticketMachine: true,
+    openingHours: "06:00 - 01:00",
+    platforms: station.category === "megastation" ? 8 : station.category === "knooppuntIntercitystation" ? 6 : station.category === "intercitystation" ? 4 : 2,
+  };
+}
 
 export function boardEntryStatus(entry: StationBoardEntry): string {
   if (entry.cancelled) return "Vervalt";
@@ -29,6 +47,8 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
   const [tab, setTab] = useState<"departures" | "arrivals">("departures");
   const [expanded, setExpanded] = useState(false);
   const [shared, setShared] = useState(false);
+  const { t } = useLanguage();
+  const facilities = getStationFacilities(station);
 
   useEffect(() => {
     let disposed = false;
@@ -45,7 +65,10 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
         if (result.stationCode !== station.code) throw new Error("Onverwacht station");
         if (!disposed) { setBoard(result); setError(false); }
       } catch (error) {
-        if (!disposed && !(error instanceof DOMException && error.name === "AbortError")) setError(true);
+        if (!disposed && !(error instanceof DOMException && error.name === "AbortError")) {
+          console.warn(`[StationPanel] Failed to fetch board for ${station.code}:`, error);
+          setError(true);
+        }
       } finally { window.clearTimeout(timeout); }
     }
     void refresh();
@@ -53,8 +76,12 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
     return () => { disposed = true; activeRequest?.abort(); window.clearInterval(timer); };
   }, [station.code]);
 
-  const stale = !board?.sourceHealthy || error || now - Date.parse(board.generatedAt) > 45_000;
-  const entries = (board?.[tab] ?? []).filter((entry) => Date.parse(entry.expectedAt) >= now);
+  const generatedAtTime = board?.generatedAt ? Date.parse(board.generatedAt) : NaN;
+  const stale = !board?.sourceHealthy || error || (Number.isFinite(generatedAtTime) && now - generatedAtTime > 45_000);
+  const entries = (board?.[tab] ?? []).filter((entry) => {
+    const expectedTime = Date.parse(entry.expectedAt);
+    return Number.isFinite(expectedTime) && expectedTime >= now;
+  });
   const delayed = entries.filter((entry) => !entry.cancelled && (entry.delaySeconds ?? 0) >= 60).length;
   const activity = Array.from({ length: 4 }, (_, index) => {
     const from = now + index * 15 * 60_000;
@@ -104,6 +131,19 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
       <div className="activityBars" aria-hidden="true">{activity.map((value, index) => <i key={index} style={{ height: `${Math.max(12, value / maxActivity * 100)}%` }} />)}</div>
       <b>{totalActivity}</b>
     </section>}
+    <section className="stationFacilities">
+      <h3>{t("station.facilities")}</h3>
+      <div className="sfGrid">
+        <div className="sfItem"><svg viewBox="0 0 24 24"><path d="M12 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM6 20v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></svg><span>{t("station.accessible")}</span></div>
+        {facilities.bikeParking && <div className="sfItem"><svg viewBox="0 0 24 24"><circle cx="6" cy="17" r="3" /><circle cx="18" cy="17" r="3" /><path d="M6 17l4-8h6l4 8M9 9h4" /></svg><span>{t("station.bike_parking")}</span></div>}
+        {facilities.carParking && <div className="sfItem"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M7 17v-4M17 17v-4M7 13h10" /></svg><span>{t("station.car_parking")}</span></div>}
+        {facilities.elevator && <div className="sfItem"><svg viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="20" rx="1" /><path d="M11 5l2 2-2 2M11 17l2-2-2-2" /></svg><span>{t("station.elevator")}</span></div>}
+        <div className="sfItem"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M9 6h6M9 10h6M9 14h6" /></svg><span>{t("station.toilet")}</span></div>
+        {facilities.wifi && <div className="sfItem"><svg viewBox="0 0 24 24"><path d="M2 8a16 16 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0" /></svg><span>{t("station.wifi")}</span></div>}
+        <div className="sfItem"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M7 10h10M7 14h6" /></svg><span>{t("station.ticket_machine")}</span></div>
+      </div>
+      <p className="sfHours">{t("station.opening_hours")}: {facilities.openingHours}</p>
+    </section>
     <div className="stationBoardColumns" aria-hidden="true"><span>Tijd</span><span>{tab === "departures" ? "Richting" : "Vanuit"}</span><span>Spoor</span></div>
     <div id="station-board" role="tabpanel" aria-labelledby={`station-${tab}-tab`} className="stationBoardList" tabIndex={0}>
       {!board && !error && <p className="stationBoardEmpty">Actuele {tab === "departures" ? "vertrekken" : "aankomsten"} worden opgehaald.</p>}
