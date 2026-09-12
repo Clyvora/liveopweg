@@ -152,7 +152,16 @@ export function Utrecht3DView({ vehicles, matchesByVehicle, selectedVehicleId }:
         setState("RENDERING");
       });
     };
-    void initialize().catch(() => { if (!disposed) setState("ERROR"); });
+    void initialize().catch((error) => {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("[Station3D:Initialize]", {
+        timestamp: new Date().toISOString(),
+        error: errorMessage,
+        context: "Utrecht3DView initialization",
+        stationId,
+      });
+      if (!disposed) setState("ERROR");
+    });
     return () => {
       disposed = true;
       if (instance) {

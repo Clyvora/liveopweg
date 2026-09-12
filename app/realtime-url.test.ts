@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { realtimeHttpUrl, realtimeWebSocketUrl } from "./realtime-url.js";
+import { parseTimestamp, realtimeHttpUrl, realtimeWebSocketUrl } from "./realtime-url.js";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
@@ -20,5 +20,21 @@ describe("realtime URLs", () => {
     vi.stubGlobal("window", { location: new URL("https://mobility.example/") });
     expect(realtimeWebSocketUrl()).toBe("wss://mobility.example/v1/realtime");
     expect(realtimeHttpUrl("/v1/fleet")).toBe("https://mobility.example/v1/fleet");
+  });
+});
+
+describe("parseTimestamp", () => {
+  it("parses valid ISO timestamps", () => {
+    expect(parseTimestamp("2026-08-21T12:00:00Z")).toBe(Date.parse("2026-08-21T12:00:00Z"));
+  });
+  it("returns null for empty and null values", () => {
+    expect(parseTimestamp(null)).toBeNull();
+    expect(parseTimestamp(undefined)).toBeNull();
+    expect(parseTimestamp("")).toBeNull();
+  });
+  it("returns null for malformed timestamps", () => {
+    expect(parseTimestamp("invalid")).toBeNull();
+    expect(parseTimestamp("not-a-date")).toBeNull();
+    expect(parseTimestamp("garbage string")).toBeNull();
   });
 });

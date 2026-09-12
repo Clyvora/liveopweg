@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./train-panel.css";
+import "./dashboard-polish.css";
 import { ThemeProvider } from "./ThemeContext";
 import { LanguageProvider } from "./LanguageContext";
 
@@ -14,7 +15,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata = { title: "Liveopweg", description: "Live treintracking" };
+export const metadata = { title: "Liveopweg", description: "Live treintracking", icons: { icon: "/favicon.svg" } };
 
 export default function RootLayout({
   children,

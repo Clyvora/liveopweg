@@ -1,0 +1,40 @@
+/* Keep the map as the canvas, with legible controls at every viewport size. */
+:root { --radar-sidebar:132px; }
+.sideNav button > span:last-child { width:auto; max-width:100%; font-size:inherit; line-height:1.2; overflow-wrap:anywhere; }
+.sideNav .mobileMoreButton,.mobileMoreMenu { display:none; }
+.notificationToggle { left:calc(var(--radar-sidebar) + 24px); bottom:86px; }
+.notificationToggle button { min-height:36px; border-color:#dce6ed; color:#18364e; }
+.radarStatusBar { max-width:calc(100% - var(--radar-sidebar) - 48px); }
+.dsDataNote { margin:2px 0 0; color:#65798a; font-size:11px; line-height:1.5; }
+.dsHeader { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+.delayStatsPanel .dsHeader h3 { margin:0; }
+.dsHeader button { width:30px; height:30px; border:0; border-radius:8px; background:#edf3f7; color:#42596a; font-size:20px; cursor:pointer; }
+.jpSourceNotice { padding:18px; border:1px solid #dce7ef; border-radius:12px; background:#f6f9fc; color:#17334b; }
+.jpSourceNotice strong { font-size:14px; line-height:1.4; }
+.jpSourceNotice p { margin:10px 0 18px; color:#5f7381; font-size:12px; line-height:1.5; }
+.jpSourceNotice a { display:inline-flex; align-items:center; min-height:42px; padding:0 14px; border-radius:9px; background:#1268d7; color:#fff; font-size:12px; font-weight:700; text-decoration:none; }
+.jpSourceNotice a:hover { background:#0c55b5; }
+
+@media (min-width:2200px) {
+  :root { --radar-sidebar:170px; }
+  .notificationToggle { bottom:93px; }
+}
+
+@media (max-width:900px) {
+  :root { --radar-sidebar:0px; }
+  .topbar { z-index:100; }
+  .sideNav { grid-template-columns:repeat(5,minmax(0,1fr)); }
+  .sideNav button { min-width:0; width:100%; padding:6px 1px; gap:5px; font-size:10px; }
+  .sideNav button > span:last-child { font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sideNav .secondaryNavItem { display:none; }
+  .sideNav .mobileMoreButton { display:grid; }
+  .mobileMoreMenu { position:absolute; right:0; bottom:70px; width:min(250px,calc(100vw - 16px)); padding:7px; display:grid; gap:3px; border:1px solid #dce6ed; border-radius:13px; background:#fff; box-shadow:0 12px 36px #0b284233; }
+  .mobileMoreMenu button { display:block; width:100%; min-height:44px; padding:0 13px; border:0; border-radius:8px; background:transparent; color:#17334b; font:600 13px/1.2 var(--font-geist-sans); text-align:left; cursor:pointer; }
+  .mobileMoreMenu button:hover,.mobileMoreMenu button:focus-visible { background:#eaf3ff; }
+  .radarStatusBar { top:67px; left:10px; right:10px; max-width:none; }
+  .radarStatusBar>div,.radarStatusBar>button { height:54px; padding:6px 3px; display:grid; align-content:center; justify-items:center; gap:3px; }
+  .radarStatusBar strong { font-size:12px; line-height:1; }
+  .radarStatusBar span { display:block; font-size:9px; line-height:1; }
+  .notificationToggle { left:10px; bottom:136px; }
+  .notificationToggle button { min-height:36px; }
+}

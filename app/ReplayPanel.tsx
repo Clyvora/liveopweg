@@ -6,7 +6,7 @@ import {
   railReplayResponseSchema,
   type RailReplayFrame,
 } from "../packages/protocol/replay";
-import { realtimeHttpUrl } from "./realtime-url";
+import { parseTimestamp, realtimeHttpUrl } from "./realtime-url";
 
 export interface ReplayCursor {
   frames: RailReplayFrame[];
@@ -46,7 +46,12 @@ export function ReplayPanel({ vehicleId, trainNumber, onCursorChange }: ReplayPa
         setState("IDLE");
       })
       .catch((error) => {
-        console.warn("[ReplayPanel] Failed to fetch catalog:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.warn("[ReplayPanel:Catalog]", {
+          timestamp: new Date().toISOString(),
+          error: errorMessage,
+          context: "fetch replay catalog",
+        });
         if (!disposed) setState("ERROR");
       });
     return () => { disposed = true; };
@@ -65,15 +70,16 @@ export function ReplayPanel({ vehicleId, trainNumber, onCursorChange }: ReplayPa
       return () => { cancelled = true; };
     }
     let disposed = false;
-    const until = Date.parse(catalog.availableUntil);
-    const from = Math.max(Date.parse(catalog.availableFrom), until - 20 * 60_000);
-    if (!Number.isFinite(until) || !Number.isFinite(from)) {
+    const until = parseTimestamp(catalog.availableUntil);
+    const catalogFrom = parseTimestamp(catalog.availableFrom);
+    if (until === null || catalogFrom === null) {
       console.warn("[ReplayPanel] Invalid catalog timestamps:", catalog);
       queueMicrotask(() => {
         if (!disposed) setState("ERROR");
       });
       return;
     }
+    const from = Math.max(catalogFrom, until - 20 * 60_000);
     const query = new URLSearchParams({
       vehicleId,
       from: new Date(from).toISOString(),
@@ -92,11 +98,17 @@ export function ReplayPanel({ vehicleId, trainNumber, onCursorChange }: ReplayPa
       .then((value) => {
         if (disposed) return;
         setFrames(value.frames);
-        setClock(value.frames.length ? Date.parse(value.frames[0].eventTime) : null);
+        setClock(value.frames.length ? parseTimestamp(value.frames[0].eventTime) : null);
         setState("READY");
       })
       .catch((error) => {
-        console.warn("[ReplayPanel] Failed to fetch replay:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.warn("[ReplayPanel:Sequence]", {
+          timestamp: new Date().toISOString(),
+          error: errorMessage,
+          context: "fetch replay sequence",
+          vehicleId,
+        });
         if (disposed) return;
         setFrames([]);
         setClock(null);
@@ -105,13 +117,14 @@ export function ReplayPanel({ vehicleId, trainNumber, onCursorChange }: ReplayPa
     return () => { disposed = true; };
   }, [catalog, onCursorChange, vehicleId]);
 
-  const firstTime = frames.length ? Date.parse(frames[0].eventTime) : null;
-  const lastTime = frames.length ? Date.parse(frames.at(-1)!.eventTime) : null;
+  const firstTime = frames.length ? parseTimestamp(frames[0].eventTime) : null;
+  const lastTime = frames.length ? parseTimestamp(frames.at(-1)!.eventTime) : null;
   const frameIndex = useMemo(() => {
     if (clock === null || !Number.isFinite(clock)) return -1;
     let found = -1;
     for (let index = 0; index < frames.length; index += 1) {
-      if (Date.parse(frames[index].eventTime) > clock) break;
+      const frameTime = parseTimestamp(frames[index].eventTime);
+      if (frameTime !== null && frameTime > clock) break;
       found = index;
     }
     return found;

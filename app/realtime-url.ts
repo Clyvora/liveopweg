@@ -24,3 +24,21 @@ export function realtimeHttpUrl(pathname: string): string {
   url.hash = "";
   return url.toString();
 }
+
+/**
+ * Safely parse a timestamp string, returning null for invalid values.
+ * Always returns null when given empty strings or invalid dates,
+ * preventing silent failures from NaN comparisons.
+ */
+export function parseTimestamp(value: string | null | undefined): number | null {
+  if (!value || typeof value !== "string") return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Check if a timestamp string is valid.
+ */
+export function isValidTimestamp(value: string | null | undefined): boolean {
+  return parseTimestamp(value) !== null;
+}

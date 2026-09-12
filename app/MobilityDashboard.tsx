@@ -13,6 +13,7 @@ import {
   type RailJourney,
 } from "../packages/protocol/journey";
 import {
+  railEdgeResponseSchema,
   railFleetBatchMessageSchema,
   railFleetSnapshotMessageSchema,
   railMatchBatchMessageSchema,
@@ -26,13 +27,13 @@ import {
   roadSnapshotMessageSchema,
   type RoadEvent,
 } from "../packages/protocol/road";
-import { realtimeHttpUrl, realtimeWebSocketUrl } from "./realtime-url";
+import { parseTimestamp, realtimeHttpUrl, realtimeWebSocketUrl } from "./realtime-url";
 import { railStations, searchStations, stationMinZoom, stationsByCode, type RailStation } from "../packages/domain-rail/stations";
 import { StationPanel } from "./StationPanel";
-import { TrainPanel } from "./TrainPanel";
+import { TrainPanel, nextTrainStop } from "./TrainPanel";
+import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { JourneyPlanner } from "./JourneyPlanner";
 import { DelayStats } from "./DelayStats";
-import { WeatherWidget } from "./WeatherWidget";
 import { useTheme } from "./ThemeContext";
 import { useLanguage } from "./LanguageContext";
 
@@ -301,10 +302,10 @@ function trackMotionPosition(
     : null;
   if (!previousPosition) return currentTrackPosition ?? currentPosition;
 
-  const previousTime = Date.parse(sample.previous?.sourceMeasuredAt ?? sample.previous?.matchedAt ?? "");
-  const currentTime = Date.parse(sample.current.sourceMeasuredAt ?? sample.current.matchedAt);
+  const previousTime = parseTimestamp(sample.previous?.sourceMeasuredAt ?? sample.previous?.matchedAt);
+  const currentTime = parseTimestamp(sample.current.sourceMeasuredAt ?? sample.current.matchedAt);
   const targetTime = nowMs - renderDelayMs;
-  if (!Number.isFinite(previousTime) || !Number.isFinite(currentTime) || currentTime <= previousTime) return currentTrackPosition ?? currentPosition;
+  if (previousTime === null || currentTime === null || currentTime <= previousTime) return currentTrackPosition ?? currentPosition;
   if (targetTime <= previousTime) return previousTrackPosition ?? previousPosition;
   if (targetTime >= currentTime) {
     const extrapolationSeconds = Math.min(30, (targetTime - currentTime) / 1_000);
@@ -507,6 +508,7 @@ export function MobilityDashboard() {
   });
   const map = useRef<MapLibreMap | null>(null);
   const initialZoomRef = useRef<number | null>(null);
+  const initialCenterRef = useRef<[number, number] | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const selectFromMapRef = useRef<(vehicleId: string) => void>(() => undefined);
   const motionSamplesRef = useRef(new Map<string, MotionSample>());
@@ -540,6 +542,7 @@ export function MobilityDashboard() {
   const [showAlerts, setShowAlerts] = useState(false);
   const [showJourneyPlanner, setShowJourneyPlanner] = useState(false);
   const [showDelayStats, setShowDelayStats] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [baseMap, setBaseMap] = useState<BaseMapKey>("standard");
   const [showMapStyles, setShowMapStyles] = useState(false);
@@ -591,29 +594,35 @@ export function MobilityDashboard() {
       const url = new URL(realtimeHttpUrl("/v1/geometry/rail/edges"));
       url.searchParams.set("ids", missing.slice(0, 500).join(","));
       const response = await fetch(url.toString());
-      if (!response.ok) return;
-      const payload = await response.json() as {
-        features?: Array<{
-          properties?: { edgeId?: unknown; fromNode?: unknown; toNode?: unknown; lengthMeters?: unknown };
-          geometry?: { coordinates?: unknown };
-        }>;
-      };
+      if (!response.ok) {
+        console.warn("[MobilityDashboard:GeometryFetch]", {
+          timestamp: new Date().toISOString(),
+          error: `HTTP ${response.status}`,
+          context: "requestTrackGeometries",
+          missingEdges: missing.length,
+        });
+        return;
+      }
+      const payload = railEdgeResponseSchema.parse(await response.json());
       for (const feature of payload.features ?? []) {
-        const edgeId = typeof feature.properties?.edgeId === "string" ? feature.properties.edgeId : null;
-        const fromNode = typeof feature.properties?.fromNode === "string" ? feature.properties.fromNode : null;
-        const toNode = typeof feature.properties?.toNode === "string" ? feature.properties.toNode : null;
-        const lengthMeters = typeof feature.properties?.lengthMeters === "number" ? feature.properties.lengthMeters : null;
-        const coordinates = Array.isArray(feature.geometry?.coordinates)
-          ? feature.geometry.coordinates
-            .filter((point): point is number[] => Array.isArray(point) && point.length >= 2 && point.every((value) => typeof value === "number"))
-            .map((point) => [point[0], point[1]] as [number, number])
-          : [];
+        const edgeId = feature.properties?.edgeId;
+        const fromNode = feature.properties?.fromNode;
+        const toNode = feature.properties?.toNode;
+        const lengthMeters = feature.properties?.lengthMeters;
+        const coordinates = feature.geometry?.coordinates
+          ?.map((point) => [point[0], point[1]] as [number, number]) ?? [];
         if (edgeId && fromNode && toNode && lengthMeters && coordinates.length >= 2) {
           trackGeometriesRef.current.set(edgeId, { coordinates, fromNode, toNode, lengthMeters });
         }
       }
     } catch (error) {
-      console.warn("[MobilityDashboard] Failed to fetch track geometries:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn("[MobilityDashboard:GeometryFetch]", {
+        timestamp: new Date().toISOString(),
+        error: errorMessage,
+        context: "requestTrackGeometries",
+        missingEdges: missing.length,
+      });
     } finally {
       missing.forEach((edgeId) => trackGeometryRequestsRef.current.delete(edgeId));
     }
@@ -637,8 +646,8 @@ export function MobilityDashboard() {
   const availableVehicleIds = useMemo(() => new Set(vehicles.map((vehicle) => vehicle.vehicleId)), [vehicles]);
   const roadEvents = useMemo(() => Object.values(roadEventsById), [roadEventsById]);
   const recentRoadEvents = useMemo(() => roadEvents.toSorted((left, right) => {
-    const leftTime = Date.parse(left.time.sourceUpdatedAt ?? left.time.publicationTime);
-    const rightTime = Date.parse(right.time.sourceUpdatedAt ?? right.time.publicationTime);
+    const leftTime = parseTimestamp(left.time.sourceUpdatedAt ?? left.time.publicationTime) ?? 0;
+    const rightTime = parseTimestamp(right.time.sourceUpdatedAt ?? right.time.publicationTime) ?? 0;
     return rightTime - leftTime;
   }).slice(0, 5), [roadEvents]);
   const selectedRoadEvent = selectedRoadEventId ? roadEventsById[selectedRoadEventId] ?? null : null;
@@ -650,6 +659,9 @@ export function MobilityDashboard() {
     const selected = vehiclesById[vehicleId];
     if (!selected) return;
     setSelectedStation(null);
+    // Clear previous animation state before setting up new animation (prevents glitches from rapid selection)
+    trainSwitchAnimationRef.current = null;
+    previousVehicleIdRef.current = null;
     // Trigger train switch animation if selecting a different train
     if (selectedVehicleIdRef.current && selectedVehicleIdRef.current !== vehicleId) {
       previousVehicleIdRef.current = selectedVehicleIdRef.current;
@@ -663,6 +675,9 @@ export function MobilityDashboard() {
     setQuery("");
     setShowAlerts(false);
     setShowLayers(false);
+    setShowJourneyPlanner(false);
+    setShowDelayStats(false);
+    setSelectedRoadEventId(null);
     replaceSelectionUrl({ train: selected.trainNumber });
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ protocolVersion: 2, type: "select", vehicleId }));
     if (focusMap && map.current) {
@@ -693,6 +708,9 @@ export function MobilityDashboard() {
     replaceSelectionUrl({ station: station.code });
     setShowLayers(false);
     setShowAlerts(false);
+    setShowJourneyPlanner(false);
+    setShowDelayStats(false);
+    setSelectedRoadEventId(null);
     map.current?.easeTo({
       center: [station.longitude, station.latitude],
       offset: window.innerWidth <= 760 ? [0, -Math.min(140, window.innerHeight * 0.2)] : [-195, 0],
@@ -703,10 +721,13 @@ export function MobilityDashboard() {
   const resetMap = useCallback(() => {
     setShowLayers(false);
     setShowAlerts(false);
+    setShowJourneyPlanner(false);
+    setShowDelayStats(false);
+    setShowMobileMenu(false);
     setSelectedRoadEventId(null);
     setSelectedStation(null);
     clearVehicleSelection();
-    map.current?.easeTo({ center: [5.3, 52.2], zoom: initialZoomRef.current ?? undefined, duration: 500 });
+    map.current?.easeTo({ center: initialCenterRef.current ?? [5.3, 52.2], zoom: initialZoomRef.current ?? undefined, duration: 500 });
   }, [clearVehicleSelection]);
 
   useEffect(() => {
@@ -745,6 +766,10 @@ export function MobilityDashboard() {
       setSelectedStation(null);
       setShowLayers(false);
       setShowAlerts(false);
+      setShowJourneyPlanner(false);
+      setShowDelayStats(false);
+      setShowMobileMenu(false);
+      setShowMapStyles(false);
       clearVehicleSelection();
     };
     window.addEventListener("keydown", close);
@@ -787,10 +812,8 @@ export function MobilityDashboard() {
       
       // Remove stale entries (older than MAX_SAMPLE_AGE)
       for (const [vehicleId, sample] of motionSamplesRef.current) {
-        const sampleTime = sample.current?.time?.sourceMeasuredAt 
-          ? Date.parse(sample.current.time.sourceMeasuredAt) 
-          : NaN;
-        if (Number.isFinite(sampleTime) && nowMs - sampleTime > MAX_SAMPLE_AGE) {
+        const sampleTime = parseTimestamp(sample.current?.time?.sourceMeasuredAt);
+        if (sampleTime !== null && nowMs - sampleTime > MAX_SAMPLE_AGE) {
           motionSamplesRef.current.delete(vehicleId);
           trackMotionSamplesRef.current.delete(vehicleId);
         }
@@ -799,33 +822,23 @@ export function MobilityDashboard() {
     return () => window.clearInterval(timer);
   }, [vehiclesById]);
 
-  // Notification permission and delay alerts
-  useEffect(() => {
-    if (!notificationsEnabled || !("Notification" in window)) return;
-    if (Notification.permission === "default") {
-      Notification.requestPermission().then(permission => {
-        if (permission !== "granted") setNotificationsEnabled(false);
-      });
-    }
-  }, [notificationsEnabled]);
-
   // Monitor selected train for delay notifications
-  const lastDelayRef = useRef<number | null>(null);
+  const lastDelayRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!notificationsEnabled || !observation) return;
-    // Generate mock delay based on vehicle ID (in real app, this would come from journey data)
-    const hash = observation.vehicleId.split("").reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0);
-    const currentDelay = Math.abs(hash) % 600; // 0-600 seconds
-    if (currentDelay >= 300 && lastDelayRef.current !== currentDelay) {
-      lastDelayRef.current = currentDelay;
-      if (Notification.permission === "granted") {
+    if (!notificationsEnabled || !observation || !journey || !("Notification" in window)) return;
+    const nextStop = nextTrainStop(journey.stops, Date.now());
+    const currentDelay = nextStop?.arrival.exactDelaySeconds ?? nextStop?.departure.exactDelaySeconds;
+    if (currentDelay != null && currentDelay >= 300 && Notification.permission === "granted") {
+      const notificationKey = `${observation.vehicleId}:${nextStop?.station.code}:${currentDelay}`;
+      if (lastDelayRef.current !== notificationKey) {
+        lastDelayRef.current = notificationKey;
         new Notification("Vertraging", {
-          body: `Trein ${observation.trainNumber} heeft ${Math.round(currentDelay / 60)} minuten vertraging`,
+          body: `Trein ${observation.trainNumber} heeft bij ${nextStop?.station.longName ?? "de volgende halte"} ${Math.round(currentDelay / 60)} minuten vertraging`,
           icon: "/train-icon.png",
         });
       }
     }
-  }, [notificationsEnabled, observation]);
+  }, [notificationsEnabled, observation, journey]);
 
   // Multi-level zoom: platform details at high zoom
   useEffect(() => {
@@ -842,40 +855,47 @@ export function MobilityDashboard() {
     return () => { instance.off("zoom", handleZoom); };
   }, [mapReady]);
 
-  const toggleNotifications = useCallback(() => {
-    setNotificationsEnabled(prev => !prev);
-  }, []);
+  const toggleNotifications = useCallback(async () => {
+    if (notificationsEnabled) { setNotificationsEnabled(false); return; }
+    if (!("Notification" in window)) return;
+    const permission = Notification.permission === "default"
+      ? await Notification.requestPermission()
+      : Notification.permission;
+    setNotificationsEnabled(permission === "granted");
+  }, [notificationsEnabled]);
 
   const openJourneyPlanner = useCallback(() => {
+    clearVehicleSelection();
+    setSelectedStation(null);
+    setSelectedRoadEventId(null);
     setShowJourneyPlanner(true);
     setShowDelayStats(false);
     setShowAlerts(false);
     setShowLayers(false);
-  }, []);
+  }, [clearVehicleSelection]);
 
   const openDelayStats = useCallback(() => {
+    clearVehicleSelection();
+    setSelectedStation(null);
+    setSelectedRoadEventId(null);
     setShowDelayStats(true);
     setShowJourneyPlanner(false);
     setShowAlerts(false);
     setShowLayers(false);
-  }, []);
+  }, [clearVehicleSelection]);
   useEffect(() => {
     let disposed = false;
-    void Promise.all([import("maplibre-gl"), loadPublicMapStyle()]).then(([{ Map, Popup }, mapStyle]) => {
+    void Promise.all([import("maplibre-gl"), loadPublicMapStyle()]).then(([{ Map, Popup, setWorkerUrl }, mapStyle]) => {
       if (disposed || !mapElement.current || map.current) return;
-      const ultrawideMapView = window.innerWidth >= 2200
-        ? { center: [5.32, 52.16] as [number, number], zoom: 6.85 }
-        : {
-            bounds: [[3.15, 50.7], [7.45, 53.7]] as [[number, number], [number, number]],
-            fitBoundsOptions: {
-              padding: window.innerWidth <= 900
-                ? { top: 120, right: 22, bottom: 82, left: 22 }
-                : { top: 96, right: 60, bottom: 70, left: 140 },
-            },
-          };
+      setWorkerUrl(mapWorkerUrl);
       const instance = new Map({
         container: mapElement.current,
-        ...ultrawideMapView,
+        bounds: [[3.15, 50.7], [7.45, 53.7]] as [[number, number], [number, number]],
+        fitBoundsOptions: {
+          padding: window.innerWidth <= 900
+            ? { top: 120, right: 22, bottom: 100, left: 22 }
+            : { top: 108, right: window.innerWidth >= 2200 ? 520 : 64, bottom: 92, left: window.innerWidth >= 2200 ? 190 : 150 },
+        },
         attributionControl: false,
         minZoom: 5,
         maxZoom: 16,
@@ -892,6 +912,8 @@ export function MobilityDashboard() {
       instance.on("load", () => {
         if (disposed) return;
         initialZoomRef.current = instance.getZoom();
+        const initialCenter = instance.getCenter();
+        initialCenterRef.current = [initialCenter.lng, initialCenter.lat];
         instance.touchZoomRotate.disableRotation();
         const stationPopup = new Popup({ closeButton: false, closeOnClick: true, offset: 12, className: "stationTooltip" });
         const stationAtPoint = (point: { x: number; y: number }) => {
@@ -1438,15 +1460,12 @@ export function MobilityDashboard() {
     let latestRoadSequence: number | null = null;
 
     const connect = () => {
-      setConnection(latestSequence !== null ? "herstellen" : "verbinden");
+      setConnection(latestSequence !== null || latestRoadSequence !== null ? "herstellen" : "verbinden");
       socket = new WebSocket(realtimeWebSocketUrl());
       socketRef.current = socket;
       socket.onopen = () => {
         setConnection("live");
-        // Request fresh snapshot on (re)connect to ensure state sync
-        if (latestSequence !== null) {
-          socket?.send(JSON.stringify({ protocolVersion: 2, type: "resync" }));
-        }
+        // The server sends fresh fleet, match and road snapshots on every connection.
       };
       socket.onmessage = (event) => {
         let decoded: unknown;
@@ -1654,11 +1673,22 @@ export function MobilityDashboard() {
         if (value.method !== "EXPECTED_SHORTEST_TRACK_PATH" || value.geometry?.type !== "MultiLineString" || !Array.isArray(value.stops)) throw new Error("Invalid route");
         setExpectedRoute(value);
       })
-      .catch(() => { if (!controller.signal.aborted) setExpectedRoute(null); });
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.warn("[MobilityDashboard:ExpectedRoute]", {
+            timestamp: new Date().toISOString(),
+            error: errorMessage,
+            context: "fetch expected route",
+          });
+          setExpectedRoute(null);
+        }
+      });
     return () => controller.abort();
   }, [journey, selectedVehicleId]);
 
-  const strikeIsActive = now <= Date.parse(nationalStrikeAlert.validUntil);
+  const strikeValidUntil = parseTimestamp(nationalStrikeAlert.validUntil);
+  const strikeIsActive = strikeValidUntil !== null && now <= strikeValidUntil;
   const staleRoadEvents = roadEvents.filter((event) => event.status === "STALE").length;
 
   return (
@@ -1670,12 +1700,18 @@ export function MobilityDashboard() {
         </a>
         <nav className="sideNav" aria-label="Hoofdnavigatie">
           <button className={!showAlerts && !showLayers && !observation && !selectedStation ? "active" : ""} type="button" onClick={resetMap}><UiIcon name="map" /><span>Kaart</span></button>
-          <button className={observation ? "active" : ""} type="button" onClick={() => searchInputRef.current?.focus()}><UiIcon name="train" /><span>Treinen</span></button>
-          <button className={selectedStation ? "active" : ""} type="button" onClick={() => { setMapLayers((current) => ({ ...current, stations: true })); searchInputRef.current?.focus(); }}><UiIcon name="clock" /><span>Stations</span></button>
-          <button className={showJourneyPlanner ? "active" : ""} type="button" onClick={openJourneyPlanner}><UiIcon name="queue" /><span>Reisplanner</span></button>
-          <button className={showDelayStats ? "active" : ""} type="button" onClick={openDelayStats}><UiIcon name="settings" /><span>Statistieken</span></button>
-          <button className={showAlerts ? "active" : ""} type="button" onClick={() => { setSelectedStation(null); clearVehicleSelection(); setShowLayers(false); setShowJourneyPlanner(false); setShowDelayStats(false); setShowAlerts((current) => !current); }}><span className="navIconWrap"><UiIcon name="bell" />{roadCounts.incidents + roadCounts.closures > 0 && <b>{Math.min(99, roadCounts.incidents + roadCounts.closures)}</b>}</span><span>Meldingen</span></button>
-          <button className={showLayers ? "active" : ""} type="button" onClick={() => { setShowAlerts(false); setShowJourneyPlanner(false); setShowDelayStats(false); setShowLayers(true); }}><UiIcon name="sliders" /><span>Instellingen</span></button>
+          <button className={observation ? "active" : ""} type="button" onClick={() => { setShowMobileMenu(false); searchInputRef.current?.focus(); }}><UiIcon name="train" /><span>Treinen</span></button>
+          <button className={selectedStation ? "active" : ""} type="button" onClick={() => { setShowMobileMenu(false); setMapLayers((current) => ({ ...current, stations: true })); searchInputRef.current?.focus(); }}><UiIcon name="clock" /><span>Stations</span></button>
+          <button className={`secondaryNavItem ${showJourneyPlanner ? "active" : ""}`} type="button" onClick={openJourneyPlanner}><UiIcon name="queue" /><span>Reisplanner</span></button>
+          <button className={`secondaryNavItem ${showDelayStats ? "active" : ""}`} type="button" onClick={openDelayStats}><UiIcon name="settings" /><span>Statistieken</span></button>
+          <button className={showAlerts ? "active" : ""} type="button" onClick={() => { setShowMobileMenu(false); setSelectedStation(null); clearVehicleSelection(); setShowLayers(false); setShowJourneyPlanner(false); setShowDelayStats(false); setShowAlerts((current) => !current); }}><span className="navIconWrap"><UiIcon name="bell" />{roadCounts.incidents + roadCounts.closures > 0 && <b>{Math.min(99, roadCounts.incidents + roadCounts.closures)}</b>}</span><span>Meldingen</span></button>
+          <button className={`secondaryNavItem ${showLayers ? "active" : ""}`} type="button" onClick={() => { setShowAlerts(false); setShowJourneyPlanner(false); setShowDelayStats(false); setShowLayers(true); }}><UiIcon name="sliders" /><span>Instellingen</span></button>
+          <button className="mobileMoreButton" type="button" aria-expanded={showMobileMenu} aria-controls="mobileMoreMenu" onClick={() => setShowMobileMenu((current) => !current)}><UiIcon name="sliders" /><span>Meer</span></button>
+          {showMobileMenu && <div className="mobileMoreMenu" id="mobileMoreMenu">
+            <button type="button" onClick={() => { openJourneyPlanner(); setShowMobileMenu(false); }}>Reisplanner</button>
+            <button type="button" onClick={() => { openDelayStats(); setShowMobileMenu(false); }}>Statistieken</button>
+            <button type="button" onClick={() => { setShowAlerts(false); setShowJourneyPlanner(false); setShowDelayStats(false); setShowLayers(true); setShowMobileMenu(false); }}>Instellingen en lagen</button>
+          </div>}
         </nav>
         <div className="sidebarLive"><div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live" : connection}</div></div>
       </header>
@@ -1832,11 +1868,10 @@ export function MobilityDashboard() {
         {selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
         {observation && !selectedStation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} onClose={clearVehicleSelection} />}
         {showJourneyPlanner && <JourneyPlanner onClose={() => setShowJourneyPlanner(false)} />}
-        {showDelayStats && <DelayStats vehicles={vehicles} />}
+        {showDelayStats && <DelayStats vehicles={vehicles} onClose={() => setShowDelayStats(false)} />}
       </section>
-      <WeatherWidget />
       <div className="notificationToggle">
-        <button type="button" onClick={toggleNotifications} aria-label={t("notifications.enable")}>
+        <button type="button" onClick={toggleNotifications} aria-label={notificationsEnabled ? "Schakel meldingen uit" : t("notifications.enable")}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7Z" /><path d="M10 20h4" /></svg>
           <span>{notificationsEnabled ? "Meldingen aan" : "Meldingen uit"}</span>
         </button>

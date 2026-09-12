@@ -38,7 +38,8 @@ function clamp(value: number, minimum = 0, maximum = 1): number {
 }
 
 function observationTime(observation: RailObservation): number {
-  return Date.parse(observation.time.sourceMeasuredAt ?? observation.time.receivedAt);
+  const parsed = Date.parse(observation.time.sourceMeasuredAt ?? observation.time.receivedAt);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function distanceMeters(left: RailObservation, right: RailObservation): number {

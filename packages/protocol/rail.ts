@@ -211,3 +211,21 @@ export const railMatchBatchMessageSchema = z.object({
 export type RailMatchRealtimeMessage =
   | z.infer<typeof railMatchSnapshotMessageSchema>
   | z.infer<typeof railMatchBatchMessageSchema>;
+
+export const railEdgeFeatureSchema = z.object({
+  properties: z.object({
+    edgeId: z.string().min(1),
+    fromNode: z.string().min(1),
+    toNode: z.string().min(1),
+    lengthMeters: z.number().positive(),
+  }).optional(),
+  geometry: z.object({
+    coordinates: z.array(z.tuple([z.number(), z.number()])).min(2),
+  }).optional(),
+}).passthrough();
+
+export const railEdgeResponseSchema = z.object({
+  features: z.array(railEdgeFeatureSchema).optional(),
+}).passthrough();
+
+export type RailEdgeResponse = z.infer<typeof railEdgeResponseSchema>;

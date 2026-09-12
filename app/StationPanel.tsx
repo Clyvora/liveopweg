@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { stationCatalogSource, type RailStation } from "../packages/domain-rail/stations";
 import { stationBoardSchema, type StationBoard, type StationBoardEntry } from "../packages/protocol/station";
-import { realtimeHttpUrl } from "./realtime-url";
+import { parseTimestamp, realtimeHttpUrl } from "./realtime-url";
 import { useLanguage } from "./LanguageContext";
 
 const clock = (value: string) => new Intl.DateTimeFormat("nl-NL", {
@@ -76,11 +76,11 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
     return () => { disposed = true; activeRequest?.abort(); window.clearInterval(timer); };
   }, [station.code]);
 
-  const generatedAtTime = board?.generatedAt ? Date.parse(board.generatedAt) : NaN;
-  const stale = !board?.sourceHealthy || error || (Number.isFinite(generatedAtTime) && now - generatedAtTime > 45_000);
+  const generatedAtTime = parseTimestamp(board?.generatedAt);
+  const stale = !board?.sourceHealthy || error || generatedAtTime === null || now - generatedAtTime > 45_000;
   const entries = (board?.[tab] ?? []).filter((entry) => {
-    const expectedTime = Date.parse(entry.expectedAt);
-    return Number.isFinite(expectedTime) && expectedTime >= now;
+    const expectedTime = parseTimestamp(entry.expectedAt);
+    return expectedTime !== null && expectedTime >= now;
   });
   const delayed = entries.filter((entry) => !entry.cancelled && (entry.delaySeconds ?? 0) >= 60).length;
   const activity = Array.from({ length: 4 }, (_, index) => {
@@ -88,8 +88,8 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
     const until = from + 15 * 60_000;
     const events = [...(board?.arrivals ?? []), ...(board?.departures ?? [])];
     return new Set(events.filter((entry) => {
-      const time = Date.parse(entry.expectedAt);
-      return !entry.cancelled && time >= from && time < until;
+      const time = parseTimestamp(entry.expectedAt);
+      return time !== null && !entry.cancelled && time >= from && time < until;
     }).map((entry) => `${entry.trainNumber}:${entry.expectedAt}`)).size;
   });
   const maxActivity = Math.max(1, ...activity);
