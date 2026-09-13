@@ -1,4 +1,4 @@
-.observationPanel.trainPanel{--tp-blue:#2468e9;width:clamp(380px,16vw,500px);height:100%;max-height:none;inset:0 0 0 auto;padding:0;display:flex;flex-direction:column;overflow:hidden;border:0;border-left:1px solid #e5eaf0;border-radius:0;background:#fbfcfe;color:#152b48;box-shadow:-5px 0 24px #12304712;}
+.observationPanel.trainPanel{--tp-blue:#2468e9;width:clamp(380px,16vw,500px);height:100%;max-height:none;inset:0 0 0 auto;padding:0;display:flex;flex-direction:column;overflow:hidden;border:0;border-left:1px solid #e5eaf0;border-radius:0;background:#fbfcfe;color:#152b48;box-shadow:-5px 0 24px #12304712;animation:tpPanelEnter .24s cubic-bezier(.2,.7,.2,1) both;}
 .trainPanel::before{display:none;}
 .tpHeader{flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:25px 24px 13px;background:#fbfcfe;}
 .trainPanel .tpHeader h2{margin:0;font:750 24px/1.2 Arial,sans-serif;letter-spacing:-.035em;}
@@ -47,19 +47,10 @@
 .tpJourney li.cancelled small{color:#bd695e;}
 .tpJourney .tpEmpty{margin-left:-24px;line-height:1.5;}
 .tpHeader button:focus-visible,.tpJourneyToggle:focus-visible{outline:2px solid var(--tp-blue);outline-offset:3px;}
-.tpOccupancySection{display:flex;align-items:center;gap:8px;padding:12px 15px;background:#f0f4f8;border-radius:8px;margin-bottom:15px;font-size:12px;}
-.tpOccupancySection svg{width:20px;height:20px;fill:none;stroke:#253951;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;}
-.tpOccupancy{padding:3px 10px;border-radius:12px;font-weight:700;font-size:11px;}
-.tpOccupancy-low{background:#d4edda;color:#155724;}
-.tpOccupancy-medium{background:#fff3cd;color:#856404;}
-.tpOccupancy-high{background:#f8d7da;color:#721c24;}
 .tpETA{color:#3375c4;font-weight:600;font-size:11px;}
 .tpStopETA{color:#3375c4;font-size:10px;margin-top:2px;}
-@keyframes trainIllustrationSlideIn{from{transform:translateX(-60%);opacity:0;}to{transform:translateX(0);opacity:1;}}
-.tpIllustration{animation:trainIllustrationSlideIn .4s cubic-bezier(.25,.46,.45,.94) forwards;}
-@keyframes trainPanelSlideIn{from{transform:translateX(100%);opacity:0;}to{transform:translateX(0);opacity:1;}}
-@keyframes trainPanelSlideOut{from{transform:translateX(0);opacity:1;}to{transform:translateX(100%);opacity:0;}}
-.trainPanel-enter{animation:trainPanelSlideIn .35s cubic-bezier(.25,.46,.45,.94) forwards;}
-.trainPanel-exit{animation:trainPanelSlideOut .3s cubic-bezier(.55,.085,.68,.53) forwards;}
+@keyframes tpPanelEnter{from{opacity:.75;transform:translateX(18px);}to{opacity:1;transform:translateX(0);}}
 @media(min-width:901px){.shell:has(.trainPanel) .mapZoomControls,.shell:has(.trainPanel) .mapStylePicker{right:calc(clamp(380px,16vw,500px) + 18px);}.shell:has(.trainPanel) .mapAttribution{right:calc(clamp(380px,16vw,500px) + 185px);}}
-@media(max-width:900px){.observationPanel.trainPanel{inset:10px 8px 76px;width:calc(100% - 16px);height:calc(100dvh - 86px);max-height:none;z-index:30;border-radius:14px;}.tpHeader{padding:20px 18px 10px;}.tpScroll{padding:0 18px 20px;}.tpIllustration{height:100px;}}
+@media(max-width:900px){.observationPanel.trainPanel{inset:10px 8px 76px;width:calc(100% - 16px);height:calc(100dvh - 86px);max-height:none;z-index:30;border-radius:14px;animation-name:tpPanelEnterMobile;}.tpHeader{padding:20px 18px 10px;}.tpScroll{padding:0 18px 20px;}.tpIllustration{height:100px;}}
+@keyframes tpPanelEnterMobile{from{opacity:.75;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
+@media(prefers-reduced-motion:reduce){.observationPanel.trainPanel{animation:none;}}

@@ -37,36 +37,20 @@ function getETA(stop: Stop, now: number): number | null {
   return eta > 0 ? Math.round(eta) : null;
 }
 
-// Mock occupancy data (in real app, this would come from the API)
-function getOccupancy(vehicleId: string): "low" | "medium" | "high" {
-  const hash = vehicleId.split("").reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0);
-  const mod = Math.abs(hash) % 100;
-  if (mod < 33) return "low";
-  if (mod < 66) return "medium";
-  return "high";
-}
 function Delay({ seconds }: { seconds: number | null | undefined }) {
   return <span className={seconds != null && seconds > 0 ? "tpLate" : "tpDelay"}>{trainDelay(seconds)}</span>;
 }
-function FactIcon({ kind }: { kind: "speed" | "clock" | "stop" | "occupancy" }) {
-  if (kind === "occupancy") {
-    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM6 8a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM18 8a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM12 13c2 0 4 1 4 3v2H8v-2c0-2 2-3 4-3zM6 14c1.5 0 3 .8 3 2.2V18H3v-1.8C3 14.8 4.5 14 6 14zM18 14c1.5 0 3 .8 3 2.2V18h-6v-1.8c0-1.4 1.5-2.2 3-2.2z" /></svg>;
-  }
+function FactIcon({ kind }: { kind: "speed" | "clock" | "stop" }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true">{kind === "clock" ? <><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></> : kind === "stop" ? <path d="M5 19V13M10 19V9M15 19V5M20 19V2" /> : <><path d="M4 19a9 9 0 1 1 16 0M12 13l4-5M5 12h2M7 6l1 2M12 4v2M19 12h-2" /><circle cx="12" cy="14" r="1.5" /></>}</svg>;
-}
-
-function OccupancyBadge({ level, t }: { level: "low" | "medium" | "high"; t: (key: string) => string }) {
-  const labels = { low: t("train.occupancy.low"), medium: t("train.occupancy.medium"), high: t("train.occupancy.high") };
-  return <span className={`tpOccupancy tpOccupancy-${level}`}>{labels[level]}</span>;
 }
 
 export function TrainPanel({ observation, journey, now, onClose }: { observation: RailObservation; journey: RailJourney | null; now: number; onClose: () => void }) {
   const [expanded, setExpanded] = useState(true);
   const { t } = useLanguage();
   const stock = identifyRollingStock(observation.materialNumber);
-  // Only show stations where the train will actually stop (calls.planned === true)
+  // Include added stops as well as planned ones; cancelled stops remain visible in the timeline.
   const stops = journey?.stops
-    .filter(stop => stop.calls.planned === true)
+    .filter(stop => stop.calls.planned || stop.calls.actual)
     .sort((a, b) => a.order - b.order) ?? [];
   const next = nextTrainStop(stops, now);
   const first = stops[0]; const last = stops.at(-1);
@@ -74,7 +58,6 @@ export function TrainPanel({ observation, journey, now, onClose }: { observation
   const delay = next?.arrival.exactDelaySeconds ?? next?.departure.exactDelaySeconds;
   const track = next?.arrival.actualTrack ?? next?.departure.actualTrack ?? next?.arrival.plannedTrack ?? next?.departure.plannedTrack;
   const category = journey?.trainCategory.name ?? journey?.trainCategory.code ?? "Trein";
-  const occupancy = getOccupancy(observation.vehicleId);
   return <aside className="observationPanel trainPanel" aria-label={t("train.close")}>
     <header className="tpHeader"><div><h2>{category} {observation.trainNumber}</h2><p>{journey?.operator ?? t("train.unknown_operator")}<span>·</span>{category}<span>·</span>Trein {observation.trainNumber}</p></div><button type="button" onClick={onClose} aria-label={t("train.close")}>×</button></header>
     <div className="tpScroll">
@@ -87,11 +70,6 @@ export function TrainPanel({ observation, journey, now, onClose }: { observation
         <div><FactIcon kind="speed" /><span>{t("train.speed")}</span><strong>{observation.speed ? `${Math.round(observation.speed.valueKmh)} km/u` : "—"}</strong></div>
         <div><FactIcon kind="clock" /><span>{t("train.delay")}</span><strong><Delay seconds={delay} /></strong></div>
         <div><FactIcon kind="stop" /><span>{t("train.nextStop")}</span><strong>{next?.station.shortName ?? next?.station.longName ?? "—"}</strong></div>
-      </section>
-      <section className="tpOccupancySection">
-        <FactIcon kind="occupancy" />
-        <span>{t("train.occupancy")}</span>
-        <OccupancyBadge level={occupancy} t={t} />
       </section>
       <section className="tpNext" aria-label={t("train.nextStop")}>
         <span>{t("train.nextStop")}</span>

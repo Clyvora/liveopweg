@@ -38,6 +38,7 @@ describe("train passenger panel", () => {
   it("renders every stop, cancellations, changed tracks and next-stop status", () => {
     const html=render(); expect(html).toContain('aria-current="step"'); expect(html).toContain("Vervalt"); expect(html).toContain("Spoor gewijzigd: 5");
     expect(html).toContain("132 km/u"); expect(html).not.toContain("confidence"); expect(html).not.toContain("Delen");
+    expect(html).not.toContain("Bezetting");
     const long=render({...journey,stops:Array.from({length:40},(_,i)=>stop(i,`Station ${i}`,"2026-09-09T13:00:00Z"))});
     expect(long).toContain("Station 39");
   });
@@ -52,6 +53,10 @@ describe("train passenger panel", () => {
     dwelling.departure.actualAt = "2026-09-09T12:32:00Z";
     expect(nextTrainStop([dwelling], now)).toBe(dwelling);
     expect(nextTrainStop([dwelling], Date.parse("2026-09-09T12:33:00Z"))).toBeNull();
+  });
+  it("shows a newly added stop in the journey", () => {
+    const added = { ...stop(2, "Nieuw station", "2026-09-09T12:40:00Z"), calls: { actual: true, planned: false } };
+    expect(render({ ...journey, stops: [...stops, added] })).toContain("Nieuw station");
   });
   it("shows unknown track and delay when neither is supplied", () => {
     const missing = stop(0, "Hilversum", "2026-09-09T12:38:00Z");

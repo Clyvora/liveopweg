@@ -5,6 +5,9 @@
 .sideNav a > span:last-child { max-width:100%; line-height:1.2; overflow-wrap:anywhere; }
 .sideNav a .uiIcon { width:25px; height:25px; stroke-width:1.7; }
 .sideNav a:focus-visible,.settingsNav a:focus-visible,.settingsLinks a:focus-visible { outline:2px solid #83b8ff; outline-offset:-2px; }
+.sideNav a,.settingsNav a,.settingsLinks a,.alertFilterGrid label,.liveFeedItem { transition:background-color .16s ease,color .16s ease,border-color .16s ease,box-shadow .16s ease; }
+.alertsPage .liveFeedItem.selected { background:#edf5ff; box-shadow:inset 3px 0 #237ce7; }
+@media(prefers-reduced-motion:reduce){.sideNav a,.settingsNav a,.settingsLinks a,.alertFilterGrid label,.liveFeedItem,.settingsSwitch span { transition:none; }}
 .trainPage .mapActions button:nth-child(n+2),.alertsPage .mapActions button:nth-child(n+2),.notificationToggle { display:none; }
 .trainPage .mapActions { bottom:22px; }
 .trainPage .radarStatusBar { max-width:calc(100% - var(--radar-sidebar) - 36px); }

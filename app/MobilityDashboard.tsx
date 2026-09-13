@@ -4,18 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import NextImage from "next/image";
 import type { GeoJSONSource, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
-import {
-  DEFAULT_RENDER_DELAY_MS,
-  renderMotion,
-  type MotionSample,
-} from "../packages/domain-rail/client-motion";
+import { reliableTrainPosition } from "../packages/domain-rail/display-position";
 import { identifyRollingStock } from "../packages/domain-rail/rolling-stock";
 import {
   journeySnapshotMessageSchema,
   type RailJourney,
 } from "../packages/protocol/journey";
 import {
-  railEdgeResponseSchema,
   railFleetBatchMessageSchema,
   railFleetSnapshotMessageSchema,
   railMatchBatchMessageSchema,
@@ -51,11 +46,6 @@ type ExpectedRoute = {
   stops: Array<{ code: string; name: string; arrivalAt: string | null; departureAt: string | null; delaySeconds: number | null }>;
   routedStops: number;
 };
-const configuredRenderDelayMs = Number(process.env.NEXT_PUBLIC_RENDER_DELAY_MS ?? DEFAULT_RENDER_DELAY_MS);
-const renderDelayMs = Number.isFinite(configuredRenderDelayMs) && configuredRenderDelayMs >= 0 && configuredRenderDelayMs <= 30_000
-  ? configuredRenderDelayMs
-  : DEFAULT_RENDER_DELAY_MS;
-
 const fallbackMapStyle: StyleSpecification = {
   version: 8,
   sources: {
@@ -201,187 +191,6 @@ function toRecord(observations: RailObservation[]): Record<string, RailObservati
   return Object.fromEntries(observations.map((observation) => [observation.vehicleId, observation]));
 }
 
-type TrackMotionSample = {
-  previous: RailTrackMatch | null;
-  current: RailTrackMatch;
-};
-
-type TrackCoordinates = [number, number][];
-type TrackGeometry = {
-  coordinates: TrackCoordinates;
-  fromNode: string;
-  toNode: string;
-  lengthMeters: number;
-};
-
-// Smooth easing function for more natural motion
-// Uses ease-in-out cubic bezier-like curve
-function easeInOutCubic(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-function coordinateDistanceMeters(left: [number, number], right: [number, number]): number {
-  const latitudeRadians = ((left[1] + right[1]) / 2) * Math.PI / 180;
-  const longitudeMeters = (right[0] - left[0]) * 111_320 * Math.max(0.2, Math.cos(latitudeRadians));
-  const latitudeMeters = (right[1] - left[1]) * 111_320;
-  return Math.hypot(longitudeMeters, latitudeMeters);
-}
-
-function pointAlongTrack(coordinates: TrackCoordinates, progress: number): { longitude: number; latitude: number } | null {
-  if (coordinates.length < 2) return null;
-  const lengths = coordinates.slice(1).map((point, index) => coordinateDistanceMeters(coordinates[index], point));
-  const totalLength = lengths.reduce((sum, length) => sum + length, 0);
-  if (totalLength <= 0) return { longitude: coordinates[0][0], latitude: coordinates[0][1] };
-  let distance = Math.min(1, Math.max(0, progress)) * totalLength;
-  for (let index = 1; index < coordinates.length; index += 1) {
-    const segmentLength = lengths[index - 1];
-    if (distance <= segmentLength || index === coordinates.length - 1) {
-      const ratio = segmentLength > 0 ? distance / segmentLength : 0;
-      const from = coordinates[index - 1];
-      const to = coordinates[index];
-      return {
-        longitude: from[0] + (to[0] - from[0]) * ratio,
-        latitude: from[1] + (to[1] - from[1]) * ratio,
-      };
-    }
-    distance -= segmentLength;
-  }
-  const last = coordinates.at(-1)!;
-  return { longitude: last[0], latitude: last[1] };
-}
-
-function sharedTrackNode(left: TrackGeometry, right: TrackGeometry): string | null {
-  if (left.fromNode === right.fromNode || left.fromNode === right.toNode) return left.fromNode;
-  if (left.toNode === right.fromNode || left.toNode === right.toNode) return left.toNode;
-  return null;
-}
-
-function pointAlongConnectedTracks(
-  previousGeometry: TrackGeometry,
-  previousProgress: number,
-  currentGeometry: TrackGeometry,
-  currentProgress: number,
-  progress: number,
-): { longitude: number; latitude: number } | null {
-  const sharedNode = sharedTrackNode(previousGeometry, currentGeometry);
-  if (!sharedNode) return null;
-  const previousNodeProgress = sharedNode === previousGeometry.fromNode ? 0 : 1;
-  const currentNodeProgress = sharedNode === currentGeometry.fromNode ? 0 : 1;
-  const previousDistance = Math.abs(previousNodeProgress - previousProgress) * previousGeometry.lengthMeters;
-  const currentDistance = Math.abs(currentProgress - currentNodeProgress) * currentGeometry.lengthMeters;
-  const totalDistance = previousDistance + currentDistance;
-  if (totalDistance <= 0) return pointAlongTrack(currentGeometry.coordinates, currentProgress);
-  const targetDistance = Math.min(1, Math.max(0, progress)) * totalDistance;
-  if (targetDistance <= previousDistance && previousDistance > 0) {
-    const edgeProgress = previousProgress
-      + (previousNodeProgress - previousProgress) * (targetDistance / previousDistance);
-    return pointAlongTrack(previousGeometry.coordinates, edgeProgress);
-  }
-  if (currentDistance <= 0) return pointAlongTrack(currentGeometry.coordinates, currentProgress);
-  const edgeProgress = currentNodeProgress
-    + (currentProgress - currentNodeProgress) * ((targetDistance - previousDistance) / currentDistance);
-  return pointAlongTrack(currentGeometry.coordinates, edgeProgress);
-}
-
-function matchedPosition(match: RailTrackMatch | null | undefined): { longitude: number; latitude: number } | null {
-  return match?.snappedPosition && match.status.startsWith("MATCHED") ? match.snappedPosition : null;
-}
-
-function trackMotionPosition(
-  sample: TrackMotionSample | null,
-  nowMs: number,
-  renderDelayMs: number,
-  geometries: Map<string, TrackGeometry>,
-): { longitude: number; latitude: number } | null {
-  const currentPosition = matchedPosition(sample?.current);
-  if (!sample || !currentPosition) return null;
-  const previousPosition = matchedPosition(sample.previous);
-  const currentGeometry = sample.current.edgeId ? geometries.get(sample.current.edgeId) : undefined;
-  const currentTrackPosition = currentGeometry && sample.current.edgeProgress !== null
-    ? pointAlongTrack(currentGeometry.coordinates, sample.current.edgeProgress)
-    : null;
-  const previousGeometry = sample.previous?.edgeId ? geometries.get(sample.previous.edgeId) : undefined;
-  const previousTrackPosition = previousGeometry && sample.previous?.edgeProgress !== null && sample.previous?.edgeProgress !== undefined
-    ? pointAlongTrack(previousGeometry.coordinates, sample.previous.edgeProgress)
-    : null;
-  if (!previousPosition) return currentTrackPosition ?? currentPosition;
-
-  const previousTime = parseTimestamp(sample.previous?.sourceMeasuredAt ?? sample.previous?.matchedAt);
-  const currentTime = parseTimestamp(sample.current.sourceMeasuredAt ?? sample.current.matchedAt);
-  const targetTime = nowMs - renderDelayMs;
-  if (previousTime === null || currentTime === null || currentTime <= previousTime) return currentTrackPosition ?? currentPosition;
-  if (targetTime <= previousTime) return previousTrackPosition ?? previousPosition;
-  if (targetTime >= currentTime) {
-    const extrapolationSeconds = Math.min(30, (targetTime - currentTime) / 1_000);
-    const elapsedSeconds = (currentTime - previousTime) / 1_000;
-    if (
-      extrapolationSeconds > 0
-      && elapsedSeconds > 0
-      && currentGeometry
-      && sample.current.edgeProgress !== null
-    ) {
-      let signedDistanceMeters: number | null = null;
-      if (
-        previousGeometry
-        && sample.previous?.edgeId === sample.current.edgeId
-        && sample.previous.edgeProgress !== null
-      ) {
-        signedDistanceMeters = (sample.current.edgeProgress - sample.previous.edgeProgress) * currentGeometry.lengthMeters;
-      } else if (previousGeometry && sample.previous?.edgeProgress !== null && sample.previous?.edgeProgress !== undefined) {
-        const sharedNode = sharedTrackNode(previousGeometry, currentGeometry);
-        if (sharedNode) {
-          const currentNodeProgress = sharedNode === currentGeometry.fromNode ? 0 : 1;
-          const direction = Math.sign(sample.current.edgeProgress - currentNodeProgress);
-          const connectedDistance = Math.abs(
-            (sharedNode === previousGeometry.fromNode ? 0 : 1) - sample.previous.edgeProgress,
-          ) * previousGeometry.lengthMeters
-            + Math.abs(sample.current.edgeProgress - currentNodeProgress) * currentGeometry.lengthMeters;
-          signedDistanceMeters = connectedDistance * direction;
-        }
-      }
-      if (signedDistanceMeters !== null) {
-        const extrapolatedProgress = sample.current.edgeProgress
-          + (signedDistanceMeters / elapsedSeconds * extrapolationSeconds) / currentGeometry.lengthMeters;
-        return pointAlongTrack(currentGeometry.coordinates, extrapolatedProgress) ?? currentTrackPosition ?? currentPosition;
-      }
-    }
-    return currentTrackPosition ?? currentPosition;
-  }
-  const progress = (targetTime - previousTime) / (currentTime - previousTime);
-  // Apply easing for smoother motion
-  const easedProgress = easeInOutCubic(progress);
-  if (
-    currentGeometry
-    && sample.current.edgeId === sample.previous?.edgeId
-    && sample.previous.edgeProgress !== null
-    && sample.current.edgeProgress !== null
-  ) {
-    const edgeProgress = sample.previous.edgeProgress
-      + (sample.current.edgeProgress - sample.previous.edgeProgress) * easedProgress;
-    return pointAlongTrack(currentGeometry.coordinates, edgeProgress) ?? currentPosition;
-  }
-  if (
-    previousGeometry
-    && currentGeometry
-    && sample.previous?.edgeProgress !== null
-    && sample.previous?.edgeProgress !== undefined
-    && sample.current.edgeProgress !== null
-  ) {
-    const connectedPosition = pointAlongConnectedTracks(
-      previousGeometry,
-      sample.previous.edgeProgress,
-      currentGeometry,
-      sample.current.edgeProgress,
-      easedProgress,
-    );
-    if (connectedPosition) return connectedPosition;
-  }
-  // Zonder bewezen topologische verbinding houden we de laatste betrouwbare
-  // spoorpositie vast; een rechte lijn zou zichtbaar door weiland of gebouwen
-  // kunnen snijden.
-  return progress < 0.5 ? previousTrackPosition ?? previousPosition : currentTrackPosition ?? currentPosition;
-}
-
 function roundRectPath(
   context: CanvasRenderingContext2D,
   x: number,
@@ -406,23 +215,15 @@ type TrainSprites = {
   icm: HTMLImageElement | null;
   sng: HTMLImageElement | null;
   slt: HTMLImageElement | null;
-  intercity: HTMLImageElement | null;
-  sprinter: HTMLImageElement | null;
 };
 
 function spriteForVehicle(
-  vehicleId: string,
   materialNumber: string | null,
   sprites: TrainSprites,
 ): HTMLImageElement | null {
   const identity = identifyRollingStock(materialNumber);
   if (identity.family !== "unknown") return sprites[identity.family];
-
-  let hash = 0;
-  for (let index = 0; index < vehicleId.length; index += 1) {
-    hash = ((hash << 5) - hash + vehicleId.charCodeAt(index)) | 0;
-  }
-  return (hash & 1) === 0 ? sprites.intercity : sprites.sprinter;
+  return null;
 }
 
 function drawTrainIcon(
@@ -432,7 +233,6 @@ function drawTrainIcon(
   rotation: number,
   sprite: HTMLImageElement | null,
   selected: boolean,
-  matched: boolean,
   scale: number,
 ): void {
   const selectedScale = selected ? Math.max(1.2, scale) : scale;
@@ -454,7 +254,6 @@ function drawTrainIcon(
 
   if (hasSprite && sprite) {
     context.imageSmoothingEnabled = true;
-    context.globalAlpha = matched ? 1 : 0.82;
     context.shadowColor = selected ? "rgba(15,28,36,.32)" : "transparent";
     context.shadowBlur = selected ? 4 : 0;
     context.shadowOffsetY = selected ? 1 : 0;
@@ -472,7 +271,7 @@ function drawTrainIcon(
   context.fill();
   context.shadowColor = "transparent";
   context.lineWidth = selected ? 1.8 : Math.max(0.8, 1.15 * selectedScale);
-  context.strokeStyle = matched ? "#172b55" : "#9a4d35";
+  context.strokeStyle = "#172b55";
   context.stroke();
 
   // Blauwe kap, doorlopende donkere ramen en een rood frontlicht geven de
@@ -508,22 +307,15 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     icm: null,
     sng: null,
     slt: null,
-    intercity: null,
-    sprinter: null,
   });
   const map = useRef<MapLibreMap | null>(null);
   const initialZoomRef = useRef<number | null>(null);
   const initialCenterRef = useRef<[number, number] | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const selectFromMapRef = useRef<(vehicleId: string) => void>(() => undefined);
-  const motionSamplesRef = useRef(new Map<string, MotionSample>());
   const trackMatchesRef = useRef(new Map<string, RailTrackMatch>());
-  const trackMotionSamplesRef = useRef(new Map<string, TrackMotionSample>());
-  const trackGeometriesRef = useRef(new Map<string, TrackGeometry>());
-  const trackGeometryRequestsRef = useRef(new Set<string>());
+  const displayTrainsRef = useRef<Array<{ observation: RailObservation; position: { longitude: number; latitude: number } }>>([]);
   const selectedVehicleIdRef = useRef<string | null>(null);
-  const previousVehicleIdRef = useRef<string | null>(null);
-  const trainSwitchAnimationRef = useRef<{ startTime: number; duration: number } | null>(null);
   const pendingTrainNumberRef = useRef<string | null>(null);
   const deepLinkHandledRef = useRef(false);
   const selectRoadFromMapRef = useRef<(eventId: string) => void>(() => undefined);
@@ -552,6 +344,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const [mapLayers, setMapLayers] = useState<Record<MapLayerKey, boolean>>({
     trains: !isAlertsPage, stations: !isAlertsPage, railways: !isAlertsPage,
   });
+  const mapLayersRef = useRef(mapLayers);
+  useEffect(() => { mapLayersRef.current = mapLayers; }, [mapLayers]);
   const [roadLayers, setRoadLayers] = useState<Record<RoadLayerKey, boolean>>({
     congestion: isAlertsPage, incidents: isAlertsPage, roadworks: isAlertsPage, closures: isAlertsPage, safety: isAlertsPage,
   });
@@ -562,17 +356,13 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     const icm = new Image();
     const sng = new Image();
     const slt = new Image();
-    const intercity = new Image();
-    const sprinter = new Image();
-    const sprites = { virm, icng, icm, sng, slt, intercity, sprinter };
+    const sprites = { virm, icng, icm, sng, slt };
     Object.values(sprites).forEach((sprite) => { sprite.decoding = "async"; });
     virm.src = "/train-virm-v1.png";
     icng.src = "/train-icng-v1.png";
     icm.src = "/train-icm-v1.png";
     sng.src = "/train-sng-v1.png";
     slt.src = "/train-slt-v1.png";
-    intercity.src = "/train-intercity-real.png";
-    sprinter.src = "/train-sprinter-real.png";
     trainSpritesRef.current = sprites;
 
     return () => {
@@ -582,58 +372,18 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         icm: null,
         sng: null,
         slt: null,
-        intercity: null,
-        sprinter: null,
       };
     };
   }, []);
-  const requestTrackGeometries = useCallback(async (edgeIds: string[]) => {
-    const missing = [...new Set(edgeIds)].filter((edgeId) => (
-      !trackGeometriesRef.current.has(edgeId) && !trackGeometryRequestsRef.current.has(edgeId)
-    ));
-    if (!missing.length) return;
-    missing.forEach((edgeId) => trackGeometryRequestsRef.current.add(edgeId));
-    try {
-      const url = new URL(realtimeHttpUrl("/v1/geometry/rail/edges"));
-      url.searchParams.set("ids", missing.slice(0, 500).join(","));
-      const response = await fetch(url.toString());
-      if (!response.ok) {
-        console.warn("[MobilityDashboard:GeometryFetch]", {
-          timestamp: new Date().toISOString(),
-          error: `HTTP ${response.status}`,
-          context: "requestTrackGeometries",
-          missingEdges: missing.length,
-        });
-        return;
-      }
-      const payload = railEdgeResponseSchema.parse(await response.json());
-      for (const feature of payload.features ?? []) {
-        const edgeId = feature.properties?.edgeId;
-        const fromNode = feature.properties?.fromNode;
-        const toNode = feature.properties?.toNode;
-        const lengthMeters = feature.properties?.lengthMeters;
-        const coordinates = feature.geometry?.coordinates
-          ?.map((point) => [point[0], point[1]] as [number, number]) ?? [];
-        if (edgeId && fromNode && toNode && lengthMeters && coordinates.length >= 2) {
-          trackGeometriesRef.current.set(edgeId, { coordinates, fromNode, toNode, lengthMeters });
-        }
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.warn("[MobilityDashboard:GeometryFetch]", {
-        timestamp: new Date().toISOString(),
-        error: errorMessage,
-        context: "requestTrackGeometries",
-        missingEdges: missing.length,
-      });
-    } finally {
-      missing.forEach((edgeId) => trackGeometryRequestsRef.current.delete(edgeId));
-    }
-  }, []);
-
   const vehicles = useMemo(() => Object.values(vehiclesById).sort((left, right) => (
     left.trainNumber.localeCompare(right.trainNumber, "nl", { numeric: true })
   )), [vehiclesById]);
+  const displayTrains = useMemo(() => vehicles.flatMap((observation) => {
+    const position = reliableTrainPosition(observation, trackMatchesByVehicle[observation.vehicleId], now);
+    return position ? [{ observation, position }] : [];
+  }), [vehicles, trackMatchesByVehicle, now]);
+  const mappedTrainCount = displayTrains.length;
+  useEffect(() => { displayTrainsRef.current = displayTrains; }, [displayTrains]);
   const searchResults = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return vehicles.slice(0, 12);
@@ -670,14 +420,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     const selected = vehiclesById[vehicleId];
     if (!selected) return;
     setSelectedStation(null);
-    // Clear previous animation state before setting up new animation (prevents glitches from rapid selection)
-    trainSwitchAnimationRef.current = null;
-    previousVehicleIdRef.current = null;
-    // Trigger train switch animation if selecting a different train
-    if (selectedVehicleIdRef.current && selectedVehicleIdRef.current !== vehicleId) {
-      previousVehicleIdRef.current = selectedVehicleIdRef.current;
-      trainSwitchAnimationRef.current = { startTime: Date.now(), duration: 400 };
-    }
     setSelectedVehicleId(vehicleId);
     selectedVehicleIdRef.current = vehicleId;
     setObservation(selected);
@@ -691,8 +433,9 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     replaceSelectionUrl({ train: selected.trainNumber });
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ protocolVersion: 2, type: "select", vehicleId }));
     if (focusMap && map.current) {
-      map.current.easeTo({
-        center: [selected.position.longitude, selected.position.latitude],
+      const position = reliableTrainPosition(selected, trackMatchesRef.current.get(vehicleId), Date.now());
+      if (position) map.current.easeTo({
+        center: [position.longitude, position.latitude],
         offset: window.innerWidth <= 760
           ? [0, -Math.min(110, window.innerHeight * 0.14)]
           : [-190, 0],
@@ -797,35 +540,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     return () => window.clearInterval(timer);
   }, []);
 
-  // Cleanup stale motion samples to prevent unbounded map growth
-  useEffect(() => {
-    const CLEANUP_INTERVAL = 60_000; // 1 minute
-    const MAX_SAMPLE_AGE = 300_000; // 5 minutes
-    const timer = window.setInterval(() => {
-      const nowMs = Date.now();
-      const vehicleIds = Object.keys(vehiclesById);
-      const activeIds = new Set(vehicleIds);
-      
-      // Remove entries for vehicles that no longer exist
-      for (const [vehicleId] of motionSamplesRef.current) {
-        if (!activeIds.has(vehicleId)) {
-          motionSamplesRef.current.delete(vehicleId);
-          trackMotionSamplesRef.current.delete(vehicleId);
-        }
-      }
-      
-      // Remove stale entries (older than MAX_SAMPLE_AGE)
-      for (const [vehicleId, sample] of motionSamplesRef.current) {
-        const sampleTime = parseTimestamp(sample.current?.time?.sourceMeasuredAt);
-        if (sampleTime !== null && nowMs - sampleTime > MAX_SAMPLE_AGE) {
-          motionSamplesRef.current.delete(vehicleId);
-          trackMotionSamplesRef.current.delete(vehicleId);
-        }
-      }
-    }, CLEANUP_INTERVAL);
-    return () => window.clearInterval(timer);
-  }, [vehiclesById]);
-
   // Monitor selected train for delay notifications
   const lastDelayRef = useRef<string | null>(null);
   useEffect(() => {
@@ -914,6 +628,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         instance.touchZoomRotate.disableRotation();
         const stationPopup = new Popup({ closeButton: false, closeOnClick: true, offset: 12, className: "stationTooltip" });
         const stationAtPoint = (point: { x: number; y: number }) => {
+          if (isAlertsPage || !mapLayersRef.current.stations) return null;
           let nearest: { station: RailStation; distance: number } | null = null;
           for (const station of railStations) {
             if (instance.getZoom() < stationMinZoom(station)) continue;
@@ -991,21 +706,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           filter: ["==", ["get", "edgeId"], ""],
           paint: { "line-color": "#a7dfc5", "line-width": 6, "line-opacity": 0.9 },
         }, "rail-fleet-points");
-        instance.addSource("selected-rail-source", {
-          type: "geojson",
-          data: { type: "FeatureCollection", features: [] },
-        });
-        instance.addLayer({
-          id: "selected-rail-source-point",
-          type: "circle",
-          source: "selected-rail-source",
-          paint: {
-            "circle-radius": 11,
-            "circle-color": "rgba(255,253,247,0.16)",
-            "circle-stroke-color": "#162528",
-            "circle-stroke-width": 2,
-          },
-        });
         instance.addSource("selected-track-match", {
           type: "geojson",
           data: { type: "FeatureCollection", features: [] },
@@ -1145,7 +845,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         for (const layerId of [
           "rail-fleet-points",
           "rail-fleet-selected",
-          "selected-rail-source-point",
           "selected-track-match-link",
           "selected-track-match-point",
           "selected-road-event-line",
@@ -1159,17 +858,10 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         instance.on("mouseleave", "rail-fleet-points", () => { instance.getCanvas().style.cursor = ""; });
         instance.on("click", (event) => {
           let nearest: { vehicleId: string; distance: number } | null = null;
-          for (const [vehicleId, sample] of motionSamplesRef.current) {
-            const motion = renderMotion(sample, Date.now(), renderDelayMs);
-            const position = trackMotionPosition(
-              trackMotionSamplesRef.current.get(vehicleId) ?? null,
-              Date.now(),
-              renderDelayMs,
-              trackGeometriesRef.current,
-            ) ?? motion;
+          for (const { observation, position } of !isAlertsPage && mapLayersRef.current.trains ? displayTrainsRef.current : []) {
             const projected = instance.project([position.longitude, position.latitude]);
             const distance = Math.hypot(projected.x - event.point.x, projected.y - event.point.y);
-            if (distance <= 18 && (!nearest || distance < nearest.distance)) nearest = { vehicleId, distance };
+            if (distance <= 18 && (!nearest || distance < nearest.distance)) nearest = { vehicleId: observation.vehicleId, distance };
           }
           if (nearest) { selectFromMapRef.current(nearest.vehicleId); return; }
           const stationHit = stationAtPoint(event.point);
@@ -1193,13 +885,11 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     const renderFrame = (frameTime: number) => {
       const instance = map.current;
       if (!instance) return;
-      // Teken de volledige vloot vloeiend tussen feed-updates door. De punten
-      // blijven daardoor stabiel bewegen in plaats van per batch te springen.
+      // De canvas volgt de kaart tijdens pannen; treinposities veranderen alleen
+      // wanneer een nieuwe, betrouwbare spoor-match van de bron binnenkomt.
       if (frameTime - lastMapFrame >= 16) {
         lastMapFrame = frameTime;
-        const nowMs = Date.now();
         const selectedId = selectedVehicleIdRef.current;
-        const selectedSample = selectedId ? motionSamplesRef.current.get(selectedId) ?? null : null;
         const overlay = trainOverlayElement.current;
         const mapContainer = mapElement.current;
         if (overlay && mapContainer) {
@@ -1242,101 +932,34 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
               }
             }
             context.restore();
-            // Calculate train switch animation offset
-            let trainAnimationOffsetX = 0;
-            let trainAnimationOpacity = 1;
-            const switchAnim = trainSwitchAnimationRef.current;
-            if (switchAnim) {
-              const elapsed = nowMs - switchAnim.startTime;
-              const progress = Math.min(1, elapsed / switchAnim.duration);
-              // Ease out cubic
-              const eased = 1 - Math.pow(1 - progress, 3);
-              if (progress >= 1) {
-                trainSwitchAnimationRef.current = null;
-                previousVehicleIdRef.current = null;
-              } else {
-                // New train slides in from left (negative x offset that decreases)
-                // Old train slides out to right (positive x offset that increases)
-                trainAnimationOffsetX = (1 - eased) * -width;
-                trainAnimationOpacity = eased;
-              }
-            }
-            for (const [vehicleId, sample] of mapLayers.trains ? motionSamplesRef.current : []) {
-              const motion = renderMotion(sample, nowMs, renderDelayMs);
-              const position = trackMotionPosition(
-                trackMotionSamplesRef.current.get(vehicleId) ?? null,
-                nowMs,
-                renderDelayMs,
-                trackGeometriesRef.current,
-              );
-              const matched = Boolean(position);
-              const renderedPosition = position ?? motion;
-              const projectedPos = instance.project([renderedPosition.longitude, renderedPosition.latitude]);
+            for (const { observation, position } of mapLayers.trains ? displayTrainsRef.current : []) {
+              const vehicleId = observation.vehicleId;
+              const projectedPos = instance.project([position.longitude, position.latitude]);
               const projX = projectedPos.x;
               const projY = projectedPos.y;
-              // Apply animation offset to determine effective position
               const isSelected = vehicleId === selectedId;
-              const isPreviousVehicle = vehicleId === previousVehicleIdRef.current;
-              let offsetX = 0;
-              let opacity = 1;
-              if (switchAnim && isSelected) {
-                offsetX = trainAnimationOffsetX;
-                opacity = trainAnimationOpacity;
-              } else if (switchAnim && isPreviousVehicle) {
-                const elapsed = nowMs - switchAnim.startTime;
-                const progress = Math.min(1, elapsed / switchAnim.duration);
-                const eased = 1 - Math.pow(1 - progress, 3);
-                offsetX = eased * (width + 100);
-                opacity = 1 - eased;
-              }
-              // Check visibility with offset applied
-              const effectiveX = projX + offsetX;
-              if (effectiveX < -50 || effectiveX > width + 50 || projY < -50 || projY > height + 50) continue;
-              const heading = sample.current.headingDegrees;
-              const derivedHeading = heading ?? (sample.previous
-                ? Math.atan2(
-                    sample.current.position.longitude - sample.previous.position.longitude,
-                    -(sample.current.position.latitude - sample.previous.position.latitude),
-                  ) * 180 / Math.PI
-                : 0);
+              if (projX < -50 || projX > width + 50 || projY < -50 || projY > height + 50) continue;
+              const derivedHeading = observation.headingDegrees ?? 0;
               // Op landelijk niveau blijft de kaart rustig; vanaf regionaal
               // niveau verschijnt het volledige, realistische treinmodel.
               const sprite = zoom >= 9.3
-                ? spriteForVehicle(vehicleId, sample.current.materialNumber, trainSpritesRef.current)
+                ? spriteForVehicle(observation.materialNumber, trainSpritesRef.current)
                 : null;
               const responsiveMarkerScale = zoom < 7
                 ? (window.innerWidth >= 2200 ? 1.05 : window.innerWidth >= 1400 ? 0.84 : 0.68)
                 : markerScale;
-              if (opacity > 0) {
-                context.globalAlpha = opacity;
-                drawTrainIcon(
-                  context,
-                  projX + offsetX,
-                  projY,
-                  derivedHeading * Math.PI / 180,
-                  sprite,
-                  isSelected,
-                  matched,
-                  responsiveMarkerScale,
-                );
-                context.globalAlpha = 1;
-              }
+              drawTrainIcon(
+                context,
+                projX,
+                projY,
+                derivedHeading * Math.PI / 180,
+                sprite,
+                isSelected,
+                responsiveMarkerScale,
+              );
             }
           }
         }
-        const sourcePoint = instance.getSource("selected-rail-source") as GeoJSONSource | undefined;
-        sourcePoint?.setData({
-          type: "FeatureCollection",
-          features: selectedSample ? [{
-            type: "Feature",
-            geometry: {
-              type: "Point",
-              coordinates: [selectedSample.current.position.longitude, selectedSample.current.position.latitude],
-            },
-            properties: {},
-          }] : [],
-        });
-
       }
       animationFrame = window.requestAnimationFrame(renderFrame);
     };
@@ -1354,7 +977,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         || !instance.getLayer("match-candidate-lines")) return;
       const selectedMatch = selectedVehicleId ? trackMatchesByVehicle[selectedVehicleId] : null;
       const matchSource = instance.getSource("selected-track-match") as GeoJSONSource | undefined;
-      const features = selectedMatch?.snappedPosition ? [
+      const features = debugMatching && selectedMatch?.snappedPosition ? [
         {
           type: "Feature" as const,
           geometry: {
@@ -1475,16 +1098,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         if (fleetSnapshot.success) {
           latestSequence = fleetSnapshot.data.sequence;
           setVehiclesById(toRecord(fleetSnapshot.data.data));
-          const previousSamples = motionSamplesRef.current;
-          const restoredSamples = new Map<string, MotionSample>();
-          for (const vehicle of fleetSnapshot.data.data) {
-            const previous = previousSamples.get(vehicle.vehicleId)?.current ?? null;
-            restoredSamples.set(vehicle.vehicleId, {
-              previous: previous?.observationId === vehicle.observationId ? previousSamples.get(vehicle.vehicleId)?.previous ?? null : previous,
-              current: vehicle,
-            });
-          }
-          motionSamplesRef.current = restoredSamples;
           return;
         }
         const fleetBatch = railFleetBatchMessageSchema.safeParse(decoded);
@@ -1502,34 +1115,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             return next;
           });
           for (const vehicleId of fleetBatch.data.removedVehicleIds) {
-            motionSamplesRef.current.delete(vehicleId);
-            trackMotionSamplesRef.current.delete(vehicleId);
-          }
-          for (const vehicle of fleetBatch.data.upserts) {
-            const currentSample = motionSamplesRef.current.get(vehicle.vehicleId);
-            if (currentSample?.current.observationId === vehicle.observationId) continue;
-            // Use the current interpolated position as the new starting point
-            // to avoid "jumping back" when a new position arrives
-            const now = Date.now();
-            const rendered = currentSample ? renderMotion(currentSample, now, renderDelayMs) : null;
-            const effectivePrevious = rendered && currentSample
-              ? {
-                  ...currentSample.current,
-                  position: {
-                    ...currentSample.current.position,
-                    longitude: rendered.longitude,
-                    latitude: rendered.latitude,
-                  },
-                  time: {
-                    ...currentSample.current.time,
-                    sourceMeasuredAt: new Date(now - renderDelayMs).toISOString(),
-                  },
-                }
-              : currentSample?.current ?? null;
-            motionSamplesRef.current.set(vehicle.vehicleId, {
-              previous: effectivePrevious,
-              current: vehicle,
-            });
+            trackMatchesRef.current.delete(vehicleId);
           }
           setConnection("live");
           return;
@@ -1537,61 +1123,20 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         const matchSnapshot = railMatchSnapshotMessageSchema.safeParse(decoded);
         if (matchSnapshot.success) {
           const matches = new Map(matchSnapshot.data.data.map((match) => [match.vehicleId, match]));
-          const trackMotionSamples = new Map<string, TrackMotionSample>();
-          const now = Date.now();
-          for (const match of matchSnapshot.data.data) {
-            const currentTrackSample = trackMotionSamplesRef.current.get(match.vehicleId);
-            const previousMatch = currentTrackSample?.current ?? trackMatchesRef.current.get(match.vehicleId) ?? null;
-            // Use the current interpolated position as the new starting point
-            // to avoid "jumping back" when a new position arrives
-            let effectivePrevious = previousMatch;
-            if (currentTrackSample && previousMatch?.snappedPosition) {
-              const interpolatedPos = trackMotionPosition(currentTrackSample, now, renderDelayMs, trackGeometriesRef.current);
-              if (interpolatedPos) {
-                effectivePrevious = {
-                  ...previousMatch,
-                  snappedPosition: interpolatedPos,
-                };
-              }
-            }
-            trackMotionSamples.set(match.vehicleId, { previous: effectivePrevious, current: match });
-          }
-          trackMotionSamplesRef.current = trackMotionSamples;
           trackMatchesRef.current = matches;
-          void requestTrackGeometries(matchSnapshot.data.data.map((match) => match.edgeId).filter((edgeId): edgeId is string => Boolean(edgeId)));
           setTrackMatchesByVehicle(Object.fromEntries(matches));
           return;
         }
         const matchBatch = railMatchBatchMessageSchema.safeParse(decoded);
         if (matchBatch.success) {
           const matches = new Map(trackMatchesRef.current);
-          const trackMotionSamples = new Map(trackMotionSamplesRef.current);
           for (const vehicleId of matchBatch.data.removedVehicleIds) {
             matches.delete(vehicleId);
-            trackMotionSamples.delete(vehicleId);
           }
-          const now = Date.now();
           for (const match of matchBatch.data.upserts) {
-            const currentTrackSample = trackMotionSamples.get(match.vehicleId);
-            const previousMatch = currentTrackSample?.current ?? matches.get(match.vehicleId) ?? null;
             matches.set(match.vehicleId, match);
-            // Use the current interpolated position as the new starting point
-            // to avoid "jumping back" when a new position arrives
-            let effectivePrevious = previousMatch;
-            if (currentTrackSample && previousMatch?.snappedPosition) {
-              const interpolatedPos = trackMotionPosition(currentTrackSample, now, renderDelayMs, trackGeometriesRef.current);
-              if (interpolatedPos) {
-                effectivePrevious = {
-                  ...previousMatch,
-                  snappedPosition: interpolatedPos,
-                };
-              }
-            }
-            trackMotionSamples.set(match.vehicleId, { previous: effectivePrevious, current: match });
           }
-          trackMotionSamplesRef.current = trackMotionSamples;
           trackMatchesRef.current = matches;
-          void requestTrackGeometries(matchBatch.data.upserts.map((match) => match.edgeId).filter((edgeId): edgeId is string => Boolean(edgeId)));
           setTrackMatchesByVehicle(Object.fromEntries(matches));
           return;
         }
@@ -1645,7 +1190,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
       socket?.close();
     };
-  }, [requestTrackGeometries]);
+  }, []);
 
   useEffect(() => {
     const instance = map.current;
@@ -1762,7 +1307,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
               <p className="panelKicker">Kaartweergave</p>
               <h2>Treinenkaart</h2>
             </div>
-            <span>{vehicles.length.toLocaleString("nl-NL")} treinen</span>
+            <span>{mappedTrainCount.toLocaleString("nl-NL")} op spoor</span>
           </div>
           <div className="layerToggleSection">
             <h3>Kaart</h3>
@@ -1775,7 +1320,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
               ))}
             </div>
           </div>
-          <p className="roadSourceNote">Kies welke spoorinformatie je ziet. Wegmeldingen staan op hun eigen kaart.</p>
+          <p className="roadSourceNote">Alleen treinen met een recente, betrouwbare spoorpositie verschijnen op de kaart. Wegmeldingen staan op hun eigen kaart.</p>
         </div>
       </section>}
 
@@ -1800,7 +1345,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
                 onClick={() => selectVehicle(vehicle.vehicleId)}
               >
                 <strong>Trein {vehicle.trainNumber}</strong>
-                <span>{rollingStock.label} · materieel {vehicle.materialNumber ?? "onbekend"}</span>
+                <span>{rollingStock.label} · materieel {vehicle.materialNumber ?? "onbekend"}{!reliableTrainPosition(vehicle, trackMatchesByVehicle[vehicle.vehicleId], now) ? " · geen bevestigde spoorpositie" : ""}</span>
               </button>
             );
           })}
@@ -1809,7 +1354,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       </section>}
 
       {!isAlertsPage && <section className="radarStatusBar" aria-label="Landelijke livestatus">
-        <div><UiIcon name="train" /><strong>{vehicles.length.toLocaleString("nl-NL")}</strong><span>treinen live</span></div>
+        <div><UiIcon name="train" /><strong>{mappedTrainCount.toLocaleString("nl-NL")}</strong><span>treinen op spoor</span></div>
         <div><i className={connection === "live" ? "live" : ""} /><strong>{connection === "live" ? "Verbonden" : "Wachten"}</strong><span>gegevensfeed</span></div>
       </section>}
 
@@ -1818,6 +1363,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           <div ref={mapElement} className="liveMap" aria-label={isAlertsPage ? "Kaart van Nederland met wegmeldingen" : "Kaart van Nederland met actuele treinposities"} />
           {!isAlertsPage && <canvas ref={trainOverlayElement} className="trainOverlay" aria-hidden="true" />}
           {!isAlertsPage && !vehicles.length && <div className="waitingMarker"><span /> Wachten op eerste vlootbatch</div>}
+          {!isAlertsPage && vehicles.length > 0 && mappedTrainCount === 0 && <div className="waitingMarker"><span /> Wachten op betrouwbare spoorposities</div>}
           {isAlertsPage && <div className="alertMapHeading"><span>Meldingenkaart</span><strong>Nederland onderweg</strong><small>Alleen wegmeldingen · geen treinen</small></div>}
           <div className="mapActions" aria-label="Kaartbediening">
             {!isAlertsPage && <button type="button" onClick={() => setShowLayers(true)} aria-expanded={showLayers}><UiIcon name="sliders" /><span>Kaartlagen</span></button>}
