@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import NextImage from "next/image";
 import type { GeoJSONSource, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
-import { reliableTrainPosition } from "../packages/domain-rail/display-position";
+import { trainDisplayPosition } from "../packages/domain-rail/display-position";
 import { identifyRollingStock } from "../packages/domain-rail/rolling-stock";
 import {
   journeySnapshotMessageSchema,
@@ -233,6 +233,8 @@ function drawTrainIcon(
   rotation: number,
   sprite: HTMLImageElement | null,
   selected: boolean,
+  matched: boolean,
+  stale: boolean,
   scale: number,
 ): void {
   const selectedScale = selected ? Math.max(1.2, scale) : scale;
@@ -251,6 +253,24 @@ function drawTrainIcon(
     context.strokeStyle = "rgba(255,255,255,.96)";
     context.stroke();
   }
+
+  // Een trein zonder bevestigde spoorpositie krijgt een onderbroken ring om
+  // het voertuig. Zo blijft het verschil met een op het spoor vastgezette
+  // trein afleesbaar, ook wanneer op hoog zoomniveau de PNG-sprite verschijnt.
+  if (!matched && hasSprite && sprite) {
+    roundRectPath(context, -width / 2 + 1.5, -height / 2 + 1.5, width - 3, height - 3, 4);
+    context.setLineDash([3, 3]);
+    context.lineWidth = 1.2;
+    context.strokeStyle = "rgba(154,77,53,.95)";
+    context.stroke();
+    context.setLineDash([]);
+  }
+
+  // Treinen zonder bevestigde spoorpositie blijven zichtbaar op hun laatst
+  // gemeten GPS-punt, maar iets transparanter zodat het verschil in
+  // betrouwbaarheid direct afleesbaar is. Metingen die ouder zijn dan de
+  // bronfrisheid worden zwakker getekend in plaats van verborgen.
+  context.globalAlpha = stale ? 0.55 : matched ? 1 : 0.85;
 
   if (hasSprite && sprite) {
     context.imageSmoothingEnabled = true;
@@ -271,7 +291,7 @@ function drawTrainIcon(
   context.fill();
   context.shadowColor = "transparent";
   context.lineWidth = selected ? 1.8 : Math.max(0.8, 1.15 * selectedScale);
-  context.strokeStyle = "#172b55";
+  context.strokeStyle = matched ? "#172b55" : "#9a4d35";
   context.stroke();
 
   // Blauwe kap, doorlopende donkere ramen en een rood frontlicht geven de
@@ -314,7 +334,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const socketRef = useRef<WebSocket | null>(null);
   const selectFromMapRef = useRef<(vehicleId: string) => void>(() => undefined);
   const trackMatchesRef = useRef(new Map<string, RailTrackMatch>());
-  const displayTrainsRef = useRef<Array<{ observation: RailObservation; position: { longitude: number; latitude: number } }>>([]);
+  const displayTrainsRef = useRef<Array<{ observation: RailObservation; position: { longitude: number; latitude: number }; matched: boolean; stale: boolean }>>([]);
   const selectedVehicleIdRef = useRef<string | null>(null);
   const pendingTrainNumberRef = useRef<string | null>(null);
   const deepLinkHandledRef = useRef(false);
@@ -379,10 +399,14 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     left.trainNumber.localeCompare(right.trainNumber, "nl", { numeric: true })
   )), [vehiclesById]);
   const displayTrains = useMemo(() => vehicles.flatMap((observation) => {
-    const position = reliableTrainPosition(observation, trackMatchesByVehicle[observation.vehicleId], now);
-    return position ? [{ observation, position }] : [];
+    const display = trainDisplayPosition(observation, trackMatchesByVehicle[observation.vehicleId], now);
+    return display ? [{ observation, position: display.position, matched: display.matched, stale: display.stale }] : [];
   }), [vehicles, trackMatchesByVehicle, now]);
   const mappedTrainCount = displayTrains.length;
+  const matchedTrainCount = useMemo(
+    () => displayTrains.reduce((count, train) => count + (train.matched ? 1 : 0), 0),
+    [displayTrains],
+  );
   useEffect(() => { displayTrainsRef.current = displayTrains; }, [displayTrains]);
   const searchResults = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -433,9 +457,9 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     replaceSelectionUrl({ train: selected.trainNumber });
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ protocolVersion: 2, type: "select", vehicleId }));
     if (focusMap && map.current) {
-      const position = reliableTrainPosition(selected, trackMatchesRef.current.get(vehicleId), Date.now());
-      if (position) map.current.easeTo({
-        center: [position.longitude, position.latitude],
+      const display = trainDisplayPosition(selected, trackMatchesRef.current.get(vehicleId), Date.now());
+      if (display) map.current.easeTo({
+        center: [display.position.longitude, display.position.latitude],
         offset: window.innerWidth <= 760
           ? [0, -Math.min(110, window.innerHeight * 0.14)]
           : [-190, 0],
@@ -885,8 +909,9 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     const renderFrame = (frameTime: number) => {
       const instance = map.current;
       if (!instance) return;
-      // De canvas volgt de kaart tijdens pannen; treinposities veranderen alleen
-      // wanneer een nieuwe, betrouwbare spoor-match van de bron binnenkomt.
+      // De canvas volgt de kaart tijdens pannen. Treinen met een spoor-match
+      // staan exact op het spoor; treinen zonder match blijven op hun laatst
+      // gemeten GPS-punt zichtbaar.
       if (frameTime - lastMapFrame >= 16) {
         lastMapFrame = frameTime;
         const selectedId = selectedVehicleIdRef.current;
@@ -932,7 +957,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
               }
             }
             context.restore();
-            for (const { observation, position } of mapLayers.trains ? displayTrainsRef.current : []) {
+            for (const { observation, position, matched, stale } of mapLayers.trains ? displayTrainsRef.current : []) {
               const vehicleId = observation.vehicleId;
               const projectedPos = instance.project([position.longitude, position.latitude]);
               const projX = projectedPos.x;
@@ -955,6 +980,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
                 derivedHeading * Math.PI / 180,
                 sprite,
                 isSelected,
+                matched,
+                stale,
                 responsiveMarkerScale,
               );
             }
@@ -1102,10 +1129,18 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         }
         const fleetBatch = railFleetBatchMessageSchema.safeParse(decoded);
         if (fleetBatch.success) {
+          // At-least-once levering kan een batch herhalen of te laat afleveren.
+          // Zo'n batch mag de vloot nooit bevriezen: een reeds verwerkt of ouder
+          // volgnummer wordt genegeerd en de batch wordt daarna altijd toegepast,
+          // zodat iedere trein die de gateway nog live houdt op de kaart blijft.
+          // Alleen een echt gat vraagt om een volledige resync.
+          if (latestSequence !== null && fleetBatch.data.sequence <= latestSequence) return;
           if (latestSequence !== null && fleetBatch.data.sequence !== latestSequence + 1) {
+            console.warn("[MobilityDashboard] Fleet sequence gap, requesting resync", {
+              expected: latestSequence + 1,
+              received: fleetBatch.data.sequence,
+            });
             socket?.send(JSON.stringify({ protocolVersion: 2, type: "resync" }));
-            setConnection("herstellen");
-            return;
           }
           latestSequence = fleetBatch.data.sequence;
           setVehiclesById((current) => {
@@ -1162,9 +1197,13 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         }
         const roadBatch = roadBatchMessageSchema.safeParse(decoded);
         if (roadBatch.success) {
+          if (latestRoadSequence !== null && roadBatch.data.sequence <= latestRoadSequence) return;
           if (latestRoadSequence !== null && roadBatch.data.sequence !== latestRoadSequence + 1) {
+            console.warn("[MobilityDashboard] Road sequence gap, requesting resync", {
+              expected: latestRoadSequence + 1,
+              received: roadBatch.data.sequence,
+            });
             socket?.send(JSON.stringify({ protocolVersion: 2, type: "resync" }));
-            return;
           }
           latestRoadSequence = roadBatch.data.sequence;
           setRoadEventsById((current) => {
@@ -1307,7 +1346,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
               <p className="panelKicker">Kaartweergave</p>
               <h2>Treinenkaart</h2>
             </div>
-            <span>{mappedTrainCount.toLocaleString("nl-NL")} op spoor</span>
+            <span>{mappedTrainCount.toLocaleString("nl-NL")} zichtbaar · {matchedTrainCount.toLocaleString("nl-NL")} op spoor</span>
           </div>
           <div className="layerToggleSection">
             <h3>Kaart</h3>
@@ -1320,7 +1359,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
               ))}
             </div>
           </div>
-          <p className="roadSourceNote">Alleen treinen met een recente, betrouwbare spoorpositie verschijnen op de kaart. Wegmeldingen staan op hun eigen kaart.</p>
+          <p className="roadSourceNote">Alle actieve treinen uit de livefeed staan op de kaart. Treinen met een betrouwbare spoorpositie worden op het spoor vastgezet; treinen zonder recente spoor-match tonen hun laatst gemeten GPS-punt. Wegmeldingen staan op hun eigen kaart.</p>
         </div>
       </section>}
 
@@ -1337,6 +1376,10 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           {searchResults.length > 0 && <p className="searchGroupLabel">Treinen</p>}
           {searchResults.map((vehicle) => {
             const rollingStock = identifyRollingStock(vehicle.materialNumber);
+            const display = trainDisplayPosition(vehicle, trackMatchesByVehicle[vehicle.vehicleId], now);
+            const positionNote = display === null
+              ? ""
+              : display.matched ? "" : display.stale ? " · positie verouderd" : " · GPS-positie";
             return (
               <button
                 className={vehicle.vehicleId === selectedVehicleId ? "selected" : ""}
@@ -1345,7 +1388,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
                 onClick={() => selectVehicle(vehicle.vehicleId)}
               >
                 <strong>Trein {vehicle.trainNumber}</strong>
-                <span>{rollingStock.label} · materieel {vehicle.materialNumber ?? "onbekend"}{!reliableTrainPosition(vehicle, trackMatchesByVehicle[vehicle.vehicleId], now) ? " · geen bevestigde spoorpositie" : ""}</span>
+                <span>{rollingStock.label} · materieel {vehicle.materialNumber ?? "onbekend"}{positionNote}</span>
               </button>
             );
           })}
@@ -1354,7 +1397,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       </section>}
 
       {!isAlertsPage && <section className="radarStatusBar" aria-label="Landelijke livestatus">
-        <div><UiIcon name="train" /><strong>{mappedTrainCount.toLocaleString("nl-NL")}</strong><span>treinen op spoor</span></div>
+        <div><UiIcon name="train" /><strong>{mappedTrainCount.toLocaleString("nl-NL")}</strong><span>treinen op kaart</span></div>
         <div><i className={connection === "live" ? "live" : ""} /><strong>{connection === "live" ? "Verbonden" : "Wachten"}</strong><span>gegevensfeed</span></div>
       </section>}
 
@@ -1363,7 +1406,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           <div ref={mapElement} className="liveMap" aria-label={isAlertsPage ? "Kaart van Nederland met wegmeldingen" : "Kaart van Nederland met actuele treinposities"} />
           {!isAlertsPage && <canvas ref={trainOverlayElement} className="trainOverlay" aria-hidden="true" />}
           {!isAlertsPage && !vehicles.length && <div className="waitingMarker"><span /> Wachten op eerste vlootbatch</div>}
-          {!isAlertsPage && vehicles.length > 0 && mappedTrainCount === 0 && <div className="waitingMarker"><span /> Wachten op betrouwbare spoorposities</div>}
+          {!isAlertsPage && vehicles.length > 0 && mappedTrainCount === 0 && <div className="waitingMarker"><span /> Wachten op treinposities</div>}
           {isAlertsPage && <div className="alertMapHeading"><span>Meldingenkaart</span><strong>Nederland onderweg</strong><small>Alleen wegmeldingen · geen treinen</small></div>}
           <div className="mapActions" aria-label="Kaartbediening">
             {!isAlertsPage && <button type="button" onClick={() => setShowLayers(true)} aria-expanded={showLayers}><UiIcon name="sliders" /><span>Kaartlagen</span></button>}
