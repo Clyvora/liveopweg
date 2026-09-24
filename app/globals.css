@@ -1016,7 +1016,7 @@ body {
 .stationPanel.expanded .stationBoardList { max-height:440px; }
 .stationPanel:not(.expanded) .stationBoardRow:nth-child(n+5) { display:none; }
 .stationBoardRow { width:100%; align-items:center; min-height:68px; padding:11px 16px; border:0; border-top:1px solid #edf1f4; background:#fff; color:inherit; text-align:left; font-family:inherit; cursor:pointer; }
-.stationBoardRow:disabled { opacity:1; cursor:default; }
+.stationBoardRow:disabled { opacity:0.5; cursor:not-allowed; }
 .stationBoardRow:not(:disabled):hover { background:#f1f7fc; }
 .stationBoardRow:focus-visible,.stationTabs button:focus-visible,.stationClose:focus-visible,.stationExpand:focus-visible { outline:2px solid #2877d4; outline-offset:-3px; }
 .stationTime { align-self:start; padding-top:2px; font:700 13px/1.3 var(--font-geist-mono); }
@@ -1551,17 +1551,11 @@ body {
 .radarStatusBar button .uiIcon { color:#ff736c; }
 .radarStatusBar i { width:8px; height:8px; border-radius:50%; background:#efb44e; }
 .radarStatusBar i.live { background:#38c985; box-shadow:0 0 0 4px rgba(56,201,133,.13); }
+.radarStatusBar i.partial { background:#efb44e; box-shadow:0 0 0 4px rgba(239,180,78,.13); }
+.radarStatusBar i.delay { background:#e94e45; box-shadow:0 0 0 4px rgba(233,78,69,.13); }
 .radarStatusBar strong { font-size:13px; white-space:nowrap; }
 .radarStatusBar span { color:#b9cad7; font-size:9px; white-space:nowrap; }
 
-.trainHero { height:105px; margin:0 18px; display:grid; place-items:center; overflow:hidden; border-bottom:1px solid #e3e9ee; background:linear-gradient(90deg,#f7f9fa,#eef4f7 50%,#f7f9fa); }
-.trainHero img { width:190px; height:auto; transform:rotate(90deg); filter:drop-shadow(0 6px 8px rgba(20,43,61,.18)); }
-.routeOverview { position:relative; margin:0 18px; padding:15px 0 15px 31px; display:grid; gap:18px; border-bottom:1px solid #e3e9ee; }
-.routeOverview::before { content:""; position:absolute; left:6px; top:25px; bottom:25px; border-left:2px solid #2b75d7; }
-.routeOverview>div { position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:10px; }
-.routeOverview i { position:absolute; left:-30px; width:12px; height:12px; border:3px solid #2475dd; border-radius:50%; background:#fff; }
-.routeOverview strong { overflow:hidden; color:#17334b; font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
-.routeOverview time { color:#5f7381; font:600 11px/1 var(--font-geist-mono); }
 
 @media (min-width:901px) {
   .topbar { inset:0 auto 0 0; width:var(--radar-sidebar); height:auto; padding:19px 0 16px; display:flex; flex-direction:column; justify-content:flex-start; border:0; border-radius:0; background:linear-gradient(180deg,#0c2d49,#0a243b); box-shadow:7px 0 26px rgba(13,39,60,.16); }
@@ -1768,6 +1762,77 @@ body {
 .sfItem { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border-radius: 8px; background: #f4f8fb; font-size: 8px; color: #5f7381; text-align: center; }
 .sfItem svg { width: 18px; height: 18px; fill: none; stroke: #1268d7; stroke-width: 1.6; }
 .sfHours { margin: 8px 0 0; font-size: 9px; color: #7b8d98; }
+
+/* Donkere thema-overschrijvingen voor de control-room redesign en de panelen
+   die in globals.css onderaan het bestand staan. Deze blokken hebben geen
+   [data-theme="dark"]-regels, dus de harde kleuren bleven always-light. */
+[data-theme="dark"] {
+  .railAlertsPanel.liveFeedPanel { background:rgba(26,37,40,.97); }
+  .railAlertCard { background:#1a2528; border-color:rgba(255,255,255,.08); }
+  .railAlertCard.critical { background:#2a1416; border-color:#7a2a24; }
+  .railAlertMeta { border-color:rgba(255,255,255,.1); }
+  .liveFeedDetail { background:linear-gradient(145deg,#1a2528,#141c1f); border-color:#5a2a24; }
+  .liveFeedItem { border-color:rgba(255,255,255,.06); }
+  .liveFeedItem:hover,.liveFeedItem.selected { background:#1f2c31; }
+  .networkSummary { background:#1a2528; }
+  .networkSummary div { background:#10181b; }
+  .networkSummary strong { color:#e8f0f2; }
+  .feedSectionTitle { color:#9fb2ba; }
+  .journeyPlannerPanel { background:rgba(26,37,40,.97); }
+  .jpBody { background:transparent; }
+  .jpSearch,.jpField,.jpInputWrap,.jpSuggestions,.jpResult { background:#1a2528; border-color:rgba(255,255,255,.08); }
+  .jpSuggestions button { background:#1a2528; color:#e8f0f2; border-color:rgba(255,255,255,.06); }
+  .jpSuggestions button:hover { background:#243136; }
+  .jpSearchBtn { background:var(--blue); }
+  .delayStatsPanel { background:rgba(26,37,40,.97); }
+  .dsCard { background:#1a2528; }
+  .dsOnTime { background:#143326; }
+  .dsDelayed { background:#3a2410; }
+  .dsAvg { background:#102a4a; }
+  .dsMax { background:#3a1420; }
+  .dsBar,.dsBarWrap { background:transparent; }
+  .speedProfilePanel,.trainComposition { background:#1a2528; border-color:rgba(255,255,255,.08); }
+  .spHeader h4,.spStats,.spTimeLabels,.tcLegend { color:#9fb2ba; }
+  .tcTrain { background:#10181b; }
+  .tcCarriage { background:#2a3a42; }
+  .stationFacilities { border-color:rgba(255,255,255,.08); }
+  .sfGrid { background:#10181b; }
+  .sfItem { background:#1a2528; color:#9fb2bc; }
+  .sfItem svg { stroke:var(--blue); }
+  .sfHours { color:#8a9ba3; }
+  .mapDrawer,.mapDrawer .roadLayerPanel,.mapDrawer .roadEventCard { background:#1a2528; border-color:rgba(255,255,255,.08); }
+  .mapDrawer .roadLayerHeading h2,.mapDrawer .roadEventCard h2 { color:#e8f0f2; }
+  .mapDrawer .roadToggles label { background:#1a2528; border-color:rgba(255,255,255,.08); }
+  .mapDrawer .roadToggles label:has(input:checked) { background:#102a4a; }
+  .mapDrawer .roadToggles strong { color:var(--blue); }
+  .mapStyleMenu { background:#1a2528; }
+  .mapStyleMenu button { color:#cfd8dd; }
+  .mapStyleMenu button:hover,.mapStyleMenu button[aria-checked="true"] { background:#102a4a; color:#fff; }
+  .liveFeedHeaderActions .railAlertCount { background:#1f2c31; color:#9fb2ba; }
+  .liveFeedHeaderActions button { background:#1f2c31; }
+  .liveFeedHeaderActions button:hover { background:#2a3a42; }
+  .feedCopy small { color:#8a9ba3; }
+  .feedCopy strong { color:#e8f0f2; }
+  .liveFeedItem>b { background:#3a1420; color:#ff9a8a; }
+  .railFeedSummary { color:#8a9ba3; }
+  .railFeedSummary strong { color:#9fb2ba; }
+}
+
+/* Rustige scrollbar in alle scrollbare panelen, in zowel licht als donker. */
+.panelScroll::-webkit-scrollbar { width:6px; }
+.panelScroll::-webkit-scrollbar-track { background:transparent; }
+.panelScroll::-webkit-scrollbar-thumb { background:rgba(22,37,40,.18); border-radius:999px; }
+[data-theme="dark"] .panelScroll::-webkit-scrollbar-thumb { background:rgba(232,240,242,.18); }
+
+/* Animaties uitschakelen wanneer de gebruiker dat verkiest. */
+@media (prefers-reduced-motion:reduce) {
+  * {
+    animation-duration:0.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:0.01ms !important;
+    scroll-behavior:auto !important;
+  }
+}
 
 /* Responsive */
 @media (max-width:900px) {

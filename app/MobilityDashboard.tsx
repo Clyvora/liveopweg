@@ -25,7 +25,7 @@ import {
   type RoadEvent,
 } from "../packages/protocol/road";
 import { parseTimestamp, realtimeHttpUrl, realtimeWebSocketUrl } from "./realtime-url";
-import { railStations, searchStations, stationMinZoom, stationsByCode, type RailStation } from "../packages/domain-rail/stations";
+import { railStations, searchStations, stationMinZoom, stationsByCode, stationsForZoom, type RailStation } from "../packages/domain-rail/stations";
 import { StationPanel } from "./StationPanel";
 import { TrainPanel, nextTrainStop } from "./TrainPanel";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
@@ -217,13 +217,45 @@ type TrainSprites = {
   slt: HTMLImageElement | null;
 };
 
+/** Vanaf dit zoomniveau wordt het realistische bovenaanzicht getekend. */
+const SPRITE_ZOOM = 9.3;
+
+/**
+ * Onder deze markeringsschaal is de compacte basisvorm niet te onderscheiden
+ * van het volledige bovenaanzicht. Op die zoomniveaus tonen we alleen de
+ * basisvorm, wat per frame acht tekenoperaties per trein scheelt.
+ */
+const SIMPLIFIED_MARKER_MAX_SCALE = 0.8;
+
+/** Een trein zoals de overlay die tekent, inclusief betrouwbaarheidsvlaggen. */
+type DisplayTrain = {
+  observation: RailObservation;
+  position: { longitude: number; latitude: number };
+  matched: boolean;
+  stale: boolean;
+};
+
+// Hergebruikte lege lijsten: de renderloop draait per frame, dus een verse
+// array-allocatie voor een uitgeschakelde laag is pure verspilling.
+const noStations: RailStation[] = [];
+const noDisplayTrains: DisplayTrain[] = [];
+
+// Materieelnummer -> spritefamilie. Zonder cache werd de range-tabel voor
+// iedere trein bij ieder frame opnieuw doorlopen.
+const spriteFamilyCache = new Map<string, keyof TrainSprites | null>();
+
 function spriteForVehicle(
   materialNumber: string | null,
   sprites: TrainSprites,
 ): HTMLImageElement | null {
-  const identity = identifyRollingStock(materialNumber);
-  if (identity.family !== "unknown") return sprites[identity.family];
-  return null;
+  const key = materialNumber ?? "";
+  let family = spriteFamilyCache.get(key);
+  if (family === undefined) {
+    const identity = identifyRollingStock(materialNumber);
+    family = identity.family === "unknown" ? null : identity.family;
+    spriteFamilyCache.set(key, family);
+  }
+  return family ? sprites[family] : null;
 }
 
 function drawTrainIcon(
@@ -283,9 +315,12 @@ function drawTrainIcon(
   }
 
   // Compacte fallback voor de paar frames waarin de PNG-sprites nog laden.
-  context.shadowColor = "rgba(22,37,40,.36)";
-  context.shadowBlur = selected ? 7 : 3;
-  context.shadowOffsetY = 1;
+  // Een slagschaduw is de duurste canvasbewerking per marker, dus alleen de
+  // geselecteerde trein krijgt er een.
+  const simplified = !selected && selectedScale < SIMPLIFIED_MARKER_MAX_SCALE;
+  context.shadowColor = selected ? "rgba(22,37,40,.36)" : "transparent";
+  context.shadowBlur = selected ? 7 : 0;
+  context.shadowOffsetY = selected ? 1 : 0;
   roundRectPath(context, -width / 2, -height / 2, width, height, 3.5);
   context.fillStyle = "#f2c928";
   context.fill();
@@ -293,6 +328,11 @@ function drawTrainIcon(
   context.lineWidth = selected ? 1.8 : Math.max(0.8, 1.15 * selectedScale);
   context.strokeStyle = matched ? "#172b55" : "#9a4d35";
   context.stroke();
+
+  if (simplified) {
+    context.restore();
+    return;
+  }
 
   // Blauwe kap, doorlopende donkere ramen en een rood frontlicht geven de
   // marker een herkenbare bovenaanzicht-trein in plaats van een stip.
@@ -334,7 +374,13 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const socketRef = useRef<WebSocket | null>(null);
   const selectFromMapRef = useRef<(vehicleId: string) => void>(() => undefined);
   const trackMatchesRef = useRef(new Map<string, RailTrackMatch>());
-  const displayTrainsRef = useRef<Array<{ observation: RailObservation; position: { longitude: number; latitude: number }; matched: boolean; stale: boolean }>>([]);
+  const displayTrainsRef = useRef<DisplayTrain[]>([]);
+  // Vraagt een nieuwe overlaytekening aan. De overlay tekent alleen wanneer de
+  // kaart beweegt of de data verandert, in plaats van blind 60 fps door te
+  // gaan en zo de hoofdthread met MapLibre te delen.
+  const overlayRenderRef = useRef<(() => void) | null>(null);
+  const spritesRequestedRef = useRef(false);
+  const spriteLoaderRef = useRef<() => void>(() => undefined);
   const selectedVehicleIdRef = useRef<string | null>(null);
   const pendingTrainNumberRef = useRef<string | null>(null);
   const deepLinkHandledRef = useRef(false);
@@ -358,7 +404,17 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const [showLayers, setShowLayers] = useState(false);
   const [showJourneyPlanner, setShowJourneyPlanner] = useState(false);
   const [showDelayStats, setShowDelayStats] = useState(false);
-  const [notificationsEnabled] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("liveopweg-notifications") === "on");
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("liveopweg-notifications") === "on");
+  // Houd de meldingenstand in sync met de instellingenpagina, zodat de twee
+  // onafhankelijke componenten niet uit elkaar groeien.
+  useEffect(() => {
+    const onSettingsChange = () => {
+      const stored = typeof window !== "undefined" && window.localStorage.getItem("liveopweg-notifications") === "on";
+      setNotificationsEnabled(stored);
+    };
+    window.addEventListener("storage", onSettingsChange);
+    return () => window.removeEventListener("storage", onSettingsChange);
+  }, []);
   const [baseMap, setBaseMap] = useState<BaseMapKey>("standard");
   const [showMapStyles, setShowMapStyles] = useState(false);
   const [mapLayers, setMapLayers] = useState<Record<MapLayerKey, boolean>>({
@@ -371,21 +427,36 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   });
 
   useEffect(() => {
-    const virm = new Image();
-    const icng = new Image();
-    const icm = new Image();
-    const sng = new Image();
-    const slt = new Image();
-    const sprites = { virm, icng, icm, sng, slt };
-    Object.values(sprites).forEach((sprite) => { sprite.decoding = "async"; });
-    virm.src = "/train-virm-v1.png";
-    icng.src = "/train-icng-v1.png";
-    icm.src = "/train-icm-v1.png";
-    sng.src = "/train-sng-v1.png";
-    slt.src = "/train-slt-v1.png";
-    trainSpritesRef.current = sprites;
+    // De sprites worden pas opgevraagd wanneer de kaart ver genoeg is
+    // ingezoomd om ze echt te tekenen. Op landelijk niveau blijft zo'n 270 kB
+    // aan PNG's buiten de kritieke laadtijd van de eerste kaartweergave.
+    const spriteSources: Array<[keyof TrainSprites, string]> = [
+      ["virm", "/train-virm-v1.png"],
+      ["icng", "/train-icng-v1.png"],
+      ["icm", "/train-icm-v1.png"],
+      ["sng", "/train-sng-v1.png"],
+      ["slt", "/train-slt-v1.png"],
+    ];
+    const loadSprites = () => {
+      if (spritesRequestedRef.current) return;
+      spritesRequestedRef.current = true;
+      const sprites: TrainSprites = { virm: null, icng: null, icm: null, sng: null, slt: null };
+      for (const [family, source] of spriteSources) {
+        const sprite = new Image();
+        sprite.decoding = "async";
+        // Eén hertekening zodra een sprite klaar is, zodat de marker meteen
+        // van de compacte fallback naar het bovenaanzicht wisselt.
+        sprite.onload = () => { overlayRenderRef.current?.(); };
+        sprite.src = source;
+        sprites[family] = sprite;
+      }
+      trainSpritesRef.current = sprites;
+    };
+    spriteLoaderRef.current = loadSprites;
 
     return () => {
+      spriteLoaderRef.current = () => undefined;
+      spritesRequestedRef.current = false;
       trainSpritesRef.current = {
         virm: null,
         icng: null,
@@ -407,6 +478,15 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     () => displayTrains.reduce((count, train) => count + (train.matched ? 1 : 0), 0),
     [displayTrains],
   );
+  const maxDelay = useMemo(() => {
+    if (!journey) return 0;
+    let max = 0;
+    for (const stop of journey.stops) {
+      const d = stop.arrival.exactDelaySeconds ?? stop.departure.exactDelaySeconds ?? 0;
+      if (d > max) max = d;
+    }
+    return max;
+  }, [journey]);
   useEffect(() => { displayTrainsRef.current = displayTrains; }, [displayTrains]);
   const searchResults = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -518,7 +598,10 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     const trainNumber = pendingTrainNumberRef.current;
     if (!trainNumber) return;
     const vehicle = vehicles.find((candidate) => candidate.trainNumber === trainNumber);
-    if (!vehicle) return;
+    if (!vehicle) {
+      pendingTrainNumberRef.current = null;
+      return;
+    }
     pendingTrainNumberRef.current = null;
     selectVehicle(vehicle.vehicleId);
   }, [selectVehicle, vehicles]);
@@ -563,6 +646,11 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  // Nieuwe posities, een andere selectie of een hertekende laag vragen ieder
+  // één overlaytekening aan. Zonder deze aanroepen zou de overlay pas weer
+  // verschijnen bij de volgende kaartbeweging.
+  useEffect(() => { overlayRenderRef.current?.(); }, [displayTrains, selectedVehicleId, selectedStation]);
 
   // Monitor selected train for delay notifications
   const lastDelayRef = useRef<string | null>(null);
@@ -903,17 +991,17 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
 
   useEffect(() => {
     if (!mapReady || !map.current) return;
-    let animationFrame = 0;
-    let lastMapFrame = 0;
+    const instance = map.current;
+    let pendingFrame = 0;
 
-    const renderFrame = (frameTime: number) => {
-      const instance = map.current;
-      if (!instance) return;
+    const renderFrame = () => {
+      pendingFrame = 0;
       // De canvas volgt de kaart tijdens pannen. Treinen met een spoor-match
       // staan exact op het spoor; treinen zonder match blijven op hun laatst
-      // gemeten GPS-punt zichtbaar.
-      if (frameTime - lastMapFrame >= 16) {
-        lastMapFrame = frameTime;
+      // gemeten GPS-punt zichtbaar. Iedere aanvraag tekent ook echt: de
+      // animatieframe-coalescing hierboven begrenst het aantal tekeningen al
+      // tot één per schermverversing.
+      {
         const selectedId = selectedVehicleIdRef.current;
         const overlay = trainOverlayElement.current;
         const mapContainer = mapElement.current;
@@ -933,11 +1021,19 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             context.clearRect(0, 0, width, height);
             const zoom = instance.getZoom();
             const markerScale = zoom < 7 ? 0.48 : zoom < 8.5 ? 0.68 : zoom < 10.5 ? 0.86 : 1;
+            // Eenmaal per tekening lezen; window.innerWidth per trein opvragen
+            // dwingt onnodige layoutberekeningen af in de renderloop.
+            const viewportWidth = window.innerWidth;
+            // De bovenaanzicht-sprites zijn alleen nodig vanaf dit niveau;
+            // vraag ze lui aan zodat het landelijke overzicht niet wacht op
+            // PNG's die het toch niet tekent.
+            if (zoom >= SPRITE_ZOOM) spriteLoaderRef.current();
             // Stationpunten gebruiken dezelfde lichte canvaslaag als de treinen.
             // Tekenen vóór de treinen houdt de vloot zichtbaar en aanklikbaar.
             context.save();
-            for (const station of mapLayers.stations ? railStations : []) {
-              if (zoom < stationMinZoom(station)) continue;
+            // Alleen de stations die op dit zoomniveau zichtbaar zijn; de
+            // catalogus is vooraf per zoomniveau gebundeld.
+            for (const station of mapLayers.stations ? stationsForZoom(zoom) : noStations) {
               const point = instance.project([station.longitude, station.latitude]);
               if (point.x < -15 || point.x > width + 15 || point.y < -15 || point.y > height + 15) continue;
               const active = station.code === selectedStationRef.current?.code;
@@ -957,7 +1053,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
               }
             }
             context.restore();
-            for (const { observation, position, matched, stale } of mapLayers.trains ? displayTrainsRef.current : []) {
+            for (const { observation, position, matched, stale } of mapLayers.trains ? displayTrainsRef.current : noDisplayTrains) {
               const vehicleId = observation.vehicleId;
               const projectedPos = instance.project([position.longitude, position.latitude]);
               const projX = projectedPos.x;
@@ -967,11 +1063,11 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
               const derivedHeading = observation.headingDegrees ?? 0;
               // Op landelijk niveau blijft de kaart rustig; vanaf regionaal
               // niveau verschijnt het volledige, realistische treinmodel.
-              const sprite = zoom >= 9.3
+              const sprite = zoom >= SPRITE_ZOOM
                 ? spriteForVehicle(observation.materialNumber, trainSpritesRef.current)
                 : null;
               const responsiveMarkerScale = zoom < 7
-                ? (window.innerWidth >= 2200 ? 1.05 : window.innerWidth >= 1400 ? 0.84 : 0.68)
+                ? (viewportWidth >= 2200 ? 1.05 : viewportWidth >= 1400 ? 0.84 : 0.68)
                 : markerScale;
               drawTrainIcon(
                 context,
@@ -988,11 +1084,29 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           }
         }
       }
-      animationFrame = window.requestAnimationFrame(renderFrame);
     };
 
-    animationFrame = window.requestAnimationFrame(renderFrame);
-    return () => window.cancelAnimationFrame(animationFrame);
+    // De overlay tekent alleen wanneer de kaart beweegt of de data verandert,
+    // in plaats van onafgebroken op 60 fps mee te draaien met MapLibre.
+    const requestOverlayRender = () => {
+      if (pendingFrame) return;
+      pendingFrame = window.requestAnimationFrame(renderFrame);
+    };
+    overlayRenderRef.current = requestOverlayRender;
+    for (const eventName of ["move", "zoom", "resize", "rotate", "pitch"] as const) {
+      instance.on(eventName, requestOverlayRender);
+    }
+    instance.once("idle", requestOverlayRender);
+    requestOverlayRender();
+
+    return () => {
+      for (const eventName of ["move", "zoom", "resize", "rotate", "pitch"] as const) {
+        instance.off(eventName, requestOverlayRender);
+      }
+      instance.off("idle", requestOverlayRender);
+      overlayRenderRef.current = null;
+      if (pendingFrame) window.cancelAnimationFrame(pendingFrame);
+    };
   }, [mapLayers, mapReady]);
 
   useEffect(() => {
@@ -1398,12 +1512,14 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
 
       {!isAlertsPage && <section className="radarStatusBar" aria-label="Landelijke livestatus">
         <div><UiIcon name="train" /><strong>{mappedTrainCount.toLocaleString("nl-NL")}</strong><span>treinen op kaart</span></div>
+        <div><i className={matchedTrainCount === mappedTrainCount && mappedTrainCount > 0 ? "live" : matchedTrainCount > 0 ? "partial" : ""} /><strong>{matchedTrainCount.toLocaleString("nl-NL")}</strong><span>betrouwbare posities</span></div>
+        {maxDelay > 0 && <div><i className="delay" /><strong>{Math.round(maxDelay / 60)} min</strong><span>max vertraging</span></div>}
         <div><i className={connection === "live" ? "live" : ""} /><strong>{connection === "live" ? "Verbonden" : "Wachten"}</strong><span>gegevensfeed</span></div>
       </section>}
 
       <section className="workspace" id="map" aria-label={isAlertsPage ? "Kaart met actuele wegmeldingen" : "Landelijk realtime treindashboard"}>
         <div className="mapWrap">
-          <div ref={mapElement} className="liveMap" aria-label={isAlertsPage ? "Kaart van Nederland met wegmeldingen" : "Kaart van Nederland met actuele treinposities"} />
+          <div ref={mapElement} className="liveMap" aria-label={isAlertsPage ? "Kaart van Nederland met wegmeldingen" : "Kaart van Nederland met actuele treinposities"} aria-busy={!mapReady ? "true" : undefined} />
           {!isAlertsPage && <canvas ref={trainOverlayElement} className="trainOverlay" aria-hidden="true" />}
           {!isAlertsPage && !vehicles.length && <div className="waitingMarker"><span /> Wachten op eerste vlootbatch</div>}
           {!isAlertsPage && vehicles.length > 0 && mappedTrainCount === 0 && <div className="waitingMarker"><span /> Wachten op treinposities</div>}

@@ -15,7 +15,9 @@
   "train.arrival": "Arrival (expected)",
   "train.route": "Route details",
   "train.close": "Close train info",
+  "train.number": "Train",
   "train.unknown_operator": "Operator unknown",
+  "train.unknown_type": "Illustrative train side view; rolling stock type unknown",
   "train.unknown_origin": "Origin station unknown",
   "train.unknown_destination": "Destination unknown",
   "train.no_route": "Route details are not yet available.",
@@ -28,6 +30,8 @@
   "train.occupancy.medium": "Medium",
   "train.occupancy.high": "High",
   "train.eta": "Estimated",
+  "train.arrived": "Arrived",
+  "time.minute": "min",
   "station.departures": "Departures",
   "station.arrivals": "Arrivals",
   "station.activity": "Train activity",
@@ -91,5 +95,6 @@
   "station.toilet": "Toilet",
   "station.wifi": "WiFi",
   "station.ticket_machine": "Ticket machine",
-  "station.opening_hours": "Opening hours"
+  "station.opening_hours": "Opening hours",
+  "settings.always_on_way": "Always on the move, always up to date."
 }

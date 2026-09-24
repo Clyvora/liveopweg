@@ -1,4 +1,5 @@
 import type { RailObservation } from "../protocol/rail.js";
+import { parseTimestamp } from "../../app/realtime-url";
 
 export const DEFAULT_RENDER_DELAY_MS = 12_000;
 const MAX_PLAUSIBLE_SEGMENT_SPEED_KMH = 350;
@@ -37,9 +38,8 @@ function clamp(value: number, minimum = 0, maximum = 1): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-function observationTime(observation: RailObservation): number {
-  const parsed = Date.parse(observation.time.sourceMeasuredAt ?? observation.time.receivedAt);
-  return Number.isFinite(parsed) ? parsed : 0;
+function observationTime(observation: RailObservation): number | null {
+  return parseTimestamp(observation.time.sourceMeasuredAt ?? observation.time.receivedAt);
 }
 
 function distanceMeters(left: RailObservation, right: RailObservation): number {
@@ -116,7 +116,7 @@ export function renderMotion(
   nowMs: number,
   renderDelayMs = DEFAULT_RENDER_DELAY_MS,
 ): RenderedMotion {
-  const currentTime = observationTime(sample.current);
+  const currentTime = observationTime(sample.current) ?? 0;
   const sourceAgeSeconds = Math.max(0, (nowMs - currentTime) / 1_000);
   const stale = sourceAgeSeconds > sample.current.quality.freshnessThresholdSeconds;
   const targetTime = nowMs - renderDelayMs;
@@ -127,7 +127,7 @@ export function renderMotion(
   let movementPlausibility = 1;
 
   if (sample.previous) {
-    const previousTime = observationTime(sample.previous);
+    const previousTime = observationTime(sample.previous) ?? 0;
     const elapsedSeconds = (currentTime - previousTime) / 1_000;
     if (elapsedSeconds > 0) {
       const segmentSpeedKmh = distanceMeters(sample.previous, sample.current) / elapsedSeconds * 3.6;
@@ -160,6 +160,21 @@ export function renderMotion(
         mode = "EXTRAPOLATED";
       } else if (sample.previous) {
         const previousTime = observationTime(sample.previous);
+        if (previousTime === null) {
+          // Skip extrapolation if we can't determine previous timestamp
+          return {
+            longitude,
+            latitude,
+            sourceLongitude: sample.current.position.longitude,
+            sourceLatitude: sample.current.position.latitude,
+            sourceAgeSeconds,
+            renderDelaySeconds: Math.max(0, (nowMs - targetTime) / 1_000),
+            progress: null,
+            mode: stale ? "STALE_HOLD" : "SOURCE_HOLD",
+            stale,
+            confidence: confidence(sample.current, sourceAgeSeconds, stale ? "STALE_HOLD" : "SOURCE_HOLD", movementPlausibility),
+          };
+        }
         const elapsedSeconds = (currentTime - previousTime) / 1_000;
         if (elapsedSeconds > 0) {
           const scale = extrapolationSeconds / elapsedSeconds;

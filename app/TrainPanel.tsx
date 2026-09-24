@@ -59,9 +59,9 @@ export function TrainPanel({ observation, journey, now, onClose }: { observation
   const track = next?.arrival.actualTrack ?? next?.departure.actualTrack ?? next?.arrival.plannedTrack ?? next?.departure.plannedTrack;
   const category = journey?.trainCategory.name ?? journey?.trainCategory.code ?? "Trein";
   return <aside className="observationPanel trainPanel" aria-label={t("train.close")}>
-    <header className="tpHeader"><div><h2>{category} {observation.trainNumber}</h2><p>{journey?.operator ?? t("train.unknown_operator")}<span>·</span>{category}<span>·</span>Trein {observation.trainNumber}</p></div><button type="button" onClick={onClose} aria-label={t("train.close")}>×</button></header>
+    <header className="tpHeader"><div><h2>{category} {observation.trainNumber}</h2><p>{journey?.operator ?? t("train.unknown_operator")}<span>·</span>{category}<span>·</span>{t("train.number")} {observation.trainNumber}</p></div><button type="button" onClick={onClose} aria-label={t("train.close")}>×</button></header>
     <div className="tpScroll">
-      <div className="tpIllustration" key={observation.vehicleId}><img src={`/trains/side-${stock.family}.png`} alt={stock.family === "unknown" ? "Illustratief treinzijaanzicht; materieeltype onbekend" : `Zijaanzicht ${stock.label}`} /></div>
+      <div className="tpIllustration" key={observation.vehicleId}><img src={`/trains/side-${stock.family}.png`} alt={stock.family === "unknown" ? t("train.unknown_type") : `Zijaanzicht ${stock.label}`} width={190} height={112} /></div>
       <section className="tpRoute" aria-label={t("train.route")}>
         <div><i /><strong>{first?.station.longName ?? t("train.unknown_origin")}</strong><time>{trainClock(first?.departure.actualAt ?? first?.departure.plannedAt)}</time></div>
         <div><i /><strong>{last?.station.longName ?? journey?.destination.actual ?? journey?.destination.planned ?? t("train.unknown_destination")}</strong><time>{trainClock(last?.arrival.actualAt ?? last?.arrival.plannedAt)}</time>{last?.arrival.exactDelaySeconds != null && last.arrival.exactDelaySeconds > 0 && <Delay seconds={last.arrival.exactDelaySeconds} />}</div>
@@ -78,7 +78,7 @@ export function TrainPanel({ observation, journey, now, onClose }: { observation
           <span>{t("train.arrival")}</span>
           <time>{trainClock(arrival)}</time>
           <Delay seconds={delay} />
-          {next && <span className="tpETA">{t("train.eta")}: {getETA(next, now) ?? "—"} min</span>}
+          {next && (() => { const e = getETA(next, now); return e === null ? null : e <= 0 ? <span className="tpETA">{t("train.arrived")}</span> : <span className="tpETA">{t("train.eta")}: {e} {t("time.minute")}</span>; })()}
         </footer>
       </section>
       <section className="tpJourney"><button className="tpJourneyToggle" type="button" aria-expanded={expanded} aria-controls="train-stop-list" onClick={() => setExpanded(value => !value)}>{t("train.route")}<span aria-hidden="true">{expanded ? "⌄" : "›"}</span></button>
@@ -90,7 +90,8 @@ export function TrainPanel({ observation, journey, now, onClose }: { observation
           const changedTrack = stop.arrival.actualTrack ?? stop.departure.actualTrack;
           const plannedTrack = stop.arrival.plannedTrack ?? stop.departure.plannedTrack;
           const eta = getETA(stop, now);
-          return <li key={`${stop.order}-${stop.station.code}`} className={`${active ? "next" : ""} ${cancelled ? "cancelled" : ""}`} aria-current={active ? "step" : undefined}><i /><div><strong>{stop.station.longName}</strong>{cancelled ? <small>{t("train.cancelled")}</small> : changedTrack && plannedTrack && changedTrack !== plannedTrack ? <small>{t("train.track_changed")} {changedTrack}</small> : null}{eta !== null && !cancelled && <small className="tpStopETA">{t("train.eta")}: {eta} min</small>}</div><time>{trainClock(time)}</time>{!cancelled && stopDelay != null && stopDelay > 0 && <Delay seconds={stopDelay} />}</li>;
+          const etaDisplay = eta !== null ? Math.max(0, Math.round(eta)) : null;
+          return <li key={`${stop.order}-${stop.station.code}`} className={`${active ? "next" : ""} ${cancelled ? "cancelled" : ""}`} aria-current={active ? "step" : undefined}><i /><div><strong>{stop.station.longName}</strong>{cancelled ? <small>{t("train.cancelled")}</small> : changedTrack && plannedTrack && changedTrack !== plannedTrack ? <small>{t("train.track_changed")} {changedTrack}</small> : null}{etaDisplay !== null && !cancelled && <small className={`tpStopETA ${etaDisplay === 0 ? "arrivalNow" : ""}`}>{etaDisplay === 0 ? t("train.arrived") : `${etaDisplay} ${t("time.minute")}`}</small>}</div><time>{trainClock(time)}</time>{!cancelled && stopDelay != null && stopDelay > 0 && <Delay seconds={stopDelay} />}</li>;
         })}{!stops.length && <li className="tpEmpty">{t("train.no_route")}</li>}</ol>}
       </section>
     </div>

@@ -165,9 +165,9 @@ export function Utrecht3DView({ vehicles, matchesByVehicle, selectedVehicleId }:
     return () => {
       disposed = true;
       if (instance) {
-        if (terrainLayer) { try { terrainLayer.onRemove?.(); } catch { /* ignore cleanup errors */ } }
-        if (buildingsLayer) { try { buildingsLayer.onRemove?.(); } catch { /* ignore cleanup errors */ } }
-        if (detailLayer) { try { detailLayer.onRemove?.(); } catch { /* ignore cleanup errors */ } }
+        if (terrainLayer) { try { terrainLayer.onRemove?.(); } catch (error) { console.error("[Utrecht3DView] Cleanup error:", error); } }
+        if (buildingsLayer) { try { buildingsLayer.onRemove?.(); } catch (error) { console.error("[Utrecht3DView] Cleanup error:", error); } }
+        if (detailLayer) { try { detailLayer.onRemove?.(); } catch (error) { console.error("[Utrecht3DView] Cleanup error:", error); } }
         instance.remove();
       }
       stationLayer.current = null;

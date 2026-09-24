@@ -22,7 +22,7 @@ function Icon({ name }: { name: IconName }) {
 
 export function SettingsScreen() {
   const { theme, toggleTheme } = useTheme();
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("liveopweg-notifications") === "on");
   const [notificationMessage, setNotificationMessage] = useState("");
 
@@ -55,7 +55,7 @@ export function SettingsScreen() {
         <Link href="/meldingen"><Icon name="bell" /><span>Meldingen</span></Link>
         <Link href="/instellingen" className="active" aria-current="page"><Icon name="settings" /><span>Instellingen</span></Link>
       </nav>
-      <small>Altijd onderweg, altijd op de hoogte.</small>
+      <small>{t("settings.always_on_way")}</small>
     </aside>
     <div className="settingsMain">
       <header className="settingsIntro"><span>LiveOpWeg</span><h1>Instellingen</h1><p>Pas de site aan zoals jij hem graag gebruikt. Je kaartlagen kies je direct op de betreffende kaart.</p></header>

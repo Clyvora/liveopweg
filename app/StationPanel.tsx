@@ -109,7 +109,7 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
   return <aside className={`stationPanel ${expanded ? "expanded" : ""}`} aria-label={`Station ${station.name}`}>
     <header className="stationPanelHeader">
       <div>
-        <p className="stationEyebrow"><span aria-hidden="true">▣</span> Station · {station.code}</p>
+        <p className="stationEyebrow"><svg viewBox="0 0 24 24" aria-hidden="true" width="10" height="10"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Station · {station.code}</p>
         <h2>{station.name}</h2>
         <p className={`stationFeedState ${stale ? "stale" : ""}`} role="status">
           <i />{error ? "Verbinding onderbroken · opnieuw proberen…" : !board ? "Ritten ophalen…" : stale ? "Ritbron nog niet actueel" : "Live ritinformatie"}

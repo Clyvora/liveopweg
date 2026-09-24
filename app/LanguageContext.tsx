@@ -35,7 +35,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   
   const t = useCallback((key: string): string => {
     const entry = translations[language][key as keyof typeof nl];
-    if (!entry) return key;
+    if (!entry) {
+      const fallback = translations.nl[key as keyof typeof nl];
+      return fallback ?? key;
+    }
     return entry;
   }, [language]);
   
