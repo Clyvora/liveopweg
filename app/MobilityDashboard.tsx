@@ -273,6 +273,9 @@ function drawTrainIcon(
   const hasSprite = Boolean(sprite?.complete && sprite.naturalWidth > 0);
   const width = (hasSprite ? (selected ? 28 : 22) : (selected ? 20 : 16)) * selectedScale;
   const height = (hasSprite ? (selected ? 60 : 48) : (selected ? 32 : 24)) * selectedScale;
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+
   context.save();
   context.translate(x, y);
   context.rotate(rotation);
@@ -280,7 +283,7 @@ function drawTrainIcon(
   // Alleen de geselecteerde trein krijgt een rustige witte contour. De echte
   // bovenaanzicht-sprite blijft zo ook boven een druk emplacement herkenbaar.
   if (selected) {
-    roundRectPath(context, -width / 2 - 2, -height / 2 - 2, width + 4, height + 4, width / 2);
+    roundRectPath(context, -halfWidth - 2, -halfHeight - 2, width + 4, height + 4, width / 2);
     context.lineWidth = 2;
     context.strokeStyle = "rgba(255,255,255,.96)";
     context.stroke();
@@ -290,7 +293,7 @@ function drawTrainIcon(
   // het voertuig. Zo blijft het verschil met een op het spoor vastgezette
   // trein afleesbaar, ook wanneer op hoog zoomniveau de PNG-sprite verschijnt.
   if (!matched && hasSprite && sprite) {
-    roundRectPath(context, -width / 2 + 1.5, -height / 2 + 1.5, width - 3, height - 3, 4);
+    roundRectPath(context, -halfWidth + 1.5, -halfHeight + 1.5, width - 3, height - 3, 4);
     context.setLineDash([3, 3]);
     context.lineWidth = 1.2;
     context.strokeStyle = "rgba(154,77,53,.95)";
@@ -309,7 +312,7 @@ function drawTrainIcon(
     context.shadowColor = selected ? "rgba(15,28,36,.32)" : "transparent";
     context.shadowBlur = selected ? 4 : 0;
     context.shadowOffsetY = selected ? 1 : 0;
-    context.drawImage(sprite, -width / 2, -height / 2, width, height);
+    context.drawImage(sprite, -halfWidth, -halfHeight, width, height);
     context.restore();
     return;
   }
@@ -321,7 +324,7 @@ function drawTrainIcon(
   context.shadowColor = selected ? "rgba(22,37,40,.36)" : "transparent";
   context.shadowBlur = selected ? 7 : 0;
   context.shadowOffsetY = selected ? 1 : 0;
-  roundRectPath(context, -width / 2, -height / 2, width, height, 3.5);
+  roundRectPath(context, -halfWidth, -halfHeight, width, height, 3.5);
   context.fillStyle = "#f2c928";
   context.fill();
   context.shadowColor = "transparent";
@@ -469,6 +472,18 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const vehicles = useMemo(() => Object.values(vehiclesById).sort((left, right) => (
     left.trainNumber.localeCompare(right.trainNumber, "nl", { numeric: true })
   )), [vehiclesById]);
+
+  // Precompute searchable data for vehicles to avoid repeated identifyRollingStock calls
+  const vehiclesWithSearchData = useMemo(() => {
+    return vehicles.map(vehicle => ({
+      ...vehicle,
+      searchableTrainNumber: vehicle.trainNumber.toLowerCase(),
+      searchableMaterialNumber: vehicle.materialNumber?.toLowerCase() ?? '',
+      searchableVehicleId: vehicle.vehicleId.toLowerCase(),
+      searchableRollingStockLabel: identifyRollingStock(vehicle.materialNumber).label.toLowerCase()
+    }));
+  }, [vehicles]);
+
   const displayTrains = useMemo(() => vehicles.flatMap((observation) => {
     const display = trainDisplayPosition(observation, trackMatchesByVehicle[observation.vehicleId], now);
     return display ? [{ observation, position: display.position, matched: display.matched, stale: display.stale }] : [];
@@ -491,14 +506,13 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const searchResults = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return vehicles.slice(0, 12);
-    return vehicles.filter((vehicle) => [
-      vehicle.trainNumber,
-      vehicle.materialNumber,
-      vehicle.vehicleId,
-      identifyRollingStock(vehicle.materialNumber).label,
-    ]
-      .some((value) => value?.toLowerCase().includes(needle))).slice(0, 12);
-  }, [query, vehicles]);
+    return vehiclesWithSearchData.filter(vehicle =>
+      vehicle.searchableTrainNumber.includes(needle) ||
+      vehicle.searchableMaterialNumber.includes(needle) ||
+      vehicle.searchableVehicleId.includes(needle) ||
+      vehicle.searchableRollingStockLabel.includes(needle)
+    ).slice(0, 12);
+  }, [query, vehiclesWithSearchData]);
   const stationResults = useMemo(() => searchStations(query), [query]);
   const availableVehicleIds = useMemo(() => new Set(vehicles.map((vehicle) => vehicle.vehicleId)), [vehicles]);
   const roadEvents = useMemo(() => Object.values(roadEventsById), [roadEventsById]);
@@ -643,7 +657,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    const timer = window.setInterval(() => setNow(Date.now()), 100);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -1028,6 +1042,10 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             // vraag ze lui aan zodat het landelijke overzicht niet wacht op
             // PNG's die het toch niet tekent.
             if (zoom >= SPRITE_ZOOM) spriteLoaderRef.current();
+            // Calculate responsiveMarkerScale once since it doesn't change during the loop
+            const responsiveMarkerScale = zoom < 7
+              ? (viewportWidth >= 2200 ? 1.05 : viewportWidth >= 1400 ? 0.84 : 0.68)
+              : markerScale;
             // Stationpunten gebruiken dezelfde lichte canvaslaag als de treinen.
             // Tekenen vóór de treinen houdt de vloot zichtbaar en aanklikbaar.
             context.save();
@@ -1066,9 +1084,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
               const sprite = zoom >= SPRITE_ZOOM
                 ? spriteForVehicle(observation.materialNumber, trainSpritesRef.current)
                 : null;
-              const responsiveMarkerScale = zoom < 7
-                ? (viewportWidth >= 2200 ? 1.05 : viewportWidth >= 1400 ? 0.84 : 0.68)
-                : markerScale;
               drawTrainIcon(
                 context,
                 projX,

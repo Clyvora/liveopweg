@@ -51,9 +51,20 @@ export default defineConfig(async () => {
     const { default: tailwindcss } = await import("@tailwindcss/postcss");
 
     return {
-      optimizeDeps: { exclude: ["maplibre-gl"] },
+      optimizeDeps: { exclude: [] },
       css: { postcss: { plugins: [tailwindcss()] } },
       plugins: [vinext(), sites(), nitro({ preset: "vercel" })],
+      build: {
+        rollupOptions: {
+          output: {
+            manualChunks(id) {
+              if (id.includes('node_modules')) {
+                return id.toString().split('node_modules/')[1].split('/')[0];
+              }
+            }
+          }
+        }
+      }
     };
   }
 
@@ -61,7 +72,7 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
-    optimizeDeps: { exclude: ["maplibre-gl"] },
+    optimizeDeps: { exclude: [] },
     server: {
       ...(isCodexSeatbeltSandbox
         ? { watch: { useFsEvents: false, usePolling: true } }
@@ -96,5 +107,16 @@ export default defineConfig(async () => {
         },
       },
     ],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              return id.toString().split('node_modules/')[1].split('/')[0];
+            }
+          }
+        }
+      }
+    }
   };
 });
