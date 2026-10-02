@@ -5,6 +5,13 @@
 .tpHeader p{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0 0;color:#6f7c8e;font-size:11px;}
 .tpHeader button{flex:none;width:30px;height:30px;border:0;background:transparent;color:#172e4a;font-size:26px;cursor:pointer;}
 .tpHeader button:hover{background:#eaf0f7;border-radius:6px;}
+.tpHeaderActions{flex:none;display:flex;align-items:center;gap:8px;}
+.tpHeader .tpFollowButton{width:auto;height:34px;padding:0 11px;display:flex;align-items:center;gap:7px;border:1px solid #d8e4ef;border-radius:8px;background:#fff;color:#315372;font:700 11px/1 Arial,sans-serif;white-space:nowrap;}
+.tpHeader .tpFollowButton svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.tpHeader .tpFollowButton.active{border-color:#9fc8fa;background:#eaf4ff;color:#176bd0;}
+.tpHeader .tpFollowButton:disabled{opacity:.58;cursor:not-allowed;}
+.tpHeader .tpFollowButton:hover{border-radius:8px;background:#f1f7ff;}
+.tpHeader .tpCloseButton{width:30px;height:30px;}
 .tpScroll{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:0 24px 26px;}
 .tpIllustration{height:112px;display:flex;align-items:center;border-bottom:1px solid #e5eaf0;}
 .tpIllustration img{display:block;width:100%;height:100%;object-fit:contain;}
@@ -50,7 +57,7 @@
 .tpETA{color:#3375c4;font-weight:600;font-size:11px;}
 .tpStopETA{color:#3375c4;font-size:10px;margin-top:2px;}
 @keyframes tpPanelEnter{from{opacity:.75;transform:translateX(18px);}to{opacity:1;transform:translateX(0);}}
-@media(min-width:901px){.shell:has(.trainPanel) .mapZoomControls,.shell:has(.trainPanel) .mapStylePicker{right:calc(clamp(380px,16vw,500px) + 18px);}.shell:has(.trainPanel) .mapAttribution{right:calc(clamp(380px,16vw,500px) + 185px);}}
+@media(min-width:901px){.shell:has(.trainPanel) .mapZoomControls,.shell:has(.trainPanel) .mapStylePicker{right:calc(clamp(380px,16vw,500px) + 18px);}.shell:has(.trainPanel) .mapAttribution{right:calc(clamp(380px,16vw,500px) + 185px);}.shell:has(.trainPanel) .fleetTools{left:calc(var(--radar-sidebar) + clamp(380px,16vw,500px) + 16px);}.shell:has(.trainPanel) .mapActions{left:calc(var(--radar-sidebar) + clamp(380px,16vw,500px) + 18px);}}
 @media(max-width:900px){.observationPanel.trainPanel{inset:10px 8px 76px;width:calc(100% - 16px);height:calc(100dvh - 86px);max-height:none;z-index:30;border-radius:14px;animation-name:tpPanelEnterMobile;}.tpHeader{padding:20px 18px 10px;}.tpScroll{padding:0 18px 20px;}.tpIllustration{height:100px;}}
 @keyframes tpPanelEnterMobile{from{opacity:.75;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
 @media(prefers-reduced-motion:reduce){.observationPanel.trainPanel{animation:none;}}

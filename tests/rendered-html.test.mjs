@@ -23,8 +23,10 @@ test("server-renders de treinenkaart zonder overlappend meldingenpaneel", async 
   assert.match(html, /href="\/instellingen"/);
   assert.match(html, /Treinenkaart/);
   assert.match(html, /Live treinen/);
+  assert.match(html, /Overwegen/);
   assert.match(html, /Hoofdnavigatie/);
-  assert.match(html, /Landelijke livestatus/);
+  assert.doesNotMatch(html, /class="radarStatusBar"/);
+  assert.doesNotMatch(html, /99\+/);
   assert.match(html, /Stations/);
   assert.match(html, /Kies kaartweergave/);
   assert.match(html, /Standaard/);
@@ -36,6 +38,7 @@ test("server-renders de treinenkaart zonder overlappend meldingenpaneel", async 
   assert.match(html, /Sluit kaartlagen/);
   assert.match(html, /Zoek trein, station of materieel/);
   assert.match(html, /aria-label="Zoek trein, station of materieel"/);
+  assert.match(html, /role="combobox"/);
   assert.doesNotMatch(html, /class="railAlertsPanel liveFeedPanel/);
   assert.doesNotMatch(html, /Open 3D-station/);
   assert.doesNotMatch(html, /Stations in meters/);

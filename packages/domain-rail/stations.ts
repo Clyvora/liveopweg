@@ -5,6 +5,16 @@ export const railStations: RailStation[] = catalog.stations;
 export const stationCatalogSource = { url: catalog.source, version: catalog.version, license: catalog.license };
 export const stationsByCode = new Map(railStations.map((station) => [station.code.toUpperCase(), station]));
 
+export function normalizeSearchText(value: string): string {
+  return value.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[’‘]/g, "'")
+    .toLocaleLowerCase("nl")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 export function stationMinZoom(station: RailStation): number {
   if (station.category === "megastation") return 5;
   if (station.category === "knooppuntIntercitystation") return 7;
@@ -30,17 +40,18 @@ export const railStationsByZoomLevel: ReadonlyMap<number, RailStation[]> = (() =
 })();
 
 /** Stations die op het gegeven (fractionele) zoomniveau zichtbaar zijn. */
-export function stationsForZoom(zoom: number): RailStation[] {
+export function stationsForZoom(zoom: number, stations: RailStation[] = railStations): RailStation[] {
   const level = Math.min(maximumMapZoomLevel, Math.max(5, Math.floor(zoom)));
+  if (stations !== railStations) return stations.filter((station) => stationMinZoom(station) <= level);
   return railStationsByZoomLevel.get(level) ?? railStations;
 }
 
-export function searchStations(query: string): RailStation[] {
-  const needle = query.trim().toLocaleLowerCase("nl");
+export function searchStations(query: string, stations: RailStation[] = railStations): RailStation[] {
+  const needle = normalizeSearchText(query);
   if (!needle) return [];
-  return railStations.filter((station) => station.code.toLowerCase().includes(needle)
-    || station.name.toLocaleLowerCase("nl").includes(needle))
-    .sort((a, b) => Number(b.code.toLowerCase() === needle) - Number(a.code.toLowerCase() === needle)
+  return stations.filter((station) => normalizeSearchText(station.code).includes(needle)
+    || normalizeSearchText(station.name).includes(needle))
+    .sort((a, b) => Number(normalizeSearchText(b.code) === needle) - Number(normalizeSearchText(a.code) === needle)
       || a.name.localeCompare(b.name, "nl"))
     .slice(0, 6);
 }

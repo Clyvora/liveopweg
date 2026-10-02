@@ -4,28 +4,10 @@ import { useEffect, useState } from "react";
 import { stationCatalogSource, type RailStation } from "../packages/domain-rail/stations";
 import { stationBoardSchema, type StationBoard, type StationBoardEntry } from "../packages/protocol/station";
 import { parseTimestamp, realtimeHttpUrl } from "./realtime-url";
-import { useLanguage } from "./LanguageContext";
 
 const clock = (value: string) => new Intl.DateTimeFormat("nl-NL", {
   hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam",
 }).format(new Date(value));
-
-// Mock station facilities data
-function getStationFacilities(station: RailStation) {
-  const hash = station.code.split("").reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0);
-  return {
-    accessible: true,
-    bikeParking: hash % 2 === 0,
-    carParking: hash % 3 === 0,
-    elevator: hash % 4 === 0,
-    escalator: hash % 5 === 0,
-    toilet: true,
-    wifi: hash % 2 === 0,
-    ticketMachine: true,
-    openingHours: "06:00 - 01:00",
-    platforms: station.category === "megastation" ? 8 : station.category === "knooppuntIntercitystation" ? 6 : station.category === "intercitystation" ? 4 : 2,
-  };
-}
 
 export function boardEntryStatus(entry: StationBoardEntry): string {
   if (entry.cancelled) return "Vervalt";
@@ -35,10 +17,11 @@ export function boardEntryStatus(entry: StationBoardEntry): string {
   return entry.delaySeconds < 0 ? "Eerder" : "Op tijd";
 }
 
-export function StationPanel({ station, now, availableVehicleIds, onClose, onSelectVehicle }: {
+export function StationPanel({ station, now, availableVehicleIds, catalogFetchedAt, onClose, onSelectVehicle }: {
   station: RailStation;
   now: number;
   availableVehicleIds: Set<string>;
+  catalogFetchedAt?: string | null;
   onClose: () => void;
   onSelectVehicle: (vehicleId: string) => void;
 }) {
@@ -47,8 +30,6 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
   const [tab, setTab] = useState<"departures" | "arrivals">("departures");
   const [expanded, setExpanded] = useState(false);
   const [shared, setShared] = useState(false);
-  const { t } = useLanguage();
-  const facilities = getStationFacilities(station);
 
   useEffect(() => {
     let disposed = false;
@@ -132,17 +113,8 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
       <b>{totalActivity}</b>
     </section>}
     <section className="stationFacilities">
-      <h3>{t("station.facilities")}</h3>
-      <div className="sfGrid">
-        <div className="sfItem"><svg viewBox="0 0 24 24"><path d="M12 4a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM6 20v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></svg><span>{t("station.accessible")}</span></div>
-        {facilities.bikeParking && <div className="sfItem"><svg viewBox="0 0 24 24"><circle cx="6" cy="17" r="3" /><circle cx="18" cy="17" r="3" /><path d="M6 17l4-8h6l4 8M9 9h4" /></svg><span>{t("station.bike_parking")}</span></div>}
-        {facilities.carParking && <div className="sfItem"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M7 17v-4M17 17v-4M7 13h10" /></svg><span>{t("station.car_parking")}</span></div>}
-        {facilities.elevator && <div className="sfItem"><svg viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="20" rx="1" /><path d="M11 5l2 2-2 2M11 17l2-2-2-2" /></svg><span>{t("station.elevator")}</span></div>}
-        <div className="sfItem"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M9 6h6M9 10h6M9 14h6" /></svg><span>{t("station.toilet")}</span></div>
-        {facilities.wifi && <div className="sfItem"><svg viewBox="0 0 24 24"><path d="M2 8a16 16 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0" /></svg><span>{t("station.wifi")}</span></div>}
-        <div className="sfItem"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M7 10h10M7 14h6" /></svg><span>{t("station.ticket_machine")}</span></div>
-      </div>
-      <p className="sfHours">{t("station.opening_hours")}: {facilities.openingHours}</p>
+      <h3>Voorzieningen</h3>
+      <p>Betrouwbare actuele informatie over voorzieningen is niet beschikbaar.</p>
     </section>
     <div className="stationBoardColumns" aria-hidden="true"><span>Tijd</span><span>{tab === "departures" ? "Richting" : "Vanuit"}</span><span>Spoor</span></div>
     <div id="station-board" role="tabpanel" aria-labelledby={`station-${tab}-tab`} className="stationBoardList" tabIndex={0}>
@@ -167,7 +139,9 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
     {entries.length > 3 && <button className={`stationExpand ${entries.length === 4 ? "smallOnly" : ""}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>{expanded ? "Minder ritten" : "Meer ritten"}<span>{expanded ? "−" : "+"}</span></button>}
     <footer className="stationPanelFooter">
       <p>Op basis van ontvangen ritberichten; mogelijk niet alle ritten beschikbaar.{stale && board ? " Laatst ontvangen bord: " + clock(board.generatedAt) + "." : ""}</p>
-      <a href={stationCatalogSource.url} target="_blank" rel="noreferrer" title={`Stationslijst ${stationCatalogSource.version} · ${stationCatalogSource.license}`}>Stationdata: Rijden de Treinen / NS</a>
+      {catalogFetchedAt
+        ? <a href="https://www.ns.nl/reisinformatie/ns-api" target="_blank" rel="noreferrer" title={`Catalogus opgehaald ${clock(catalogFetchedAt)}`}>Actuele stationdata: NS · {clock(catalogFetchedAt)}</a>
+        : <a href={stationCatalogSource.url} target="_blank" rel="noreferrer" title={`Stationslijst ${stationCatalogSource.version} · ${stationCatalogSource.license}`}>Stationdata: Rijden de Treinen / NS · {stationCatalogSource.version}</a>}
     </footer>
   </aside>;
 }

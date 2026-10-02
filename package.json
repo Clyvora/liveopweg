@@ -29,6 +29,7 @@
     "benchmark:journey-decode": "npm --prefix ../ClyvoraAPI/services/liveopweg run benchmark:journey-decode --",
     "journey:find-live-candidate": "npm --prefix ../ClyvoraAPI/services/liveopweg run journey:find-live-candidate --",
     "rail:import-geometry": "npm --prefix ../ClyvoraAPI/services/liveopweg run rail:import-geometry --",
+    "rail:import-level-crossings": "npm --prefix ../ClyvoraAPI/services/liveopweg run rail:import-level-crossings --",
     "rail:audit-graph": "npm --prefix ../ClyvoraAPI/services/liveopweg run rail:audit-graph --",
     "rail:measure-match-quality": "npm --prefix ../ClyvoraAPI/services/liveopweg run rail:measure-match-quality --",
     "station3d:build-utrecht": "npm --prefix ../ClyvoraAPI/services/liveopweg run station3d:build-utrecht --",

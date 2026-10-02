@@ -14,15 +14,21 @@ function stop(order: number, name: string, time: string, cancelled = false): Rai
 const stops = [stop(0,"Amsterdam Centraal","2026-09-09T12:22:00Z"),stop(1,"Amsterdam Amstel","2026-09-09T12:28:00Z"),stop(2,"Hilversum","2026-09-09T12:38:00Z"),stop(3,"Baarn","2026-09-09T12:45:00Z",true),stop(4,"Utrecht Centraal","2026-09-09T13:01:00Z")];
 const observation = { vehicleId: "test", trainNumber: "1735", materialNumber: "8601", speed: { valueKmh:132 } } as RailObservation;
 const journey = { stops, operator:"NS", trainCategory:{name:"Intercity",code:"IC"}, destination:{actual:"Utrecht Centraal",planned:"Utrecht Centraal"} } as RailJourney;
-function render(j: RailJourney | null = journey, o = observation) { 
+function render(j: RailJourney | null = journey, o = observation, isFollowing = false) {
   return renderToStaticMarkup(
     createElement(LanguageProvider, null, 
-      createElement(TrainPanel, { observation:o, journey:j, now, onClose() {} })
+      createElement(TrainPanel, { observation:o, journey:j, now, isFollowing, canFollow:true, onToggleFollow() {}, onClose() {} })
     )
   );
 }
 
 describe("train passenger panel", () => {
+  it("offers an explicit follow toggle and reports its active state accessibly", () => {
+    expect(render()).toContain('aria-pressed="false"');
+    expect(render()).toContain("Volg trein");
+    expect(render(journey, observation, true)).toContain('aria-pressed="true"');
+    expect(render(journey, observation, true)).toContain("Volgen actief");
+  });
   it("selects the next served stop and skips passed and cancelled stops", () => {
     expect(nextTrainStop(stops, now)?.station.longName).toBe("Hilversum");
     expect(nextTrainStop(stops, Date.parse("2026-09-09T12:40:00Z"))?.station.longName).toBe("Utrecht Centraal");

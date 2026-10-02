@@ -134,6 +134,20 @@
 }
 @media (max-width:500px) { .settingsCard { padding:17px; } .settingsRow { align-items:flex-start; flex-direction:column; justify-content:center; padding-top:14px; } .settingsChoices { width:100%; } .settingsChoices button { flex:1; } .settingsLinks a { flex-direction:column; gap:4px; } }
 
+/* Keep the train navigation out of the map and selected-train panel on phones. */
+@media (max-width:900px) {
+  .trainPage .topbar { position:fixed; inset:auto 8px calc(8px + env(safe-area-inset-bottom)); width:auto; height:60px; z-index:100; padding:0; display:block; }
+  .trainPage .railBrand,.trainPage .sidebarLive { display:none; }
+  .trainPage .sideNav { position:static; width:100%; height:100%; margin:0; padding:0 4px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); align-items:stretch; gap:0; }
+  .trainPage .sideNav .navSectionLabel,.trainPage .sideNav .secondaryNavItem { display:none; }
+  .trainPage .sideNav > a { width:100%; height:100%; min-height:0; margin:0; padding:5px 2px; display:grid; place-items:center; align-content:center; gap:4px; border:0; border-top:2px solid transparent; border-radius:0; font-size:10px; }
+  .trainPage .sideNav > a.active { border-top-color:#5ca0fa; border-left:0; }
+  .trainPage .sideNav > a .uiIcon { width:20px; height:20px; }
+  .trainPage .sideNav .navIconWrap b { display:none; }
+  .trainPage .observationPanel,.trainPage .stationPanel,.trainPage .journeyPlannerPanel,.trainPage .delayStatsPanel { z-index:85; bottom:calc(76px + env(safe-area-inset-bottom)); max-height:min(68dvh,610px); }
+  .trainPage .trainResults { z-index:110; }
+}
+
 .positionLegend { min-height:40px; padding:0 13px; display:flex; align-items:center; gap:14px; border:1px solid rgba(255,255,255,.84); border-radius:11px; background:rgba(255,255,255,.94); box-shadow:0 8px 24px #163a511b; color:#365064; font-size:10px; font-weight:700; }
 .positionLegend span { display:inline-flex; align-items:center; gap:7px; white-space:nowrap; }
 .positionLegend i { width:9px; height:9px; border:2px solid #fff; border-radius:50%; box-shadow:0 0 0 1px #344c62; }
@@ -271,3 +285,36 @@
 }
 [data-theme="dark"] .mapDrawer .roadLayerHeading > span { color:#c0d0dc; }
 [data-theme="dark"] .mapDrawer .roadSourceNote { color:#aebdc8; }
+
+/* Nearby panel and keyboard-friendly map search. */
+.trainPage .mapActions button.nearbyAction { display:flex; }
+.trainPage .mapDrawer .mapLayerToggles .trainLayerIcon.crossings { background:#fff2d5; color:#a86d00; }
+.trainPage .nearbyPanel { position:absolute; z-index:36; top:84px; right:calc(var(--radar-feed) + 18px); width:min(360px,calc(100vw - var(--radar-sidebar) - var(--radar-feed) - 36px)); max-height:min(72dvh,680px); overflow:auto; padding:16px; border:1px solid #dce7ef; border-radius:14px; background:rgba(255,255,255,.98); box-shadow:0 16px 44px #1230472b; color:#19384f; }
+.trainPage .nearbyPanel>header { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:13px; }
+.trainPage .nearbyPanel>header span { color:#2476d2; font-size:9px; font-weight:850; letter-spacing:.12em; }
+.trainPage .nearbyPanel h2 { margin:3px 0 0; font-size:17px; letter-spacing:-.02em; }
+.trainPage .nearbyPanel>header button { width:28px; height:28px; border:0; border-radius:7px; background:transparent; color:inherit; font-size:22px; cursor:pointer; }
+.trainPage .nearbyPanel section { padding-top:12px; border-top:1px solid #e8eef2; }
+.trainPage .nearbyPanel section+section { margin-top:8px; }
+.trainPage .nearbyPanel h3 { margin:0 0 7px; display:flex; align-items:center; gap:7px; font-size:11px; }
+.trainPage .nearbyPanel h3 .uiIcon { width:15px; height:15px; color:#2678d3; }
+.trainPage .nearbyResult { width:100%; min-height:48px; display:flex; justify-content:space-between; align-items:center; gap:12px; padding:7px 8px; border:0; border-radius:8px; background:transparent; color:inherit; text-align:left; cursor:pointer; }
+.trainPage .nearbyResult:hover { background:#edf5ff; }
+.trainPage .nearbyResult span { min-width:0; display:grid; gap:3px; }
+.trainPage .nearbyResult strong { overflow:hidden; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+.trainPage .nearbyResult small,.trainPage .nearbyResult b { color:#6c8090; font-size:10px; font-weight:600; }
+.trainPage .nearbyResult b { flex:none; }
+.trainPage .nearbyMessage { margin:9px 2px; color:#6d8090; font-size:11px; line-height:1.45; }
+.trainPage .nearbyPrivacy { margin:11px 2px 0; color:#8494a0; font-size:9px; }
+.trainPage .fleetTools label { position:relative; }
+.trainPage .fleetTools .clearSearchButton { position:absolute; top:50%; right:12px; width:27px; height:27px; display:grid; place-items:center; transform:translateY(-50%); border:0; border-radius:50%; background:#eef3f6; color:#647889; font-size:19px; cursor:pointer; }
+.trainPage .trainResults button.searchActive,.trainPage .trainResults button[aria-selected="true"] { background:#eaf3ff; color:#145eaa; outline:2px solid #9bc8fa; outline-offset:-2px; }
+[data-theme="dark"] .trainPage .nearbyPanel { border-color:#385064; background:rgba(24,43,57,.98); color:#e8f1f5; }
+[data-theme="dark"] .trainPage .nearbyPanel section { border-color:#385064; }
+[data-theme="dark"] .trainPage .nearbyResult:hover { background:#233f54; }
+[data-theme="dark"] .trainPage .fleetTools .clearSearchButton { background:#2c4556; color:#e7f1f6; }
+@media (max-width:900px) {
+  .trainPage .nearbyPanel { top:auto; right:10px; bottom:calc(146px + env(safe-area-inset-bottom)); left:10px; width:auto; max-height:43dvh; }
+  .trainPage .mapActions button.nearbyAction { max-width:42px; justify-content:center; padding:0 10px; }
+  .trainPage .mapActions button.nearbyAction span { display:none; }
+}

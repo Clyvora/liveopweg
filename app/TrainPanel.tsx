@@ -45,7 +45,7 @@ function FactIcon({ kind }: { kind: "speed" | "clock" | "stop" }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true">{kind === "clock" ? <><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></> : kind === "stop" ? <path d="M5 19V13M10 19V9M15 19V5M20 19V2" /> : <><path d="M4 19a9 9 0 1 1 16 0M12 13l4-5M5 12h2M7 6l1 2M12 4v2M19 12h-2" /><circle cx="12" cy="14" r="1.5" /></>}</svg>;
 }
 
-export function TrainPanel({ observation, journey, now, onClose }: { observation: RailObservation; journey: RailJourney | null; now: number; onClose: () => void }) {
+export function TrainPanel({ observation, journey, now, onClose, isFollowing, canFollow, onToggleFollow }: { observation: RailObservation; journey: RailJourney | null; now: number; onClose: () => void; isFollowing: boolean; canFollow: boolean; onToggleFollow: () => void }) {
   const [expanded, setExpanded] = useState(true);
   const { t } = useLanguage();
   const stock = identifyRollingStock(observation.materialNumber);
@@ -60,7 +60,7 @@ export function TrainPanel({ observation, journey, now, onClose }: { observation
   const track = next?.arrival.actualTrack ?? next?.departure.actualTrack ?? next?.arrival.plannedTrack ?? next?.departure.plannedTrack;
   const category = journey?.trainCategory.name ?? journey?.trainCategory.code ?? "Trein";
   return <aside className="observationPanel trainPanel" aria-label={t("train.close")}>
-    <header className="tpHeader"><div><h2>{category} {observation.trainNumber}</h2><p>{journey?.operator ?? t("train.unknown_operator")}<span>·</span>{category}<span>·</span>{t("train.number")} {observation.trainNumber}</p></div><button type="button" onClick={onClose} aria-label={t("train.close")}>×</button></header>
+    <header className="tpHeader"><div><h2>{category} {observation.trainNumber}</h2><p>{journey?.operator ?? t("train.unknown_operator")}<span>·</span>{category}<span>·</span>{t("train.number")} {observation.trainNumber}</p></div><div className="tpHeaderActions"><button className={`tpFollowButton ${isFollowing ? "active" : ""}`} type="button" aria-pressed={isFollowing} aria-label={!canFollow ? "Live treinpositie niet beschikbaar" : isFollowing ? "Stop met trein volgen" : "Volg trein op de kaart"} disabled={!canFollow} onClick={onToggleFollow}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36M3 4v5h5" /><circle cx="12" cy="12" r="2.5" /><path d="M12 3v2m0 14v2m9-9h-2M5 12H3" /></svg>{!canFollow ? "Geen live positie" : isFollowing ? "Volgen actief" : "Volg trein"}</button><button className="tpCloseButton" type="button" onClick={onClose} aria-label={t("train.close")}>×</button></div></header>
     <div className="tpScroll">
       <div className="tpIllustration" key={observation.vehicleId}>
         {/* eslint-disable-next-line @next/next/no-img-element -- Vinext does not provide next/image; this is a small local asset. */}
