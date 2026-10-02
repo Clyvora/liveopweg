@@ -18,11 +18,13 @@ Set `MOBILITYRADAR_DATA_DIR` to an absolute path to reuse existing data;
 otherwise a fresh backend `var/` is used. No existing data is deleted or moved.
 Supply server environment variables to the process; npm does not load `.env`.
 
-The frontend still accepts `NEXT_PUBLIC_REALTIME_URL` (WebSocket URL ending in
-`/v1/realtime`); all HTTP endpoints derive from that same host. The default
-production same-origin reverse proxy remains compatible. A separate reviewed
-API host can be configured at frontend build time without changing contracts.
-Set backend `CORS_ALLOWED_ORIGIN` to the exact frontend origin, and keep
+On `liveopweg.nl` and `www.liveopweg.nl`, the frontend connects to
+`wss://api.clyvora.tech/v1/realtime`; all HTTP endpoints derive from that same
+host. Other custom production hosts use the same-origin reverse proxy unless
+`NEXT_PUBLIC_REALTIME_URL` (a WebSocket URL ending in `/v1/realtime`) is set at
+build time. The ClyvoraAPI Worker forwards these requests to the persistent
+LiveOpWeg backend once its `LIVEOPWEG_UPSTREAM_URL` is configured. Set backend
+`CORS_ALLOWED_ORIGIN` / `CORS_ALLOWED_ORIGINS` to the exact frontend origins, and keep
 `NS_API_KEY`, `DATABASE_URL` and `REDIS_URL` server-only. The browser still
 loads map tiles, styles, glyphs and applicable 3D assets from their providers;
 this is not an offline or network-private application.

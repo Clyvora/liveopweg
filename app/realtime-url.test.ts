@@ -21,6 +21,14 @@ describe("realtime URLs", () => {
     expect(realtimeWebSocketUrl()).toBe("wss://mobility.example/v1/realtime");
     expect(realtimeHttpUrl("/v1/fleet")).toBe("https://mobility.example/v1/fleet");
   });
+
+  it("routes the LiveOpWeg domains to the ClyvoraAPI realtime gateway", () => {
+    for (const domain of ["liveopweg.nl", "www.liveopweg.nl"]) {
+      vi.stubGlobal("window", { location: new URL(`https://${domain}/`) });
+      expect(realtimeWebSocketUrl()).toBe("wss://api.clyvora.tech/v1/realtime");
+      expect(realtimeHttpUrl("/v1/fleet")).toBe("https://api.clyvora.tech/v1/fleet");
+    }
+  });
 });
 
 describe("parseTimestamp", () => {

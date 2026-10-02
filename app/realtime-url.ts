@@ -7,12 +7,17 @@ function isLocalDevelopmentHost(): boolean {
   return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 }
 
+function isLiveOpWegProductionHost(): boolean {
+  return window.location.hostname === "liveopweg.nl" || window.location.hostname === "www.liveopweg.nl";
+}
+
 export function realtimeWebSocketUrl(): string {
   const configured = configuredRealtimeUrl();
   if (configured) return configured.toString();
   if (isLocalDevelopmentHost()) {
     return `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8081/v1/realtime`;
   }
+  if (isLiveOpWegProductionHost()) return "wss://api.clyvora.tech/v1/realtime";
   return `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/v1/realtime`;
 }
 
