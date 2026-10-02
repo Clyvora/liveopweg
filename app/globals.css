@@ -1730,6 +1730,25 @@ body {
 .tcOccupancyBar { position: absolute; bottom: 2px; left: 4px; right: 4px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.3); }
 .tcOccupancyFill { height: 100%; border-radius: 2px; background: rgba(255,255,255,0.8); }
 .tcCoupler { position: absolute; right: -2px; top: 50%; transform: translateY(-50%); width: 2px; height: 12px; border-radius: 1px; background: #b0bec5; }
+
+/* Keep the selected train details on the map's right edge on desktop. */
+@media (min-width: 901px) {
+  .shell > .workspace > .observationPanel.trainPanel {
+    position: fixed;
+    inset: 18px 18px 18px auto;
+    width: min(var(--radar-feed), calc(100vw - var(--radar-sidebar) - 36px));
+    max-height: none;
+    border-radius: 16px;
+  }
+}
+
+@media (max-width: 900px) {
+  .shell > .workspace > .observationPanel.trainPanel {
+    position: absolute;
+    right: 10px;
+    left: 10px;
+  }
+}
 .tcLegend { display: flex; gap: 12px; margin-top: 8px; font-size: 9px; color: #5f7381; }
 .tcLegend span { display: flex; align-items: center; gap: 4px; }
 .tcLegend i { width: 10px; height: 10px; border-radius: 2px; }
