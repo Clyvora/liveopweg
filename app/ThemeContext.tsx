@@ -16,7 +16,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("theme");
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem("theme");
+    } catch {
+      // Keep the system preference when browser storage is unavailable.
+    }
     const preferred: Theme = stored === "light" || stored === "dark"
       ? stored
       : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -34,7 +39,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     document.documentElement.setAttribute("data-theme", theme);
-    window.localStorage.setItem("theme", theme);
+    try {
+      window.localStorage.setItem("theme", theme);
+    } catch {
+      // Theme still applies for this session even when it cannot be persisted.
+    }
   }, [ready, theme]);
   
   const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);

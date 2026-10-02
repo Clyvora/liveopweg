@@ -330,7 +330,9 @@ function drawTrainIcon(
   context.shadowColor = "transparent";
   context.lineWidth = selected ? 1.8 : Math.max(0.8, 1.15 * selectedScale);
   context.strokeStyle = matched ? "#172b55" : "#9a4d35";
+  context.setLineDash(matched ? [] : [3 * selectedScale, 2 * selectedScale]);
   context.stroke();
+  context.setLineDash([]);
 
   if (simplified) {
     context.restore();
@@ -407,16 +409,20 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const [showLayers, setShowLayers] = useState(false);
   const [showJourneyPlanner, setShowJourneyPlanner] = useState(false);
   const [showDelayStats, setShowDelayStats] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("liveopweg-notifications") === "on");
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   // Houd de meldingenstand in sync met de instellingenpagina, zodat de twee
   // onafhankelijke componenten niet uit elkaar groeien.
   useEffect(() => {
-    const onSettingsChange = () => {
-      const stored = typeof window !== "undefined" && window.localStorage.getItem("liveopweg-notifications") === "on";
-      setNotificationsEnabled(stored);
+    const syncNotificationSetting = () => {
+      try {
+        setNotificationsEnabled(window.localStorage.getItem("liveopweg-notifications") === "on");
+      } catch {
+        setNotificationsEnabled(false);
+      }
     };
-    window.addEventListener("storage", onSettingsChange);
-    return () => window.removeEventListener("storage", onSettingsChange);
+    syncNotificationSetting();
+    window.addEventListener("storage", syncNotificationSetting);
+    return () => window.removeEventListener("storage", syncNotificationSetting);
   }, []);
   const [baseMap, setBaseMap] = useState<BaseMapKey>("standard");
   const [showMapStyles, setShowMapStyles] = useState(false);
@@ -657,7 +663,10 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 100);
+    // Map markers represent measured positions, not animated estimates. A
+    // 100 ms React ticker repainted the entire dashboard ten times per second
+    // without making the underlying GPS position any newer.
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -1399,6 +1408,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
 
   const strikeValidUntil = parseTimestamp(nationalStrikeAlert.validUntil);
   const strikeIsActive = strikeValidUntil !== null && now <= strikeValidUntil;
+  const roadBadgeCount = roadCounts.incidents + roadCounts.closures;
+  const gpsOnlyTrainCount = Math.max(0, mappedTrainCount - matchedTrainCount);
 
   return (
     <main className={`shell ${isAlertsPage ? "alertsPage" : "trainPage"}`}>
@@ -1409,7 +1420,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         <nav className="sideNav" aria-label="Hoofdnavigatie">
           <p className="navSectionLabel">Kaarten</p>
           <Link className={!isAlertsPage ? "active" : ""} href="/" aria-current={!isAlertsPage ? "page" : undefined} onClick={isAlertsPage ? undefined : resetMap}><UiIcon name="train" /><span>Treinen</span></Link>
-          <Link className={isAlertsPage ? "active" : ""} href="/meldingen" aria-current={isAlertsPage ? "page" : undefined}><span className="navIconWrap"><UiIcon name="bell" />{roadCounts.incidents + roadCounts.closures > 0 && <b>{Math.min(99, roadCounts.incidents + roadCounts.closures)}</b>}</span><span>Meldingen</span></Link>
+          <Link className={isAlertsPage ? "active" : ""} href="/meldingen" aria-current={isAlertsPage ? "page" : undefined}><span className="navIconWrap"><UiIcon name="bell" />{roadBadgeCount > 0 && <b aria-label={`${roadBadgeCount} meldingen`}>{roadBadgeCount > 99 ? "99+" : roadBadgeCount}</b>}</span><span>Meldingen</span></Link>
           <p className="navSectionLabel secondaryNavItem">Overig</p>
           <Link href="/instellingen"><UiIcon name="settings" /><span>Instellingen</span></Link>
           {!isAlertsPage && <button className={`secondaryNavItem ${showJourneyPlanner ? "active" : ""}`} type="button" onClick={openJourneyPlanner}><UiIcon name="queue" /><span>Reisplanner</span></button>}
@@ -1475,7 +1486,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
               <p className="panelKicker">Kaartweergave</p>
               <h2>Treinenkaart</h2>
             </div>
-            <span>{mappedTrainCount.toLocaleString("nl-NL")} zichtbaar · {matchedTrainCount.toLocaleString("nl-NL")} op spoor</span>
+            <span>{matchedTrainCount.toLocaleString("nl-NL")} op spoor · {gpsOnlyTrainCount.toLocaleString("nl-NL")} GPS</span>
           </div>
           <div className="layerToggleSection">
             <h3>Kaart</h3>
@@ -1526,8 +1537,9 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       </section>}
 
       {!isAlertsPage && <section className="radarStatusBar" aria-label="Landelijke livestatus">
-        <div><UiIcon name="train" /><strong>{mappedTrainCount.toLocaleString("nl-NL")}</strong><span>treinen op kaart</span></div>
-        <div><i className={matchedTrainCount === mappedTrainCount && mappedTrainCount > 0 ? "live" : matchedTrainCount > 0 ? "partial" : ""} /><strong>{matchedTrainCount.toLocaleString("nl-NL")}</strong><span>betrouwbare posities</span></div>
+        <div><UiIcon name="train" /><strong>{mappedTrainCount.toLocaleString("nl-NL")}</strong><span>actieve treinen</span></div>
+        <div><i className={matchedTrainCount === mappedTrainCount && mappedTrainCount > 0 ? "live" : matchedTrainCount > 0 ? "partial" : ""} /><strong>{matchedTrainCount.toLocaleString("nl-NL")}</strong><span>op spoor vastgezet</span></div>
+        {gpsOnlyTrainCount > 0 && <div><i className="partial" /><strong>{gpsOnlyTrainCount.toLocaleString("nl-NL")}</strong><span>GPS-punten</span></div>}
         {maxDelay > 0 && <div><i className="delay" /><strong>{Math.round(maxDelay / 60)} min</strong><span>max vertraging</span></div>}
         <div><i className={connection === "live" ? "live" : ""} /><strong>{connection === "live" ? "Verbonden" : "Wachten"}</strong><span>gegevensfeed</span></div>
       </section>}
@@ -1541,6 +1553,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           {isAlertsPage && <div className="alertMapHeading"><span>Meldingenkaart</span><strong>Nederland onderweg</strong><small>Alleen wegmeldingen · geen treinen</small></div>}
           <div className="mapActions" aria-label="Kaartbediening">
             {!isAlertsPage && <button type="button" onClick={() => setShowLayers(true)} aria-expanded={showLayers}><UiIcon name="sliders" /><span>Kaartlagen</span></button>}
+            {!isAlertsPage && <div className="positionLegend" aria-label="Positienauwkeurigheid"><span><i className="matched" />Op spoor</span><span><i className="gps" />GPS-punt</span></div>}
             {isAlertsPage && <button type="button" onClick={() => map.current?.fitBounds([[3.15, 50.7], [7.45, 53.7]], { padding: 40, duration: 400 })}><UiIcon name="map" /><span>Heel Nederland</span></button>}
             <button type="button" onClick={toggleTheme} aria-label={theme === "dark" ? "Licht thema" : "Donker thema"}>
               <svg viewBox="0 0 24 24" aria-hidden="true">{theme === "dark" ? <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.36 6.36l-.71-.71M6.34 6.34l-.71-.71m12.72 0l-.71.71M6.34 17.66l-.71.71M12 7a5 5 0 100 10 5 5 0 000-10z" /> : <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />}</svg>

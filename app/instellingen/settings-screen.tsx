@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useLanguage } from "../LanguageContext";
@@ -23,28 +23,40 @@ function Icon({ name }: { name: IconName }) {
 export function SettingsScreen() {
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("liveopweg-notifications") === "on");
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
 
-  async function updateNotifications() {
-    if (notificationsEnabled) {
-      window.localStorage.setItem("liveopweg-notifications", "off");
+  useEffect(() => {
+    try {
+      setNotificationsEnabled(window.localStorage.getItem("liveopweg-notifications") === "on");
+    } catch {
       setNotificationsEnabled(false);
-      setNotificationMessage("Browsermeldingen voor geselecteerde treinen staan uit.");
-      return;
     }
-    if (!("Notification" in window)) {
-      setNotificationMessage("Deze browser ondersteunt geen meldingen.");
-      return;
+  }, []);
+
+  async function updateNotifications() {
+    try {
+      if (notificationsEnabled) {
+        window.localStorage.setItem("liveopweg-notifications", "off");
+        setNotificationsEnabled(false);
+        setNotificationMessage("Browsermeldingen voor geselecteerde treinen staan uit.");
+        return;
+      }
+      if (!("Notification" in window)) {
+        setNotificationMessage("Deze browser ondersteunt geen meldingen.");
+        return;
+      }
+      const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+      if (permission !== "granted") {
+        setNotificationMessage("Geef LiveOpWeg toestemming in je browserinstellingen om meldingen te ontvangen.");
+        return;
+      }
+      window.localStorage.setItem("liveopweg-notifications", "on");
+      setNotificationsEnabled(true);
+      setNotificationMessage("Meldingen over vertraging bij je geselecteerde trein staan aan.");
+    } catch {
+      setNotificationMessage("De browser kan deze meldingsinstelling nu niet opslaan. Je kunt LiveOpWeg blijven gebruiken zonder meldingen.");
     }
-    const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
-    if (permission !== "granted") {
-      setNotificationMessage("Geef LiveOpWeg toestemming in je browserinstellingen om meldingen te ontvangen.");
-      return;
-    }
-    window.localStorage.setItem("liveopweg-notifications", "on");
-    setNotificationsEnabled(true);
-    setNotificationMessage("Meldingen over vertraging bij je geselecteerde trein staan aan.");
   }
 
   return <main className="settingsPage">

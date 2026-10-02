@@ -21,6 +21,7 @@ export function trainDelay(seconds: number | null | undefined) {
 }
 export function nextTrainStop(stops: Stop[], now: number) {
   return stops.find(stop => {
+    if (stop.calls.actual === false && stop.calls.planned === true) return false;
     if (!(stop.calls.actual ?? stop.calls.planned)) return false;
     const time = stop.departure.actualAt ?? stop.departure.plannedAt ?? stop.arrival.actualAt ?? stop.arrival.plannedAt;
     const parsed = parseTimestamp(time);

@@ -19,7 +19,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>("nl");
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const saved = window.localStorage.getItem("liveopweg-language");
+      let saved: string | null = null;
+      try {
+        saved = window.localStorage.getItem("liveopweg-language");
+      } catch {
+        // Use the default language when browser storage is unavailable.
+      }
       if (saved === "nl" || saved === "en") {
         setLanguage(saved);
         document.documentElement.lang = saved;
@@ -29,7 +34,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, []);
   const updateLanguage = useCallback((next: Language) => {
     setLanguage(next);
-    window.localStorage.setItem("liveopweg-language", next);
+    try {
+      window.localStorage.setItem("liveopweg-language", next);
+    } catch {
+      // Language still applies for this session even when it cannot be persisted.
+    }
     document.documentElement.lang = next;
   }, []);
   
