@@ -54,17 +54,6 @@ export default defineConfig(async () => {
       optimizeDeps: { exclude: [] },
       css: { postcss: { plugins: [tailwindcss()] } },
       plugins: [vinext(), sites(), nitro({ preset: "vercel" })],
-      build: {
-        rollupOptions: {
-          output: {
-            manualChunks(id) {
-              if (id.includes('node_modules')) {
-                return id.toString().split('node_modules/')[1].split('/')[0];
-              }
-            }
-          }
-        }
-      }
     };
   }
 
@@ -107,16 +96,5 @@ export default defineConfig(async () => {
         },
       },
     ],
-    build: {
-      rollupOptions: {
-        output: {
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-              return id.toString().split('node_modules/')[1].split('/')[0];
-            }
-          }
-        }
-      }
-    }
   };
 });
