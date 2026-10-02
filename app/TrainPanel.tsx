@@ -62,7 +62,10 @@ export function TrainPanel({ observation, journey, now, onClose }: { observation
   return <aside className="observationPanel trainPanel" aria-label={t("train.close")}>
     <header className="tpHeader"><div><h2>{category} {observation.trainNumber}</h2><p>{journey?.operator ?? t("train.unknown_operator")}<span>·</span>{category}<span>·</span>{t("train.number")} {observation.trainNumber}</p></div><button type="button" onClick={onClose} aria-label={t("train.close")}>×</button></header>
     <div className="tpScroll">
-      <div className="tpIllustration" key={observation.vehicleId}><img src={`/trains/side-${stock.family}.png`} alt={stock.family === "unknown" ? t("train.unknown_type") : `Zijaanzicht ${stock.label}`} width={190} height={112} /></div>
+      <div className="tpIllustration" key={observation.vehicleId}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- Vinext does not provide next/image; this is a small local asset. */}
+        <img src={`/trains/side-${stock.family}.png`} alt={stock.family === "unknown" ? t("train.unknown_type") : `Zijaanzicht ${stock.label}`} width={190} height={112} />
+      </div>
       <section className="tpRoute" aria-label={t("train.route")}>
         <div><i /><strong>{first?.station.longName ?? t("train.unknown_origin")}</strong><time>{trainClock(first?.departure.actualAt ?? first?.departure.plannedAt)}</time></div>
         <div><i /><strong>{last?.station.longName ?? journey?.destination.actual ?? journey?.destination.planned ?? t("train.unknown_destination")}</strong><time>{trainClock(last?.arrival.actualAt ?? last?.arrival.plannedAt)}</time>{last?.arrival.exactDelaySeconds != null && last.arrival.exactDelaySeconds > 0 && <Delay seconds={last.arrival.exactDelaySeconds} />}</div>

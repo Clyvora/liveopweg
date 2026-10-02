@@ -31,6 +31,7 @@ import { TrainPanel, nextTrainStop } from "./TrainPanel";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { JourneyPlanner } from "./JourneyPlanner";
 import { DelayStats } from "./DelayStats";
+import { delayNotificationKey } from "./delay-notification";
 import { useTheme } from "./ThemeContext";
 import { useLanguage } from "./LanguageContext";
 
@@ -217,8 +218,8 @@ type TrainSprites = {
   slt: HTMLImageElement | null;
 };
 
-/** Vanaf dit zoomniveau wordt het realistische bovenaanzicht getekend. */
-const SPRITE_ZOOM = 9.3;
+/** Alleen van dichtbij tonen we de uitgebreide materieelillustraties. */
+const SPRITE_ZOOM = 10.5;
 
 /**
  * Onder deze markeringsschaal is de compacte basisvorm niet te onderscheiden
@@ -269,10 +270,12 @@ function drawTrainIcon(
   stale: boolean,
   scale: number,
 ): void {
-  const selectedScale = selected ? Math.max(1.2, scale) : scale;
+  const selectedScale = selected ? Math.max(1.12, scale) : scale;
   const hasSprite = Boolean(sprite?.complete && sprite.naturalWidth > 0);
-  const width = (hasSprite ? (selected ? 28 : 22) : (selected ? 20 : 16)) * selectedScale;
-  const height = (hasSprite ? (selected ? 60 : 48) : (selected ? 32 : 24)) * selectedScale;
+  // Compacte, langgerekte footprint zoals de treinmarkeringen op een
+  // spoorkaart: herkenbaar op afstand zonder naastgelegen sporen te bedekken.
+  const width = (selected ? 13 : 11) * selectedScale;
+  const height = (selected ? 40 : 34) * selectedScale;
   const halfWidth = width / 2;
   const halfHeight = height / 2;
 
@@ -280,8 +283,18 @@ function drawTrainIcon(
   context.translate(x, y);
   context.rotate(rotation);
 
-  // Alleen de geselecteerde trein krijgt een rustige witte contour. De echte
-  // bovenaanzicht-sprite blijft zo ook boven een druk emplacement herkenbaar.
+  // De contrastrijke dubbele contour houdt de kleine bovenaanzicht-trein
+  // leesbaar op zowel lichte als donkere kaartdelen, zoals spooratlasiconen.
+  roundRectPath(context, -halfWidth - 1.3, -halfHeight - 1.3, width + 2.6, height + 2.6, width / 2);
+  context.lineWidth = 2.6;
+  context.strokeStyle = "rgba(255,255,255,.98)";
+  context.stroke();
+  roundRectPath(context, -halfWidth - 0.5, -halfHeight - 0.5, width + 1, height + 1, width / 2);
+  context.lineWidth = 0.9;
+  context.strokeStyle = "rgba(15,35,70,.9)";
+  context.stroke();
+
+  // Geselecteerde trein krijgt daarnaast een ruimere witte focusrand.
   if (selected) {
     roundRectPath(context, -halfWidth - 2, -halfHeight - 2, width + 4, height + 4, width / 2);
     context.lineWidth = 2;
@@ -317,9 +330,9 @@ function drawTrainIcon(
     return;
   }
 
-  // Compacte fallback voor de paar frames waarin de PNG-sprites nog laden.
-  // Een slagschaduw is de duurste canvasbewerking per marker, dus alleen de
-  // geselecteerde trein krijgt er een.
+  // Op de normale kaartzoom gebruiken we een compact kaarticoon in plaats
+  // van een verkleinde fotorealistische sprite: dat blijft scherper en beter
+  // herkenbaar tussen alle spoorlijnen.
   const simplified = !selected && selectedScale < SIMPLIFIED_MARKER_MAX_SCALE;
   context.shadowColor = selected ? "rgba(22,37,40,.36)" : "transparent";
   context.shadowBlur = selected ? 7 : 0;
@@ -339,23 +352,34 @@ function drawTrainIcon(
     return;
   }
 
-  // Blauwe kap, doorlopende donkere ramen en een rood frontlicht geven de
-  // marker een herkenbare bovenaanzicht-trein in plaats van een stip.
-  roundRectPath(context, -width * 0.43, -height * 0.42, width * 0.86, height * 0.27, 2);
-  context.fillStyle = "#1e4f9c";
+  // NS-geel rijtuigdek met een donkerblauwe raamband, korte gele raamstijlen
+  // en herkenbare cabines aan beide uiteinden — bewust kaartachtig, niet 3D.
+  roundRectPath(context, -width * 0.34, -height * 0.37, width * 0.68, height * 0.74, width * 0.2);
+  context.fillStyle = "#173c83";
   context.fill();
-  roundRectPath(context, -width * 0.31, -height * 0.25, width * 0.62, height * 0.27, 1.2);
-  context.fillStyle = "#213044";
-  context.fill();
-  context.fillStyle = "#9bc2d8";
-  context.fillRect(-width * 0.24, -height * 0.19, width * 0.18, height * 0.13);
-  context.fillRect(width * 0.06, -height * 0.19, width * 0.18, height * 0.13);
-  context.fillStyle = "#173a74";
-  context.fillRect(-width * 0.34, height * 0.08, width * 0.68, height * 0.12);
-  context.fillStyle = "#d74a3d";
-  context.beginPath();
-  context.arc(0, -height * 0.42, Math.max(0.9, width * 0.09), 0, Math.PI * 2);
-  context.fill();
+  context.strokeStyle = "#f4c522";
+  context.lineWidth = Math.max(1, width * 0.1);
+  context.stroke();
+
+  const windowCount = 6;
+  const windowHeight = height * 0.052;
+  for (let i = 0; i < windowCount; i += 1) {
+    const position = -height * 0.23 + i * height * 0.092;
+    context.fillStyle = i === 0 || i === windowCount - 1 ? "#8ac4ec" : "#e8c447";
+    context.fillRect(-width * 0.18, position, width * 0.36, windowHeight);
+  }
+
+  // Blauwe cabinekapjes en witte koplampjes maken de rijrichting ook op
+  // kleine schaal zichtbaar; de positie/rotatie zelf blijft uit de feed komen.
+  for (const end of [-1, 1]) {
+    roundRectPath(context, -width * 0.23, end * height * 0.3 - height * 0.045, width * 0.46, height * 0.09, width * 0.16);
+    context.fillStyle = "#0d2e68";
+    context.fill();
+    context.fillStyle = "#fff4c2";
+    context.beginPath();
+    context.arc(0, end * height * 0.33, Math.max(0.65, width * 0.055), 0, Math.PI * 2);
+    context.fill();
+  }
   context.restore();
 }
 
@@ -511,7 +535,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   useEffect(() => { displayTrainsRef.current = displayTrains; }, [displayTrains]);
   const searchResults = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return vehicles.slice(0, 12);
+    if (!needle) return vehiclesWithSearchData.slice(0, 12);
     return vehiclesWithSearchData.filter(vehicle =>
       vehicle.searchableTrainNumber.includes(needle) ||
       vehicle.searchableMaterialNumber.includes(needle) ||
@@ -678,18 +702,28 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   // Monitor selected train for delay notifications
   const lastDelayRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!notificationsEnabled || !observation || !journey || !("Notification" in window)) return;
+    if (!notificationsEnabled || !observation || !journey || !("Notification" in window)) {
+      lastDelayRef.current = null;
+      return;
+    }
     const nextStop = nextTrainStop(journey.stops, Date.now());
     const currentDelay = nextStop?.arrival.exactDelaySeconds ?? nextStop?.departure.exactDelaySeconds;
-    if (currentDelay != null && currentDelay >= 300 && Notification.permission === "granted") {
-      const notificationKey = `${observation.vehicleId}:${nextStop?.station.code}:${currentDelay}`;
-      if (lastDelayRef.current !== notificationKey) {
-        lastDelayRef.current = notificationKey;
-        new Notification("Vertraging", {
-          body: `Trein ${observation.trainNumber} heeft bij ${nextStop?.station.longName ?? "de volgende halte"} ${Math.round(currentDelay / 60)} minuten vertraging`,
-          icon: "/train-icon.png",
-        });
-      }
+    const notificationKey = delayNotificationKey(
+      observation.vehicleId,
+      nextStop?.station.code ?? null,
+      currentDelay ?? null,
+      Notification.permission === "granted",
+    );
+    if (!notificationKey) {
+      lastDelayRef.current = null;
+      return;
+    }
+    if (lastDelayRef.current !== notificationKey) {
+      lastDelayRef.current = notificationKey;
+      new Notification("Vertraging", {
+        body: `Trein ${observation.trainNumber} heeft bij ${nextStop?.station.longName ?? "de volgende halte"} ${Math.round((currentDelay ?? 0) / 60)} minuten vertraging`,
+        icon: "/train-icon.png",
+      });
     }
   }, [notificationsEnabled, observation, journey]);
 
@@ -1043,17 +1077,16 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
             context.clearRect(0, 0, width, height);
             const zoom = instance.getZoom();
-            const markerScale = zoom < 7 ? 0.48 : zoom < 8.5 ? 0.68 : zoom < 10.5 ? 0.86 : 1;
+            const markerScale = zoom < 7 ? 0.82 : zoom < 8.5 ? 0.9 : zoom < 10.5 ? 0.95 : 1;
             // Eenmaal per tekening lezen; window.innerWidth per trein opvragen
             // dwingt onnodige layoutberekeningen af in de renderloop.
             const viewportWidth = window.innerWidth;
-            // De bovenaanzicht-sprites zijn alleen nodig vanaf dit niveau;
-            // vraag ze lui aan zodat het landelijke overzicht niet wacht op
-            // PNG's die het toch niet tekent.
+            // Laad de lichte sprites zodra regionaal detail zichtbaar wordt;
+            // op lagere zoomniveaus blijft de compacte vectorfallback actief.
             if (zoom >= SPRITE_ZOOM) spriteLoaderRef.current();
             // Calculate responsiveMarkerScale once since it doesn't change during the loop
             const responsiveMarkerScale = zoom < 7
-              ? (viewportWidth >= 2200 ? 1.05 : viewportWidth >= 1400 ? 0.84 : 0.68)
+              ? (viewportWidth >= 2200 ? 1 : viewportWidth >= 1400 ? 0.88 : 0.82)
               : markerScale;
             // Stationpunten gebruiken dezelfde lichte canvaslaag als de treinen.
             // Tekenen vóór de treinen houdt de vloot zichtbaar en aanklikbaar.

@@ -23,15 +23,35 @@ function Icon({ name }: { name: IconName }) {
 export function SettingsScreen() {
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
+  const copy = language === "en" ? {
+    nav: "Main navigation", trains: "Trains", notifications: "Notifications", settings: "Settings",
+    intro: "Adjust LiveOpWeg to suit you. Choose map layers directly on each map.",
+    appearance: "Appearance", appearanceDetail: "Adjust how the site looks.", theme: "Color theme", savedDevice: "This choice is saved on this device.",
+    light: "Light", dark: "Dark", languageTitle: "Language", languageDetail: "Choose the language used across the interface.", interface: "Interface",
+    browserNotifications: "Browser notifications", browserNotificationsDetail: "Only for delays affecting the train you select.", delayNotifications: "Delay alerts", browserPermission: "Your browser may ask for permission first.",
+    mapsFilters: "Maps and filters", mapsDetail: "Each map has the layers relevant to it.", trainMap: "Train map", trainMapDetail: "Trains, stations and tracks →", alertsMap: "Alerts map", alertsMapDetail: "Traffic, incidents and roadworks →",
+    notificationsOff: "Browser alerts for selected trains are off.", unsupported: "This browser does not support notifications.", permission: "Allow LiveOpWeg in your browser settings to receive notifications.", notificationsOn: "Delay alerts for your selected train are on.", storageError: "The browser cannot save this setting right now. You can keep using LiveOpWeg without notifications.",
+  } : {
+    nav: "Hoofdnavigatie", trains: "Treinen", notifications: "Meldingen", settings: "Instellingen",
+    intro: "Pas LiveOpWeg aan zoals jij het graag gebruikt. Kies kaartlagen direct op elke kaart.",
+    appearance: "Weergave", appearanceDetail: "Pas het uiterlijk van de site aan.", theme: "Kleurthema", savedDevice: "Deze keuze wordt op dit apparaat bewaard.",
+    light: "Licht", dark: "Donker", languageTitle: "Taal", languageDetail: "Kies de taal voor de interface.", interface: "Interface",
+    browserNotifications: "Browsermeldingen", browserNotificationsDetail: "Alleen voor vertraging van de trein die je selecteert.", delayNotifications: "Vertragingsmeldingen", browserPermission: "Je browser vraagt mogelijk eerst om toestemming.",
+    mapsFilters: "Kaarten en filters", mapsDetail: "Elke kaart heeft de lagen die daar relevant zijn.", trainMap: "Treinenkaart", trainMapDetail: "Treinen, stations en sporen →", alertsMap: "Meldingenkaart", alertsMapDetail: "Verkeer, incidenten en werkzaamheden →",
+    notificationsOff: "Browsermeldingen voor geselecteerde treinen staan uit.", unsupported: "Deze browser ondersteunt geen meldingen.", permission: "Geef LiveOpWeg toestemming in je browserinstellingen om meldingen te ontvangen.", notificationsOn: "Meldingen over vertraging bij je geselecteerde trein staan aan.", storageError: "De browser kan deze meldingsinstelling nu niet opslaan. Je kunt LiveOpWeg blijven gebruiken zonder meldingen.",
+  };
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
 
   useEffect(() => {
-    try {
-      setNotificationsEnabled(window.localStorage.getItem("liveopweg-notifications") === "on");
-    } catch {
-      setNotificationsEnabled(false);
-    }
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        setNotificationsEnabled(window.localStorage.getItem("liveopweg-notifications") === "on");
+      } catch {
+        setNotificationsEnabled(false);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   async function updateNotifications() {
@@ -39,50 +59,50 @@ export function SettingsScreen() {
       if (notificationsEnabled) {
         window.localStorage.setItem("liveopweg-notifications", "off");
         setNotificationsEnabled(false);
-        setNotificationMessage("Browsermeldingen voor geselecteerde treinen staan uit.");
+        setNotificationMessage(copy.notificationsOff);
         return;
       }
       if (!("Notification" in window)) {
-        setNotificationMessage("Deze browser ondersteunt geen meldingen.");
+        setNotificationMessage(copy.unsupported);
         return;
       }
       const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
       if (permission !== "granted") {
-        setNotificationMessage("Geef LiveOpWeg toestemming in je browserinstellingen om meldingen te ontvangen.");
+        setNotificationMessage(copy.permission);
         return;
       }
       window.localStorage.setItem("liveopweg-notifications", "on");
       setNotificationsEnabled(true);
-      setNotificationMessage("Meldingen over vertraging bij je geselecteerde trein staan aan.");
+      setNotificationMessage(copy.notificationsOn);
     } catch {
-      setNotificationMessage("De browser kan deze meldingsinstelling nu niet opslaan. Je kunt LiveOpWeg blijven gebruiken zonder meldingen.");
+      setNotificationMessage(copy.storageError);
     }
   }
 
   return <main className="settingsPage">
-    <aside className="settingsSidebar" aria-label="Hoofdnavigatie">
+    <aside className="settingsSidebar" aria-label={copy.nav}>
       <Link className="settingsBrand" href="/" aria-label="LiveOpWeg startpagina"><Image src="/liveopweg-logo.png" alt="LiveOpWeg" width={925} height={195} priority /></Link>
       <nav className="settingsNav">
-        <Link href="/"><Icon name="train" /><span>Treinen</span></Link>
-        <Link href="/meldingen"><Icon name="bell" /><span>Meldingen</span></Link>
-        <Link href="/instellingen" className="active" aria-current="page"><Icon name="settings" /><span>Instellingen</span></Link>
+        <Link href="/"><Icon name="train" /><span>{copy.trains}</span></Link>
+        <Link href="/meldingen"><Icon name="bell" /><span>{copy.notifications}</span></Link>
+        <Link href="/instellingen" className="active" aria-current="page"><Icon name="settings" /><span>{copy.settings}</span></Link>
       </nav>
       <small>{t("settings.always_on_way")}</small>
     </aside>
     <div className="settingsMain">
-      <header className="settingsIntro"><span>LiveOpWeg</span><h1>Instellingen</h1><p>Pas de site aan zoals jij hem graag gebruikt. Je kaartlagen kies je direct op de betreffende kaart.</p></header>
+      <header className="settingsIntro"><span>LiveOpWeg</span><h1>{copy.settings}</h1><p>{copy.intro}</p></header>
       <div className="settingsGrid">
-        <section className="settingsCard"><div className="settingsCardHeading"><span className="settingsCardIcon"><Icon name="sun" /></span><div><h2>Weergave</h2><p>Pas het uiterlijk van de site aan.</p></div></div>
-          <div className="settingsRow"><div><strong>Kleurthema</strong><small>De instelling wordt op dit apparaat bewaard.</small></div><div className="settingsChoices" role="group" aria-label="Kleurthema"><button type="button" className={theme === "light" ? "selected" : ""} aria-pressed={theme === "light"} onClick={() => { if (theme !== "light") toggleTheme(); }}>Licht</button><button type="button" className={theme === "dark" ? "selected" : ""} aria-pressed={theme === "dark"} onClick={() => { if (theme !== "dark") toggleTheme(); }}>Donker</button></div></div>
+        <section className="settingsCard"><div className="settingsCardHeading"><span className="settingsCardIcon"><Icon name="sun" /></span><div><h2>{copy.appearance}</h2><p>{copy.appearanceDetail}</p></div></div>
+          <div className="settingsRow"><div><strong>{copy.theme}</strong><small>{copy.savedDevice}</small></div><div className="settingsChoices" role="group" aria-label={copy.theme}><button type="button" className={theme === "light" ? "selected" : ""} aria-pressed={theme === "light"} onClick={() => { if (theme !== "light") toggleTheme(); }}>{copy.light}</button><button type="button" className={theme === "dark" ? "selected" : ""} aria-pressed={theme === "dark"} onClick={() => { if (theme !== "dark") toggleTheme(); }}>{copy.dark}</button></div></div>
         </section>
-        <section className="settingsCard"><div className="settingsCardHeading"><span className="settingsCardIcon"><Icon name="globe" /></span><div><h2>Taal</h2><p>Voor de beschikbare vertalingen in de app.</p></div></div>
-          <div className="settingsRow"><div><strong>Interface</strong><small>Je keuze blijft bewaard op dit apparaat.</small></div><div className="settingsChoices" role="group" aria-label="Taal"><button type="button" className={language === "nl" ? "selected" : ""} aria-pressed={language === "nl"} onClick={() => setLanguage("nl")}>Nederlands</button><button type="button" className={language === "en" ? "selected" : ""} aria-pressed={language === "en"} onClick={() => setLanguage("en")}>English</button></div></div>
+        <section className="settingsCard"><div className="settingsCardHeading"><span className="settingsCardIcon"><Icon name="globe" /></span><div><h2>{copy.languageTitle}</h2><p>{copy.languageDetail}</p></div></div>
+          <div className="settingsRow"><div><strong>{copy.interface}</strong><small>{copy.savedDevice}</small></div><div className="settingsChoices" role="group" aria-label={copy.languageTitle}><button type="button" className={language === "nl" ? "selected" : ""} aria-pressed={language === "nl"} onClick={() => setLanguage("nl")}>Nederlands</button><button type="button" className={language === "en" ? "selected" : ""} aria-pressed={language === "en"} onClick={() => setLanguage("en")}>English</button></div></div>
         </section>
-        <section className="settingsCard"><div className="settingsCardHeading"><span className="settingsCardIcon"><Icon name="bell" /></span><div><h2>Browsermeldingen</h2><p>Alleen voor vertraging van de trein die je selecteert.</p></div></div>
-          <div className="settingsRow"><div><strong>Vertragingsmeldingen</strong><small>Je browser vraagt mogelijk eerst om toestemming.</small></div><button className={`settingsSwitch ${notificationsEnabled ? "on" : ""}`} type="button" role="switch" aria-checked={notificationsEnabled} onClick={updateNotifications}><span /></button></div>
+        <section className="settingsCard"><div className="settingsCardHeading"><span className="settingsCardIcon"><Icon name="bell" /></span><div><h2>{copy.browserNotifications}</h2><p>{copy.browserNotificationsDetail}</p></div></div>
+          <div className="settingsRow"><div><strong>{copy.delayNotifications}</strong><small>{copy.browserPermission}</small></div><button className={`settingsSwitch ${notificationsEnabled ? "on" : ""}`} type="button" role="switch" aria-checked={notificationsEnabled} onClick={updateNotifications}><span /></button></div>
           {notificationMessage && <p className="settingsFeedback" role="status">{notificationMessage}</p>}
         </section>
-        <section className="settingsCard settingsCardLinks"><div className="settingsCardHeading"><span className="settingsCardIcon"><Icon name="map" /></span><div><h2>Kaarten en filters</h2><p>Elke kaart heeft alleen de lagen die daar relevant zijn.</p></div></div><div className="settingsLinks"><Link href="/">Treinenkaart <span>Treinen, stations en sporen →</span></Link><Link href="/meldingen">Meldingenkaart <span>Files, incidenten en werkzaamheden →</span></Link></div></section>
+        <section className="settingsCard settingsCardLinks"><div className="settingsCardHeading"><span className="settingsCardIcon"><Icon name="map" /></span><div><h2>{copy.mapsFilters}</h2><p>{copy.mapsDetail}</p></div></div><div className="settingsLinks"><Link href="/">{copy.trainMap} <span>{copy.trainMapDetail}</span></Link><Link href="/meldingen">{copy.alertsMap} <span>{copy.alertsMapDetail}</span></Link></div></section>
       </div>
     </div>
   </main>;
