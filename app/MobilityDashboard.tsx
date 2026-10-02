@@ -975,15 +975,29 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           type: "geojson",
           data: realtimeHttpUrl("/v1/geometry/rail"),
         });
+        // Draw a light casing first so official rail geometry remains legible
+        // on every basemap, then render the requested black track line above it.
+        instance.addLayer({
+          id: "pdok-rail-geometry-casing",
+          type: "line",
+          source: "pdok-rail-geometry",
+          minzoom: 4,
+          paint: {
+            "line-color": "#fffdf8",
+            "line-width": ["interpolate", ["linear"], ["zoom"], 4, 1.6, 6, 2, 9, 3.1, 12, 4.5, 16, 6.8],
+            "line-opacity": 0.94,
+          },
+          layout: { "line-cap": "round", "line-join": "round" },
+        }, "rail-fleet-points");
         instance.addLayer({
           id: "pdok-rail-geometry-lines",
           type: "line",
           source: "pdok-rail-geometry",
-          minzoom: 5,
+          minzoom: 4,
           paint: {
-            "line-color": "#15191d",
-            "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.85, 8, 1.35, 12, 2.4, 16, 3.2],
-            "line-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.78, 8, 0.9, 12, 0.97],
+            "line-color": "#111820",
+            "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.85, 6, 1.15, 9, 1.8, 12, 2.8, 16, 4.7],
+            "line-opacity": 1,
           },
           layout: { "line-cap": "round", "line-join": "round" },
         }, "rail-fleet-points");
@@ -1376,7 +1390,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       }
     };
     setVisibility(["rail-fleet-points", "rail-fleet-selected"], mapLayers.trains);
-    setVisibility(["pdok-rail-geometry-lines"], mapLayers.railways);
+    setVisibility(["pdok-rail-geometry-casing", "pdok-rail-geometry-lines"], mapLayers.railways);
     setVisibility(["rail-level-crossing-badges", "rail-level-crossing-symbols"], mapLayers.crossings);
   }, [mapLayers, mapReady]);
 
