@@ -17,7 +17,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://liveopweg.nl";
+function getSiteUrl(): URL {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (configured) {
+    try {
+      const parsed = new URL(configured);
+      if (parsed.protocol === "https:" || parsed.protocol === "http:") return parsed;
+    } catch {
+      // Fall back to the production origin when an environment value is malformed.
+    }
+  }
+  return new URL("https://liveopweg.nl");
+}
+
+const siteUrl = getSiteUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -41,7 +54,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "nl_NL",
-    url: siteUrl,
+    url: siteUrl.toString(),
     siteName: "Liveopweg",
     title: "Live treinlocaties in Nederland",
     description: "Volg actuele treinposities, stations en vertragingen op een live kaart.",
