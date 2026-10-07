@@ -118,6 +118,45 @@
   }
 }
 
+/* Prevent narrow desktop/tablet sidebars from breaking labels into one
+   character per line when the browser is zoomed. */
+@media (min-width:901px) {
+  .trainPage .topbar {
+    width:var(--radar-sidebar);
+    right:auto;
+    inset-block:0;
+    inset-inline-start:0;
+    padding:17px 0;
+    border-radius:0;
+    flex-direction:column;
+    align-items:stretch;
+    justify-content:flex-start;
+  }
+  .trainPage .sideNav {
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .trainPage .sideNav a,
+  .trainPage .sideNav button {
+    white-space:nowrap;
+  }
+  .trainPage .sideNav a > span:last-child,
+  .trainPage .sideNav button > span:last-child {
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+}
+
+@media (max-width:900px) {
+  .trainPage .sideNav > a > span:last-child {
+    max-width:none;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+}
+
 /* Quiet visual hierarchy: one surface language for the map controls and
    panels, with less shadow and less competing color. */
 .topbar {

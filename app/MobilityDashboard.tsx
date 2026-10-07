@@ -1300,7 +1300,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
             context.clearRect(0, 0, width, height);
             const zoom = instance.getZoom();
-            const markerScale = zoom < 7 ? 0.82 : zoom < 8.5 ? 0.9 : zoom < 10.5 ? 0.95 : 1;
+            const markerScale = zoom < 7 ? 0.68 : zoom < 8.5 ? 0.86 : zoom < 10.5 ? 0.95 : 1;
             // Eenmaal per tekening lezen; window.innerWidth per trein opvragen
             // dwingt onnodige layoutberekeningen af in de renderloop.
             const viewportWidth = window.innerWidth;
@@ -1309,7 +1309,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             if (zoom >= SPRITE_ZOOM) spriteLoaderRef.current();
             // Calculate responsiveMarkerScale once since it doesn't change during the loop
             const responsiveMarkerScale = zoom < 7
-              ? (viewportWidth >= 2200 ? 1 : viewportWidth >= 1400 ? 0.88 : 0.82)
+              ? (viewportWidth >= 2200 ? 0.82 : viewportWidth >= 1400 ? 0.72 : 0.66)
               : markerScale;
             // Stationpunten gebruiken dezelfde lichte canvaslaag als de treinen.
             // Tekenen vóór de treinen houdt de vloot zichtbaar en aanklikbaar.
