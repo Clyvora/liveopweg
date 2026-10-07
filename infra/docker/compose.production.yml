@@ -50,7 +50,7 @@ services:
       context: ../..
       dockerfile: infra/docker/Dockerfile
       target: realtime
-    command: ["sh", "-c", "npm run rail:import-geometry && npm run rail:audit-graph && npm run station3d:build"]
+    command: ["sh", "-c", "npm run rail:import-geometry && npm run rail:audit-graph"]
     environment:
       MOBILITYRADAR_DATA_DIR: /app/var
     volumes:

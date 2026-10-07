@@ -28,8 +28,6 @@
   ],
   "exclude": [
     "node_modules",
-    "workers",
-    "packages/domain-rail/station-3d.test.ts",
-    "packages/domain-rail/station-bundle.ts"
+    "workers"
   ]
 }

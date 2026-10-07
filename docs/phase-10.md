@@ -5,7 +5,6 @@
 Fase 10 maakt twee eerdere keuzes herbruikbaar zonder nieuwe feiten te verzinnen:
 
 - een trein kan over maximaal twee uur worden teruggekeken vanuit de exact opgeslagen, gehashte NDOV-bronberichten;
-- dezelfde 3D-stationketen werkt voor Utrecht Centraal, Amsterdam Centraal en Rotterdam Centraal.
 
 Replay is nadrukkelijk geen livebeeld. De interface toont het oorspronkelijke GPS-bronpunt en een opnieuw berekende spoorpositie afzonderlijk. Renderstate wordt niet opgeslagen of als historisch feit gepresenteerd.
 
@@ -31,18 +30,6 @@ Elke response vermeldt:
 Een aanvraag is begrensd op twee uur, 900 bronberichten en 2.000 frames. Tijdens omvangrijke reconstructies geeft de worker periodiek tijd terug aan de live-eventloop. De UI speelt GPS-tijd af op 0,5×, 1×, 2× of 4× en tekent bronspoor, actueel bronpunt en herberekend matchpunt als drie onderscheiden elementen.
 
 De huidige history-slice bevat positie, snelheid, bronkwaliteit, herkomst en opnieuw berekende route over de spoorgraph. Vertraging-over-tijd en volledige historische ritmutaties zijn nog niet toegevoegd: InfoPlus-ritten worden wel raw opgeslagen, maar de replaykoppeling daarvan vraagt een apart versiecontract.
-
-## Drie stations, één keten
-
-`station3d:build` bouwt drie bundles uit dezelfde landelijke ProRail-graph en per station een actuele BGT-snapshot:
-
-| Station | Officiële feature-id | Railcurves | Actuele perronobjecten |
-|---|---:|---:|---:|
-| Utrecht Centraal | `09f03bdc-2bcd-5640-aaa4-d8b65408cd11` | 439 | 22 |
-| Amsterdam Centraal | `0a743f44-b7b1-58df-bb0b-17bcac293349` | 632 | 21 |
-| Rotterdam Centraal | `6b12b5c0-1c77-5ec7-9147-c4323bdacb86` | 317 | 16 |
-
-De aantallen zijn gemeten op 21 augustus 2026 en horen bij de vastgelegde bronversies in iedere bundle. De UI wisselt station zonder een tweede renderimplementatie; de oude WebGL- en tile-state wordt bij iedere wissel opgeruimd.
 
 Materieel wordt nog steeds als één neutrale unit getoond. De publieke positie-envelope bevat een materieelnummer, maar geen bewezen type, baklengtes of samenstelling. Ook worden geen andere vervoerders toegevoegd: de gebruikte positie-interface is NS-specifiek. Daarmee voorkomt Fase 10 dat vormgeving of operatorlabels als bronfeit gaan ogen.
 

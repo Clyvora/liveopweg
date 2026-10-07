@@ -30,7 +30,7 @@ import { stationCatalogSchema } from "../packages/protocol/station-catalog";
 import { StationPanel } from "./StationPanel";
 import { TrainPanel, nextTrainStop } from "./TrainPanel";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
-import { JourneyPlanner } from "./JourneyPlanner";
+import { JourneyPlanner, type FollowedRoute } from "./JourneyPlanner";
 import { DelayStats } from "./DelayStats";
 import { delayNotificationKey } from "./delay-notification";
 import { useTheme } from "./ThemeContext";
@@ -182,6 +182,42 @@ function roadEventBadge(event: RoadEvent): string {
   if (event.queueLengthMeters !== null) return `${(event.queueLengthMeters / 1_000).toLocaleString("nl-NL", { maximumFractionDigits: 1 })} km`;
   if (event.temporarySpeedLimitKmh !== null) return `${event.temporarySpeedLimitKmh} km/h`;
   return event.status === "PLANNED" ? "Gepland" : "Actief";
+}
+
+function roadEventStatusLabel(event: RoadEvent): string {
+  if (event.status === "PLANNED") return "Gepland";
+  if (event.status === "ACTIVE") return "Actief";
+  if (event.status === "STALE") return "Niet recent";
+  return "Beëindigd";
+}
+
+function roadEventDetail(event: RoadEvent): string {
+  if (event.delaySeconds !== null) return `${Math.max(1, Math.round(event.delaySeconds / 60))} min extra reistijd`;
+  if (event.queueLengthMeters !== null) return `${(event.queueLengthMeters / 1_000).toLocaleString("nl-NL", { maximumFractionDigits: 1 })} km vertraging`;
+  if (event.temporarySpeedLimitKmh !== null) return `Tijdelijke limiet ${event.temporarySpeedLimitKmh} km/u`;
+  return event.detailType;
+}
+
+function isCurrentRoadEvent(event: RoadEvent): boolean {
+  return event.status === "ACTIVE" || event.status === "PLANNED";
+}
+
+function roadEventPriority(event: RoadEvent): number {
+  const severity = event.severity.toLowerCase();
+  const severityScore = severity.includes("high") || severity.includes("hoog") || severity.includes("critical") ? 3 : severity.includes("medium") || severity.includes("gemiddeld") ? 2 : 1;
+  const impactScore = event.type === "closure" || event.type === "accident" ? 3 : event.type === "incident" || event.type === "congestion" ? 2 : 1;
+  return severityScore + impactScore + (event.safetyRelated ? 1 : 0);
+}
+
+function deduplicateRoadEvents(events: RoadEvent[]): RoadEvent[] {
+  const latestBySituation = new Map<string, RoadEvent>();
+  for (const event of events) {
+    const current = latestBySituation.get(event.situationId);
+    const eventTime = parseTimestamp(event.time.sourceUpdatedAt ?? event.time.publicationTime) ?? 0;
+    const currentTime = current ? parseTimestamp(current.time.sourceUpdatedAt ?? current.time.publicationTime) ?? 0 : -1;
+    if (!current || eventTime >= currentTime) latestBySituation.set(event.situationId, event);
+  }
+  return [...latestBySituation.values()];
 }
 
 
@@ -435,7 +471,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const selectedStationRef = useRef<RailStation | null>(null);
   const [stationCatalog, setStationCatalog] = useState<RailStation[]>(railStations);
   const [stationCatalogFetchedAt, setStationCatalogFetchedAt] = useState<string | null>(null);
-  const [stationCatalogResolved, setStationCatalogResolved] = useState(false);
+  const [stationCatalogResolved, setStationCatalogResolved] = useState(isAlertsPage);
   const stationCatalogRef = useRef<RailStation[]>(railStations);
   const stationDirectory = useMemo(() => new Map(stationCatalog.map((station) => [station.code.toUpperCase(), station])), [stationCatalog]);
   useEffect(() => {
@@ -443,7 +479,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     overlayRenderRef.current?.();
   }, [stationCatalog]);
   useEffect(() => {
-    if (isAlertsPage) { setStationCatalogResolved(true); return; }
+    if (isAlertsPage) return;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8_000);
     void fetch(realtimeHttpUrl("/v1/stations/catalog"), { signal: controller.signal })
@@ -458,11 +494,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       .finally(() => { window.clearTimeout(timeout); setStationCatalogResolved(true); });
     return () => { controller.abort(); window.clearTimeout(timeout); };
   }, [isAlertsPage]);
-  useEffect(() => {
-    if (!selectedStation) return;
-    const current = stationDirectory.get(selectedStation.code.toUpperCase());
-    if (current && current !== selectedStation) setSelectedStation(current);
-  }, [selectedStation, stationDirectory]);
   const [vehiclesById, setVehiclesById] = useState<Record<string, RailObservation>>({});
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [observation, setObservation] = useState<RailObservation | null>(null);
@@ -483,6 +514,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const [selectedRoadEventId, setSelectedRoadEventId] = useState<string | null>(null);
   const [showLayers, setShowLayers] = useState(false);
   const [showJourneyPlanner, setShowJourneyPlanner] = useState(false);
+  const [followedRoute, setFollowedRoute] = useState<FollowedRoute | null>(null);
+  const [positionHistory, setPositionHistory] = useState<Array<{ at: number; latitude: number; longitude: number }>>([]);
   const [showDelayStats, setShowDelayStats] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   // Houd de meldingenstand in sync met de instellingenpagina, zodat de twee
@@ -507,7 +540,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const mapLayersRef = useRef(mapLayers);
   useEffect(() => { mapLayersRef.current = mapLayers; }, [mapLayers]);
   const [roadLayers, setRoadLayers] = useState<Record<RoadLayerKey, boolean>>({
-    congestion: isAlertsPage, incidents: isAlertsPage, roadworks: isAlertsPage, closures: isAlertsPage, safety: isAlertsPage,
+    congestion: isAlertsPage, incidents: isAlertsPage, roadworks: false, closures: isAlertsPage, safety: false,
   });
 
   useEffect(() => {
@@ -575,6 +608,19 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     [displayTrains],
   );
   useEffect(() => { displayTrainsRef.current = displayTrains; }, [displayTrains]);
+  useEffect(() => {
+    if (!selectedVehicleId) return;
+    const current = displayTrains.find(train => train.observation.vehicleId === selectedVehicleId);
+    if (!current) return;
+    const timer = window.setTimeout(() => {
+      setPositionHistory(history => {
+        const last = history.at(-1);
+        if (last && Date.now() - last.at < 15_000) return history;
+        return [...history, { at: Date.now(), latitude: current.position.latitude, longitude: current.position.longitude }].slice(-12);
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [displayTrains, selectedVehicleId]);
   const searchResults = useMemo(() => {
     const needle = normalizeSearchText(query);
     if (!needle) return vehiclesWithSearchData.slice(0, 12);
@@ -596,11 +642,14 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     .sort((left, right) => left.distance - right.distance).slice(0, 4) : [], [displayTrains, userLocation]);
   const availableVehicleIds = useMemo(() => new Set(vehicles.map((vehicle) => vehicle.vehicleId)), [vehicles]);
   const roadEvents = useMemo(() => Object.values(roadEventsById), [roadEventsById]);
-  const recentRoadEvents = useMemo(() => roadEvents.filter((event) => roadLayers[roadLayerFor(event)]).toSorted((left, right) => {
+  const currentRoadEvents = useMemo(() => deduplicateRoadEvents(roadEvents.filter(isCurrentRoadEvent)), [roadEvents]);
+  const recentRoadEvents = useMemo(() => currentRoadEvents.filter((event) => roadLayers[roadLayerFor(event)]).toSorted((left, right) => {
+    const priorityDifference = roadEventPriority(right) - roadEventPriority(left);
+    if (priorityDifference !== 0) return priorityDifference;
     const leftTime = parseTimestamp(left.time.sourceUpdatedAt ?? left.time.publicationTime) ?? 0;
     const rightTime = parseTimestamp(right.time.sourceUpdatedAt ?? right.time.publicationTime) ?? 0;
     return rightTime - leftTime;
-  }).slice(0, isAlertsPage ? 100 : 5), [roadEvents, roadLayers, isAlertsPage]);
+  }).slice(0, isAlertsPage ? 100 : 5), [currentRoadEvents, roadLayers, isAlertsPage]);
   const selectedRoadEvent = selectedRoadEventId ? roadEventsById[selectedRoadEventId] ?? null : null;
   useEffect(() => {
     if (!isAlertsPage || !selectedRoadEvent || !map.current) return;
@@ -611,14 +660,15 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     if (coordinate) map.current.flyTo({ center: coordinate, zoom: Math.max(map.current.getZoom(), 10), duration: 650, essential: true });
   }, [isAlertsPage, selectedRoadEvent]);
   const roadCounts = useMemo(() => Object.fromEntries(roadLayerDefinitions.map(({ key }) => [
-    key, roadEvents.filter((event) => roadLayerFor(event) === key).length,
-  ])) as Record<RoadLayerKey, number>, [roadEvents]);
+    key, currentRoadEvents.filter((event) => roadLayerFor(event) === key).length,
+  ])) as Record<RoadLayerKey, number>, [currentRoadEvents]);
 
   const selectVehicle = useCallback((vehicleId: string, focusMap = true) => {
     const selected = vehiclesById[vehicleId];
     if (!selected) return;
     setSelectedStation(null);
     setSelectedVehicleId(vehicleId);
+    setPositionHistory([]);
     setIsFollowingTrain(false);
     setNearbyOpen(false);
     selectedVehicleIdRef.current = vehicleId;
@@ -647,6 +697,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const clearVehicleSelection = useCallback(() => {
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ protocolVersion: 2, type: "deselect" }));
     setSelectedVehicleId(null);
+    setPositionHistory([]);
     setIsFollowingTrain(false);
     selectedVehicleIdRef.current = null;
     setObservation(null);
@@ -852,6 +903,9 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     setShowDelayStats(false);
     setShowLayers(false);
   }, [clearVehicleSelection]);
+  const updateFollowedRoute = useCallback((route: FollowedRoute | null) => {
+    setFollowedRoute(route);
+  }, []);
 
   const openDelayStats = useCallback(() => {
     clearVehicleSelection();
@@ -910,15 +964,25 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           return nearest?.station;
         };
         let hoveredStationCode: string | null = null;
-        instance.on("mousemove", (event) => {
-          const station = stationAtPoint(event.point);
+        let hoverFrame = 0;
+        let pendingHoverPoint: { x: number; y: number } | null = null;
+        const updateStationHover = () => {
+          hoverFrame = 0;
+          if (!pendingHoverPoint) return;
+          const station = stationAtPoint(pendingHoverPoint);
+          pendingHoverPoint = null;
           if ((station?.code ?? null) === hoveredStationCode) return;
           hoveredStationCode = station?.code ?? null;
           if (station) {
             instance.getCanvas().style.cursor = "pointer";
             stationPopup.setLngLat([station.longitude, station.latitude]).setText(station.name).addTo(instance);
           } else { instance.getCanvas().style.cursor = ""; stationPopup.remove(); }
-        });
+        };
+        const handleStationMouseMove = (event: { point: { x: number; y: number } }) => {
+          pendingHoverPoint = event.point;
+          if (!hoverFrame) hoverFrame = window.requestAnimationFrame(updateStationHover);
+        };
+        instance.on("mousemove", handleStationMouseMove);
         instance.getCanvas().addEventListener("mouseleave", () => { hoveredStationCode = null; stationPopup.remove(); });
         instance.addSource("rail-fleet", {
           type: "geojson",
@@ -1390,8 +1454,14 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       }
     };
     setVisibility(["rail-fleet-points", "rail-fleet-selected"], mapLayers.trains);
-    setVisibility(["pdok-rail-geometry-casing", "pdok-rail-geometry-lines"], mapLayers.railways);
-    setVisibility(["rail-level-crossing-badges", "rail-level-crossing-symbols"], mapLayers.crossings);
+    const applyZoomDensity = () => {
+      const zoom = instance.getZoom();
+      setVisibility(["pdok-rail-geometry-casing", "pdok-rail-geometry-lines"], mapLayers.railways && zoom >= 6);
+      setVisibility(["rail-level-crossing-badges", "rail-level-crossing-symbols"], mapLayers.crossings && zoom >= 8);
+    };
+    applyZoomDensity();
+    instance.on("zoomend", applyZoomDensity);
+    return () => { instance.off("zoomend", applyZoomDensity); };
   }, [mapLayers, mapReady]);
 
   useEffect(() => {
@@ -1415,7 +1485,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     const instance = map.current;
     if (!mapReady || !instance) return;
     for (const layer of roadLayerDefinitions) {
-      const matching = roadEvents.filter((event) => roadLayerFor(event) === layer.key);
+      const matching = currentRoadEvents.filter((event) => roadLayerFor(event) === layer.key);
       const features = matching.map((event) => ({
         type: "Feature" as const,
         id: event.id,
@@ -1448,7 +1518,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         properties: { eventId: selectedRoadEvent.id },
       }] : [],
     });
-  }, [mapReady, roadEvents, roadLayers, selectedRoadEvent]);
+  }, [currentRoadEvents, mapReady, roadLayers, selectedRoadEvent]);
 
   useEffect(() => {
     let socket: WebSocket | null = null;
@@ -1643,11 +1713,12 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
 
       {isAlertsPage && <aside className="railAlertsPanel liveFeedPanel open" aria-label="Actuele meldingen">
         <div className="railAlertsHeader liveFeedHeader">
-          <div><span className="railAlertsKicker">Live overzicht</span><strong>Actuele meldingen</strong></div>
-          <div className="liveFeedHeaderActions"><span className="railAlertCount">{roadEvents.length.toLocaleString("nl-NL")}</span></div>
+          <div><span className="railAlertsKicker">Alleen relevant</span><strong>Actuele meldingen</strong></div>
+          <div className="liveFeedHeaderActions"><span className="railAlertCount">{currentRoadEvents.length.toLocaleString("nl-NL")}</span></div>
         </div>
         <div className="alertFilterSection" aria-label="Filter meldingen">
-          <strong>Toon op de kaart</strong>
+          <strong>Belangrijkste meldingen</strong>
+          <p className="alertFilterHint">Files, incidenten en afsluitingen staan standaard aan. Werkzaamheden en veiligheidsmeldingen kun je zelf inschakelen.</p>
           <div className="alertFilterGrid">
             {roadLayerDefinitions.map((layer) => <label key={layer.key} className={roadLayers[layer.key] ? "selected" : ""} style={{ "--road-color": layer.color } as React.CSSProperties}>
               <input type="checkbox" checked={roadLayers[layer.key]} onChange={(event) => setRoadLayers((current) => ({ ...current, [layer.key]: event.target.checked }))} />
@@ -1658,7 +1729,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           </div>
         </div>
         <div className="networkSummary" aria-label="Landelijk live-overzicht">
-          <div><strong>{roadEvents.length}</strong><span>wegmeldingen</span></div>
+          <div><strong>{currentRoadEvents.length}</strong><span>actuele meldingen</span></div>
           <div><strong>{roadCounts.incidents + roadCounts.closures}</strong><span>ernstige meldingen</span></div>
           <div><strong className={connection === "live" ? "statusLive" : ""}>{connection === "live" ? "Live" : "Wachten"}</strong><span>gegevensfeed</span></div>
         </div>
@@ -1670,16 +1741,17 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           </a>}
           {recentRoadEvents.map((roadEvent) => <button className={`liveFeedItem ${roadLayerFor(roadEvent)} ${selectedRoadEventId === roadEvent.id ? "selected" : ""}`} type="button" key={roadEvent.id} onClick={() => setSelectedRoadEventId(roadEvent.id)}>
             <span className="feedIcon"><UiIcon name={roadLayerIcon(roadLayerFor(roadEvent))} /></span>
-            <span className="feedCopy"><strong>{roadEventTitle(roadEvent)}</strong><small>{roadEvent.direction ?? roadEvent.description ?? roadEvent.detailType}</small></span>
+            <span className="feedCopy"><strong>{roadEventTitle(roadEvent)}</strong><small>{roadEvent.direction ?? roadEventDetail(roadEvent)}</small></span>
             <b>{roadEventBadge(roadEvent)}</b><span className="feedArrow"><UiIcon name="chevron" /></span>
           </button>)}
         </div>
         {selectedRoadEvent && <article className="liveFeedDetail">
           <button className="feedDetailClose" type="button" onClick={() => setSelectedRoadEventId(null)} aria-label="Sluit melding">×</button>
-          <span className="detailEyebrow">{roadEventLabel(selectedRoadEvent)} · live</span>
+          <span className="detailEyebrow">{roadEventLabel(selectedRoadEvent)} · {roadEventStatusLabel(selectedRoadEvent)}</span>
           <h2>{roadEventTitle(selectedRoadEvent)}</h2>
-          <p>{selectedRoadEvent.description ?? `${selectedRoadEvent.detailType}. Geen extra publieksinformatie meegeleverd.`}</p>
-          <div><span>{selectedRoadEvent.direction ?? "Richting onbekend"}</span><strong>{roadEventBadge(selectedRoadEvent)}</strong></div>
+          <p>{selectedRoadEvent.description ?? `${roadEventDetail(selectedRoadEvent)}.`}</p>
+          <div><span>{selectedRoadEvent.direction ?? "Richting onbekend"} · {selectedRoadEvent.source}</span><strong>{roadEventBadge(selectedRoadEvent)}</strong></div>
+          <small className="feedUpdated">Bijgewerkt {formatJourneyClock(selectedRoadEvent.time.sourceUpdatedAt ?? selectedRoadEvent.time.publicationTime)}</small>
         </article>}
         {!selectedRoadEvent && strikeIsActive && <article className="liveFeedDetail strikeDetail">
           <span className="detailEyebrow">NS · landelijke impact</span>
@@ -1802,6 +1874,9 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
               <span>{language === "nl" ? "EN" : "NL"}</span>
             </button>
           </div>
+          {!isAlertsPage && followedRoute && <button className="followedRouteBadge" type="button" onClick={openJourneyPlanner} aria-label="Open gevolgde route">
+            <span><UiIcon name="train" /> Route volgen</span><strong>{followedRoute.originName} → {followedRoute.destinationName}</strong>
+          </button>}
           <div className="mapZoomControls" aria-label="Kaartzoom">
             <button type="button" onClick={() => map.current?.zoomIn({ duration: 250 })} aria-label={t("map.zoomIn")}>+</button>
             <button type="button" onClick={() => map.current?.zoomOut({ duration: 250 })} aria-label={t("map.zoomOut")}>−</button>
@@ -1830,8 +1905,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           </aside>}
         </div>
         {!isAlertsPage && selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} catalogFetchedAt={stationCatalogFetchedAt} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
-        {!isAlertsPage && observation && !selectedStation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} isFollowing={isFollowingTrain} canFollow={displayTrains.some((train) => train.observation.vehicleId === observation.vehicleId)} onToggleFollow={() => setIsFollowingTrain((following) => !following)} onClose={clearVehicleSelection} />}
-        {!isAlertsPage && showJourneyPlanner && <JourneyPlanner onClose={() => setShowJourneyPlanner(false)} />}
+        {!isAlertsPage && observation && !selectedStation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} positionHistory={positionHistory} isFollowing={isFollowingTrain} canFollow={displayTrains.some((train) => train.observation.vehicleId === observation.vehicleId)} onToggleFollow={() => setIsFollowingTrain((following) => !following)} onClose={clearVehicleSelection} />}
+        {!isAlertsPage && showJourneyPlanner && <JourneyPlanner stations={stationCatalog} route={followedRoute} onRouteChange={updateFollowedRoute} onClose={() => setShowJourneyPlanner(false)} />}
         {!isAlertsPage && showDelayStats && <DelayStats vehicles={vehicles} onClose={() => setShowDelayStats(false)} />}
       </section>
     </main>

@@ -26,7 +26,7 @@ build time. The ClyvoraAPI Worker forwards these requests to the persistent
 LiveOpWeg backend once its `LIVEOPWEG_UPSTREAM_URL` is configured. Set backend
 `CORS_ALLOWED_ORIGIN` / `CORS_ALLOWED_ORIGINS` to the exact frontend origins, and keep
 `NS_API_KEY`, `DATABASE_URL` and `REDIS_URL` server-only. The browser still
-loads map tiles, styles, glyphs and applicable 3D assets from their providers;
+loads map tiles and styles from their providers;
 this is not an offline or network-private application.
 
 For a reviewed production build with sibling checkouts, use
@@ -104,11 +104,11 @@ treinnummer in de actuele vloot aanwezig is.
 
 Fase 11 voegt het productierijpe fundament toe: echte PostGIS-historie, persistence-health, Prometheus-metrics, een beveiligde reverse-proxyroute, productiecontainers en continue kwaliteitscontrole. De file-backed ontwikkelmodus blijft beschikbaar.
 
-Fase 10 voegt deterministische treinreplay en herbruikbare 3D-stations toe. Historische GPS-punten worden opnieuw uit de exact opgeslagen NDOV-payloads opgebouwd; spoorposities worden zichtbaar opnieuw berekend met de vastgepinde graph. De 3D-keten werkt nu voor Utrecht, Amsterdam en Rotterdam Centraal.
+Fase 10 voegt deterministische treinreplay toe. Historische GPS-punten worden opnieuw uit de exact opgeslagen NDOV-payloads opgebouwd; spoorposities worden zichtbaar opnieuw berekend met de vastgepinde graph.
 
 Fase 9 blijft het officiële NDW Actueel Beeld leveren: files, ongevallen, werkzaamheden, afsluitingen en veiligheidsmeldingen met brongeometrie, bronupdate en geldigheidsstatus. De rail- en wegdomeinen blijven functioneel gescheiden.
 
-Fase 8 blijft rond Utrecht Centraal een begrensde 3D-detailzone leveren zonder de landelijke waarheidsketen te veranderen. De stationbundel combineert echte ProRail-spoorcurves, actuele BGT-perronvlakken en viewportgestreamde PDOK 3D-gebouwen en terrein.
+De voormalige experimentele Utrecht-detailzone is verwijderd. De landelijke 2D-kaart blijft de enige kaartweergave en gebruikt dezelfde live spoor- en wegdata.
 
 Fase 7 blijft echte GPS-observaties in heel Nederland aan de ProRail/PDOK-spoor-graaf koppelen. Raw GPS en de afgeleide spoorpositie blijven afzonderlijk bewaard. Een landelijke graph-audit markeert regionale anomalieën en staat een ruimere zoekstraal alleen toe in gezonde zones; zo'n fallback blijft altijd `LOW`.
 
@@ -122,7 +122,6 @@ Vereist: Node.js 22.13 of nieuwer.
 npm install
 npm run rail:import-geometry
 npm run rail:audit-graph
-npm run station3d:build
 npm run dev:phase11
 ```
 
@@ -189,17 +188,6 @@ Landelijke map matching
   → regionale fallback tot 125 meter uitsluitend in NORMAL-zones en altijd als LOW gelabeld
   → landelijke schaal-, uitkomst- en afstandsmeting zonder ongefundeerde accuracyclaim
   → nog geen routeprediction, werkelijke wisselstand of bewezen rijrichting
-
-Gegeneraliseerde stations-3D
-  → Utrecht, Amsterdam en Rotterdam Centraal via één versieerbare bundelketen
-  → respectievelijk 439/632/317 lokale railcurves en 22/21/16 actuele BGT-perronobjecten
-  → lokale ENU-achtige metercoördinaten rond de officiële ProRail-stationspositie
-  → afzonderlijke linker- en rechterrail, ballast, dwarsliggers, wisselcurves en geëxtrudeerde perrons
-  → live gematcht materieel als bron-neutrale enkele unit
-  → expliciet niet-live bochtproef waarin vier bakken ieder afzonderlijk de curve volgen
-  → PDOK 3D Basisvoorziening 2025 voor gebouwen en terrein, uitsluitend bij geopende detailzone
-  → viewport/LOD-culling, maximaal vier downloads, twee parses en 96/192/256 MB devicebudget
-  → sluiten van de detailzone ontlaadt tiles en WebGL-objecten
 
 Deterministische treinreplay
   → maximaal twee uur uit exact opgeslagen, gehashte NDOV-payloads

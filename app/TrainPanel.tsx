@@ -45,7 +45,7 @@ function FactIcon({ kind }: { kind: "speed" | "clock" | "stop" }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true">{kind === "clock" ? <><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></> : kind === "stop" ? <path d="M5 19V13M10 19V9M15 19V5M20 19V2" /> : <><path d="M4 19a9 9 0 1 1 16 0M12 13l4-5M5 12h2M7 6l1 2M12 4v2M19 12h-2" /><circle cx="12" cy="14" r="1.5" /></>}</svg>;
 }
 
-export function TrainPanel({ observation, journey, now, onClose, isFollowing, canFollow, onToggleFollow }: { observation: RailObservation; journey: RailJourney | null; now: number; onClose: () => void; isFollowing: boolean; canFollow: boolean; onToggleFollow: () => void }) {
+export function TrainPanel({ observation, journey, now, positionHistory = [], onClose, isFollowing, canFollow, onToggleFollow }: { observation: RailObservation; journey: RailJourney | null; now: number; positionHistory?: Array<{ at: number; latitude: number; longitude: number }>; onClose: () => void; isFollowing: boolean; canFollow: boolean; onToggleFollow: () => void }) {
   const [expanded, setExpanded] = useState(true);
   const { t } = useLanguage();
   const stock = identifyRollingStock(observation.materialNumber);
@@ -74,6 +74,10 @@ export function TrainPanel({ observation, journey, now, onClose, isFollowing, ca
         <div><FactIcon kind="speed" /><span>{t("train.speed")}</span><strong>{observation.speed ? `${Math.round(observation.speed.valueKmh)} km/u` : "—"}</strong></div>
         <div><FactIcon kind="clock" /><span>{t("train.delay")}</span><strong><Delay seconds={delay} /></strong></div>
         <div><FactIcon kind="stop" /><span>{t("train.nextStop")}</span><strong>{next?.station.shortName ?? next?.station.longName ?? "—"}</strong></div>
+      </section>
+      <section className="tpHistory" aria-label="Recente positiehistorie">
+        <div><span>Recente beweging</span><small>{positionHistory.length ? `Laatste ${positionHistory.length} posities` : "Nog geen historie beschikbaar"}</small></div>
+        {positionHistory.length > 1 && <ol>{positionHistory.slice(-6).map((point, index) => <li key={`${point.at}-${index}`}><i /><span>{new Intl.DateTimeFormat("nl-NL", { hour: "2-digit", minute: "2-digit" }).format(point.at)}</span><b>{point.latitude.toFixed(3)}, {point.longitude.toFixed(3)}</b></li>)}</ol>}
       </section>
       <section className="tpNext" aria-label={t("train.nextStop")}>
         <span>{t("train.nextStop")}</span>

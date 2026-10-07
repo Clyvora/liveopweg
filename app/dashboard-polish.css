@@ -38,3 +38,275 @@
   .notificationToggle { left:10px; bottom:136px; }
   .notificationToggle button { min-height:36px; }
 }
+
+/* Final dashboard pass: keep the map dominant while making every overlay
+   readable, tappable and visually consistent. */
+.topbar {
+  min-height: 58px;
+  padding: 9px 14px;
+  border-color: rgba(255,255,255,.82);
+  background: rgba(255,255,255,.88);
+  box-shadow: 0 12px 32px rgba(17,43,66,.16);
+}
+.topbar:focus-within { box-shadow: 0 0 0 3px rgba(38,104,233,.14), 0 12px 32px rgba(17,43,66,.16); }
+.railBrandLogo { width: 146px; }
+.sideNav { display:flex; align-items:center; gap:4px; }
+.sideNav .navSectionLabel { display:none; }
+.sideNav a, .sideNav button {
+  width:auto;
+  height:38px;
+  min-width:38px;
+  padding:0 11px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  border:1px solid transparent;
+  border-radius:10px;
+  border-left:1px solid transparent;
+  color:#526879;
+  font-size:11px;
+}
+.sideNav a:hover, .sideNav button:hover { background:#eef5fb; color:#163c5a; }
+.sideNav a.active, .sideNav button.active { border-color:#c9def4; background:#eaf3ff; color:#1268d7; }
+.sideNav a .uiIcon, .sideNav button .uiIcon { width:17px; height:17px; }
+.sidebarLive { margin-left:8px; padding-left:10px; border-left:1px solid #dbe5eb; }
+.sourcePill { padding:7px 10px; border:1px solid #d9e5ec; border-radius:999px; background:#f8fbfd; text-shadow:none; }
+.fleetTools { top:92px; left:24px; }
+.mapActions { top:145px; left:24px; }
+.mapActions button { min-height:40px; border-color:rgba(255,255,255,.9); box-shadow:0 10px 26px rgba(20,41,61,.16); }
+.mapActions button:focus-visible, .mapZoomControls button:focus-visible, .mapStyleCurrent:focus-visible {
+  outline:3px solid rgba(38,104,233,.32); outline-offset:2px;
+}
+.mapZoomControls { bottom:84px; }
+.mapZoomControls button { width:40px; height:40px; font-size:22px; }
+.mapStylePicker { bottom:22px; }
+.observationPanel { border-color:rgba(255,255,255,.96); box-shadow:0 20px 55px rgba(16,42,67,.22); }
+.mapDrawer { top:82px; left:24px; }
+.mapAttribution { bottom:6px; }
+.maplibregl-canvas { image-rendering:auto; }
+.maplibregl-canvas-container { contain:layout paint; }
+.mapZoomControls button, .mapActions button, .mapStyleCurrent {
+  transition: transform 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+.mapZoomControls button:active, .mapActions button:active, .mapStyleCurrent:active {
+  transform: translateY(1px) scale(.97);
+}
+.observationPanel, .mapDrawer, .delayStatsPanel, .journeyPlannerPanel {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width:760px) {
+  .topbar { min-height:42px; height:auto; padding:6px 9px; }
+  .railBrandLogo { width:118px; }
+  .sideNav { gap:2px; }
+  .sideNav a, .sideNav button { width:36px; min-width:36px; padding:0; font-size:0; }
+  .sideNav a .uiIcon, .sideNav button .uiIcon { width:18px; height:18px; }
+  .sidebarLive { margin-left:3px; padding-left:5px; }
+  .sourcePill { padding:6px 7px; letter-spacing:.04em; }
+  .fleetTools { top:72px; left:12px; }
+  .mapActions { top:124px; left:12px; }
+  .mapDrawer { top:60px; left:8px; }
+  .mapZoomControls { right:12px; bottom:92px; }
+  .mapStylePicker { right:12px; bottom:18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapZoomControls button, .mapActions button, .mapStyleCurrent {
+    transition:none;
+  }
+}
+
+/* Quiet visual hierarchy: one surface language for the map controls and
+   panels, with less shadow and less competing color. */
+.topbar {
+  border:1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  background:color-mix(in srgb, var(--paper) 92%, transparent);
+  box-shadow:0 8px 24px rgba(17,43,66,.12);
+  backdrop-filter:blur(16px) saturate(1.25);
+}
+.topbar:hover { box-shadow:0 8px 24px rgba(17,43,66,.12); }
+.sideNav a, .sideNav button {
+  color:color-mix(in srgb, var(--ink) 62%, transparent);
+  background:transparent;
+}
+.sideNav a:hover, .sideNav button:hover {
+  color:var(--ink);
+  background:color-mix(in srgb, var(--blue) 8%, transparent);
+}
+.sideNav a.active, .sideNav button.active {
+  border-color:color-mix(in srgb, var(--blue) 22%, transparent);
+  background:color-mix(in srgb, var(--blue) 11%, transparent);
+  color:var(--blue);
+}
+.sourcePill {
+  border-color:color-mix(in srgb, var(--ink) 12%, transparent);
+  background:color-mix(in srgb, var(--paper) 78%, transparent);
+}
+.fleetTools, .mapActions, .mapZoomControls, .mapStylePicker {
+  filter:none;
+}
+.fleetTools {
+  padding:6px;
+  border-color:color-mix(in srgb, var(--ink) 11%, transparent);
+  background:color-mix(in srgb, var(--paper) 94%, transparent);
+  box-shadow:0 8px 24px rgba(17,43,66,.12);
+  backdrop-filter:blur(16px) saturate(1.25);
+}
+.fleetTools>div:first-child strong { font-size:20px; }
+.fleetTools input {
+  height:40px;
+  border-color:color-mix(in srgb, var(--ink) 12%, transparent);
+  background:color-mix(in srgb, var(--paper) 86%, transparent);
+}
+.mapActions {
+  gap:6px;
+  padding:6px;
+  border:1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  border-radius:12px;
+  background:color-mix(in srgb, var(--paper) 90%, transparent);
+  box-shadow:0 8px 24px rgba(17,43,66,.12);
+  backdrop-filter:blur(16px) saturate(1.25);
+}
+.mapActions button {
+  min-height:36px;
+  border-color:transparent;
+  background:transparent;
+  box-shadow:none;
+  color:var(--ink);
+}
+.mapActions button:hover {
+  background:color-mix(in srgb, var(--blue) 9%, transparent);
+  box-shadow:none;
+}
+.positionLegend {
+  border-left:1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  padding-left:8px;
+}
+.mapZoomControls {
+  gap:4px;
+  padding:4px;
+  border:1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  border-radius:12px;
+  background:color-mix(in srgb, var(--paper) 90%, transparent);
+  box-shadow:0 8px 24px rgba(17,43,66,.12);
+  backdrop-filter:blur(16px) saturate(1.25);
+}
+.mapZoomControls button {
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:var(--ink);
+}
+.mapZoomControls button:hover {
+  background:color-mix(in srgb, var(--blue) 9%, transparent);
+}
+.mapStylePicker .mapStyleCurrent {
+  min-height:38px;
+  border-color:color-mix(in srgb, var(--ink) 10%, transparent);
+  border-radius:10px;
+  background:color-mix(in srgb, var(--paper) 90%, transparent);
+  box-shadow:0 8px 24px rgba(17,43,66,.12);
+  backdrop-filter:blur(16px) saturate(1.25);
+}
+.observationPanel, .nearbyPanel, .mapDrawer, .delayStatsPanel, .journeyPlannerPanel {
+  border-color:color-mix(in srgb, var(--ink) 12%, transparent);
+  box-shadow:0 14px 36px rgba(17,43,66,.16);
+}
+.alertFilterHint {
+  margin:6px 0 12px;
+  color:#718390;
+  font-size:10px;
+  line-height:1.45;
+}
+.feedUpdated {
+  display:block;
+  margin-top:10px;
+  color:#7d8d96;
+  font-size:9px;
+}
+.routeField {
+  display:grid;
+  gap:5px;
+  margin-top:10px;
+  color:#5f7381;
+  font-size:11px;
+  font-weight:700;
+}
+.routeField select {
+  min-height:40px;
+  padding:0 10px;
+  border:1px solid #dce7ef;
+  border-radius:9px;
+  background:#fff;
+  color:#17334b;
+  font:500 12px/1.2 var(--font-geist-sans);
+}
+.routeActions { display:flex; gap:8px; margin-top:14px; }
+.routeActions button {
+  min-height:38px;
+  padding:0 13px;
+  border:0;
+  border-radius:9px;
+  background:#1268d7;
+  color:#fff;
+  font:700 12px/1 var(--font-geist-sans);
+  cursor:pointer;
+}
+.routeActions button:disabled { opacity:.45; cursor:not-allowed; }
+.routeActions .routeClear { background:#edf3f7; color:#42596a; }
+.savedRoute { margin:14px 0 0 !important; padding-top:12px; border-top:1px solid #dce7ef; }
+.favoriteStations { margin-top:16px; padding-top:12px; border-top:1px solid #dce7ef; }
+.favoriteStations strong { color:#17334b; font-size:12px; }
+.favoriteStations p { margin:4px 0 8px !important; font-size:10px !important; }
+.favoriteStations>div { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px; }
+.favoriteStations button { padding:6px 8px; border:1px solid #dce7ef; border-radius:8px; background:#fff; color:#315269; font-size:10px; cursor:pointer; }
+.favoriteStations select { width:100%; min-height:34px; padding:0 8px; border:1px solid #dce7ef; border-radius:8px; background:#fff; color:#315269; font-size:11px; }
+.tpHistory { margin:12px 16px 0; padding:12px; border:1px solid #dce7ef; border-radius:11px; background:#f8fbfd; }
+.tpHistory>div { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+.tpHistory>div span { color:#17334b; font-size:11px; font-weight:800; }
+.tpHistory>div small { color:#7a8c98; font-size:9px; }
+.tpHistory ol { display:grid; gap:6px; margin:10px 0 0; padding:0; list-style:none; }
+.tpHistory li { display:grid; grid-template-columns:6px 42px 1fr; align-items:center; gap:7px; color:#718390; font-size:9px; }
+.tpHistory li i { width:6px; height:6px; border-radius:50%; background:#2877d4; }
+.tpHistory li b { overflow:hidden; color:#526879; font:500 9px/1.2 var(--font-geist-mono); text-overflow:ellipsis; white-space:nowrap; }
+.followedRouteBadge {
+  position:absolute;
+  top:92px;
+  left:50%;
+  z-index:45;
+  display:grid;
+  gap:3px;
+  min-width:220px;
+  padding:8px 12px;
+  transform:translateX(-50%);
+  border:1px solid rgba(18,104,215,.2);
+  border-radius:10px;
+  background:rgba(255,255,255,.9);
+  box-shadow:0 8px 24px rgba(17,43,66,.12);
+  color:#17334b;
+  text-align:left;
+  cursor:pointer;
+  backdrop-filter:blur(14px);
+}
+.followedRouteBadge span { display:flex; align-items:center; gap:6px; color:#1268d7; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
+.followedRouteBadge strong { overflow:hidden; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+@media (max-width:760px) {
+  .followedRouteBadge { top:72px; left:12px; right:12px; min-width:0; transform:none; }
+}
+
+[data-theme="dark"] .topbar,
+[data-theme="dark"] .fleetTools,
+[data-theme="dark"] .mapActions,
+[data-theme="dark"] .mapZoomControls,
+[data-theme="dark"] .mapStylePicker .mapStyleCurrent {
+  box-shadow:0 10px 30px rgba(0,0,0,.28);
+}
+
+@media (max-width:760px) {
+  .topbar { box-shadow:0 6px 18px rgba(17,43,66,.12); }
+  .mapActions { gap:3px; padding:4px; }
+  .mapActions button { min-height:34px; }
+  .positionLegend { display:none; }
+}
