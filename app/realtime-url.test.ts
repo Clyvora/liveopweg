@@ -25,8 +25,8 @@ describe("realtime URLs", () => {
   it("routes the LiveOpWeg domains to the ClyvoraAPI realtime gateway", () => {
     for (const domain of ["liveopweg.nl", "www.liveopweg.nl"]) {
       vi.stubGlobal("window", { location: new URL(`https://${domain}/`) });
-      expect(realtimeWebSocketUrl()).toBe("wss://api.clyvora.tech/v1/realtime");
-      expect(realtimeHttpUrl("/v1/fleet")).toBe("https://api.clyvora.tech/v1/fleet");
+      expect(realtimeWebSocketUrl()).toBe("wss://site--liveopweg-api--fpbs4m4lfsvq.code.run/v1/realtime");
+      expect(realtimeHttpUrl("/v1/fleet")).toBe("https://site--liveopweg-api--fpbs4m4lfsvq.code.run/v1/fleet");
     }
   });
 });

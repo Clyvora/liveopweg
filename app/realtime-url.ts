@@ -11,13 +11,15 @@ function isLiveOpWegProductionHost(): boolean {
   return window.location.hostname === "liveopweg.nl" || window.location.hostname === "www.liveopweg.nl";
 }
 
+const LIVEOPWEG_REALTIME_URL = "wss://site--liveopweg-api--fpbs4m4lfsvq.code.run/v1/realtime";
+
 export function realtimeWebSocketUrl(): string {
   const configured = configuredRealtimeUrl();
   if (configured) return configured.toString();
   if (isLocalDevelopmentHost()) {
     return `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8081/v1/realtime`;
   }
-  if (isLiveOpWegProductionHost()) return "wss://api.clyvora.tech/v1/realtime";
+  if (isLiveOpWegProductionHost()) return LIVEOPWEG_REALTIME_URL;
   return `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/v1/realtime`;
 }
 
