@@ -1,201 +1,86 @@
 "use client";
-
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RailStation } from "../packages/domain-rail/stations";
+import type { AdviceResponse, AdviceLeg } from "../packages/protocol/ns-travel";
 import { useLanguage } from "./LanguageContext";
-import { searchJourneys, type JourneyConnection } from "./journey-search";
-
-export type FollowedRoute = {
-  originCode: string;
-  originName: string;
-  destinationCode: string;
-  destinationName: string;
-};
-
-const routeStorageKey = "liveopweg-followed-route";
-const favoriteStationsStorageKey = "liveopweg-favorite-stations";
-
-function journeyTime(value: string, language: string): string {
-  return new Intl.DateTimeFormat(language === "en" ? "en-GB" : "nl-NL", {
-    hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam",
-  }).format(new Date(value));
-}
-
-function journeyDelay(seconds: number | null, language: string): string {
-  if (seconds === null) return language === "en" ? "No delay reported" : "Geen vertraging bekend";
-  if (seconds === 0) return language === "en" ? "On time" : "Op tijd";
-  const minutes = Math.round(Math.abs(seconds) / 60);
-  return seconds > 0
-    ? (language === "en" ? `+${minutes} min late` : `+${minutes} min vertraging`)
-    : (language === "en" ? `${minutes} min early` : `${minutes} min eerder`);
-}
-
-export function JourneyPlanner({ stations, route, onRouteChange, onClose, liveTrainNumbers, onSelectTrain }: {
-  stations: RailStation[];
-  route: FollowedRoute | null;
-  onRouteChange: (route: FollowedRoute | null) => void;
-  onClose: () => void;
-  liveTrainNumbers: ReadonlySet<string>;
-  onSelectTrain: (trainNumber: string) => void;
-}) {
-  const { language } = useLanguage();
-  const [originCode, setOriginCode] = useState(route?.originCode ?? "");
-  const [destinationCode, setDestinationCode] = useState(route?.destinationCode ?? "");
-  const [favoriteCodes, setFavoriteCodes] = useState<string[]>([]);
-  const favoritesHydrated = useRef(false);
-  const [storageMessage, setStorageMessage] = useState("");
-  const [searchResults, setSearchResults] = useState<JourneyConnection[] | null>(null);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState("");
-  const searchController = useRef<AbortController | null>(null);
-  const searchSequence = useRef(0);
-  const routeHydrated = useRef(false);
-  const copy = language === "en"
-    ? { title: "Follow a route", close: "Close route panel", lead: "Find trains between two stations.", detail: "Liveopweg keeps your route ready for your next visit.", save: "Save route", clear: "Clear route", origin: "From station", destination: "To station", chooseStation: "Choose a station", activeRoute: "Saved route", favorites: "Favorite stations", favoriteHint: "Add stations you visit often.", addFavorite: "+ Add a favorite station", storageError: "Your browser could not save this on this device. The change is available until you close this page.", search: "Find trains", searching: "Searching live journeys…", searchError: "Could not load journeys. Check your connection and try again.", noResults: "No live journeys found for this route in the next hour.", coverage: "Results use received live InfoPlus journeys and may not include every scheduled train.", results: "Available journeys", transfer: "Change at", follow: "Show train on map" }
-    : { title: "Volg een route", close: "Sluit routepaneel", lead: "Zoek treinen tussen twee stations.", detail: "Liveopweg onthoudt je route lokaal op dit apparaat en toont hem snel opnieuw.", save: "Route opslaan", clear: "Route wissen", origin: "Vanaf station", destination: "Naar station", chooseStation: "Kies een station", activeRoute: "Opgeslagen route", favorites: "Favoriete stations", favoriteHint: "Voeg stations toe die je vaak bekijkt.", addFavorite: "+ Favoriet station toevoegen", storageError: "Je browser kon dit niet op dit apparaat bewaren. De wijziging blijft actief zolang deze pagina open is.", search: "Zoek treinen", searching: "Live ritten zoeken…", searchError: "Ritten laden lukte niet. Controleer je verbinding en probeer het opnieuw.", noResults: "Geen live ritten gevonden voor deze route in het komende uur.", coverage: "Resultaten zijn gebaseerd op ontvangen InfoPlus-ritten en bevatten mogelijk niet alle geplande treinen.", results: "Beschikbare ritten", transfer: "Overstappen in", follow: "Toon trein op kaart" };
-  const stationOptions = useMemo(() => [...stations].sort((left, right) => left.name.localeCompare(right.name, "nl")), [stations]);
-
-  useEffect(() => () => {
-    searchSequence.current += 1;
-    searchController.current?.abort();
-  }, []);
-
-  const findJourneys = async () => {
-    if (!originCode || !destinationCode || originCode === destinationCode) return;
-    searchController.current?.abort();
-    const controller = new AbortController();
-    searchController.current = controller;
-    const sequence = ++searchSequence.current;
-    setSearchLoading(true);
-    setSearchError("");
-    setSearchResults(null);
-    try {
-      const result = await searchJourneys(originCode, destinationCode, controller.signal);
-      if (!controller.signal.aborted && sequence === searchSequence.current) setSearchResults(result.connections);
-    } catch {
-      if (controller.signal.aborted || sequence !== searchSequence.current) return;
-      setSearchError(copy.searchError);
-    } finally {
-      if (sequence === searchSequence.current) setSearchLoading(false);
-    }
-  };
-
-  const closePlanner = () => {
-    searchSequence.current += 1;
-    searchController.current?.abort();
-    onClose();
-  };
-  const resetSearch = () => {
-    searchSequence.current += 1;
-    searchController.current?.abort();
-    setSearchLoading(false);
-    setSearchError("");
-    setSearchResults(null);
-  };
-
+import { requestAdvice } from "./travel-api";
+import { StationPicker } from "./StationPicker";
+import { useFavoriteStations } from "./useFavoriteStations";
+export type FollowedRoute = { originCode: string; originName: string; destinationCode: string; destinationName: string };
+const routeKey = "liveopweg-followed-route";
+export type PlannerMemory = Map<string, { from: string; to: string; when: string; results: AdviceResponse | null; expanded: string | null }>;
+export function JourneyPlanner({ stations, route, onRouteChange, onClose, liveTrainNumbers, onSelectTrain, memory }: { stations: RailStation[]; route: FollowedRoute | null; onRouteChange: (route: FollowedRoute | null) => void; onClose: () => void; liveTrainNumbers: ReadonlySet<string>; onSelectTrain: (trainNumber: string) => void; memory: PlannerMemory }) {
+  const { language } = useLanguage(); const en = language === "en";
+  const draft = memory.get("planner");
+  const [from, setFrom] = useState(draft?.from ?? route?.originName ?? ""); const [to, setTo] = useState(draft?.to ?? route?.destinationName ?? "");
+  const [when, setWhen] = useState(draft?.when ?? ""); const [results, setResults] = useState<AdviceResponse | null>(draft?.results ?? null);
+  const [loading, setLoading] = useState(false); const [error, setError] = useState(false); const [storageError, setStorageError] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(draft?.expanded ?? null);
+  const [hasDraft] = useState(draft?.from !== undefined);
+  useEffect(() => { memory.set("planner", { from, to, when, results, expanded }); }, [memory, from, to, when, results, expanded]);
+  const { favorites } = useFavoriteStations();
+  const request = useRef<AbortController | null>(null); const sequence = useRef(0);
+  const origin = stations.find(s => s.name.toLocaleLowerCase() === from.trim().toLocaleLowerCase() || s.code === from.trim().toUpperCase());
+  const destination = stations.find(s => s.name.toLocaleLowerCase() === to.trim().toLocaleLowerCase() || s.code === to.trim().toUpperCase());
+  const valid = origin && destination && origin.code !== destination.code;
+  const clock = (value: string | null) => value ? new Date(value).toLocaleTimeString(en ? "en-GB" : "nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" }) : "—";
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      if (favoritesHydrated.current) return;
-      favoritesHydrated.current = true;
+    const frame = requestAnimationFrame(() => {
+      if (route || hasDraft) return;
       try {
-        const saved = window.localStorage.getItem(favoriteStationsStorageKey);
-        const parsed: unknown = saved ? JSON.parse(saved) : [];
-        if (!Array.isArray(parsed)) return;
-        const stationCodes = new Set(stationOptions.map(station => station.code));
-        setFavoriteCodes(parsed.filter((code): code is string => typeof code === "string" && stationCodes.has(code)).slice(-6));
-      } catch {
-        setFavoriteCodes([]);
-      }
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [stationOptions]);
-
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      if (routeHydrated.current) return;
-      if (route) { routeHydrated.current = true; return; }
-      try {
-        const saved = window.localStorage.getItem(routeStorageKey);
-        if (!saved) { routeHydrated.current = true; return; }
-        const parsed: unknown = JSON.parse(saved);
-        if (typeof parsed !== "object" || parsed === null || !("originCode" in parsed) || !("destinationCode" in parsed)
-          || typeof parsed.originCode !== "string" || typeof parsed.destinationCode !== "string") {
-          routeHydrated.current = true;
-          return;
+        const value: unknown = JSON.parse(localStorage.getItem(routeKey) ?? "null");
+        if (value && typeof value === "object" && "originCode" in value && "destinationCode" in value) {
+          const a = stations.find(s => s.code === value.originCode), b = stations.find(s => s.code === value.destinationCode);
+          if (a && b && a.code !== b.code) { setFrom(a.name); setTo(b.name); onRouteChange({ originCode: a.code, originName: a.name, destinationCode: b.code, destinationName: b.name }); }
         }
-        const origin = stationOptions.find(station => station.code === parsed.originCode);
-        const destination = stationOptions.find(station => station.code === parsed.destinationCode);
-        if (!origin || !destination) return;
-        routeHydrated.current = true;
-        if (origin.code === destination.code) return;
-        setOriginCode(origin.code);
-        setDestinationCode(destination.code);
-        onRouteChange({ originCode: origin.code, originName: origin.name, destinationCode: destination.code, destinationName: destination.name });
-      } catch {
-        // Invalid or unavailable local data does not prevent a new route being used.
-        routeHydrated.current = true;
-      }
+      } catch { /* Ignore invalid saved routes. */ }
     });
-    return () => window.cancelAnimationFrame(frame);
-  }, [onRouteChange, route, stationOptions]);
-  const toggleFavorite = (code: string) => {
-    const next = favoriteCodes.includes(code) ? favoriteCodes.filter(value => value !== code) : [...favoriteCodes, code].slice(-6);
+    return () => cancelAnimationFrame(frame);
+  }, [route, stations, onRouteChange, hasDraft]);
+  useEffect(() => () => { sequence.current++; request.current?.abort(); }, []);
+  const invalidate = () => { sequence.current++; request.current?.abort(); setLoading(false); setError(false); setResults(null); };
+  const search = async () => {
+    if (!valid) return;
+    request.current?.abort(); const controller = new AbortController(); request.current = controller;
+    const version = ++sequence.current; setLoading(true); setError(false); setResults(null);
     try {
-      window.localStorage.setItem(favoriteStationsStorageKey, JSON.stringify(next));
-      setStorageMessage("");
-    } catch {
-      setStorageMessage(copy.storageError);
-    }
-    setFavoriteCodes(next);
+      const value = await requestAdvice(origin.code, destination.code, when ? new Date(when).toISOString() : null, language, controller.signal);
+      if (!controller.signal.aborted && version === sequence.current) { setResults(value); setExpanded(value.journeys[0]?.id ?? null); }
+    } catch { if (!controller.signal.aborted && version === sequence.current) setError(true); }
+    finally { if (version === sequence.current) setLoading(false); }
   };
-  const saveRoute = () => {
-    const origin = stationOptions.find(station => station.code === originCode);
-    const destination = stationOptions.find(station => station.code === destinationCode);
-    if (!origin || !destination || origin.code === destination.code) return;
-    const nextRoute = { originCode: origin.code, originName: origin.name, destinationCode: destination.code, destinationName: destination.name };
-    try {
-      window.localStorage.setItem(routeStorageKey, JSON.stringify(nextRoute));
-      setStorageMessage("");
-    } catch {
-      setStorageMessage(copy.storageError);
-    }
-    onRouteChange(nextRoute);
+  const platform = (point: AdviceLeg["origin"]) => point.track ? ` · ${en ? "Platform" : "Spoor"} ${point.plannedTrack && point.plannedTrack !== point.track ? `${point.plannedTrack} → ` : ""}${point.track}` : "";
+  const transfer = (previous: AdviceLeg, next: AdviceLeg) => {
+    const arrival = previous.destination.actualAt ?? previous.destination.plannedAt;
+    const departure = next.origin.actualAt ?? next.origin.plannedAt;
+    const minutes = arrival && departure ? Math.round((Date.parse(departure) - Date.parse(arrival)) / 60_000) : null;
+    return `${en ? "Change at" : "Overstappen in"} ${next.origin.name}${minutes !== null && minutes >= 0 ? ` · ${minutes} min` : ""}`;
   };
-  const clearRoute = () => {
-    resetSearch();
-    try {
-      window.localStorage.removeItem(routeStorageKey);
-      setStorageMessage("");
-    } catch {
-      setStorageMessage(copy.storageError);
-    }
-    setOriginCode("");
-    setDestinationCode("");
-    onRouteChange(null);
+  const save = () => {
+    if (!valid) return;
+    const value = { originCode: origin.code, originName: origin.name, destinationCode: destination.code, destinationName: destination.name };
+    try { localStorage.setItem(routeKey, JSON.stringify(value)); setStorageError(false); } catch { setStorageError(true); }
+    onRouteChange(value);
   };
-  return <aside className="journeyPlannerPanel" aria-label={copy.title}>
-    <header className="jpHeader"><h2>{copy.title}</h2><button type="button" onClick={closePlanner} aria-label={copy.close}>×</button></header>
-    <div className="jpBody"><div className="jpSourceNotice"><strong>{copy.lead}</strong><p>{copy.detail}</p>
-      <label className="routeField">{copy.origin}<select value={originCode} onChange={event => { resetSearch(); setOriginCode(event.target.value); }}><option value="">{copy.chooseStation}</option>{stationOptions.map(station => <option value={station.code} key={station.code}>{station.name}</option>)}</select></label>
-      <label className="routeField">{copy.destination}<select value={destinationCode} onChange={event => { resetSearch(); setDestinationCode(event.target.value); }}><option value="">{copy.chooseStation}</option>{stationOptions.map(station => <option value={station.code} key={station.code}>{station.name}</option>)}</select></label>
-      <div className="routeActions"><button type="button" onClick={findJourneys} disabled={!originCode || !destinationCode || originCode === destinationCode || searchLoading}>{searchLoading ? copy.searching : copy.search}</button><button type="button" onClick={saveRoute} disabled={!originCode || !destinationCode || originCode === destinationCode}>{copy.save}</button>{route && <button className="routeClear" type="button" onClick={clearRoute}>{copy.clear}</button>}</div>
-      <p className="jpCoverageNotice">{copy.coverage}</p>
-      {searchError && <p className="jpSearchMessage" role="alert">{searchError}</p>}
-      {searchResults && searchResults.length === 0 && <p className="jpSearchMessage" role="status">{copy.noResults}</p>}
-      {searchResults && searchResults.length > 0 && <section className="jpResults" aria-label={copy.results}>
-        <h3>{copy.results}</h3>
-        {searchResults.map((connection) => <article className="jpConnection" key={connection.id}>
-          <div className="jpConnectionSummary"><strong>{journeyTime(connection.departureAt, language)} – {journeyTime(connection.arrivalAt, language)}</strong><span>{journeyDelay(connection.delaySeconds, language)}</span></div>
-          {connection.transferStation && <p className="jpTransfer">{copy.transfer} {connection.transferStation.name}</p>}
-          {connection.legs.map((leg, index) => <div className="jpJourneyLeg" key={`${leg.journeyId}-${leg.departureAt}-${index}`}>
-            <span>{leg.serviceType} {leg.trainNumber}</span><strong>{leg.from.name} {journeyTime(leg.departureAt, language)}</strong><span>→ {leg.to.name} {journeyTime(leg.arrivalAt, language)}</span>
-            {liveTrainNumbers.has(leg.trainNumber) && <button type="button" onClick={() => onSelectTrain(leg.trainNumber)}>{copy.follow}</button>}
-          </div>)}
-        </article>)}
-      </section>}
-      {storageMessage && <p className="settingsFeedback" role="status">{storageMessage}</p>}
-      {route && <p className="savedRoute"><strong>{copy.activeRoute}</strong><br />{route.originName} → {route.destinationName}</p>}
-      <div className="favoriteStations"><strong>{copy.favorites}</strong><p>{copy.favoriteHint}</p><div>{stationOptions.filter(station => favoriteCodes.includes(station.code)).map(station => <button type="button" key={station.code} onClick={() => toggleFavorite(station.code)}>{station.name} ★</button>)}</div><select aria-label={copy.addFavorite} value="" onChange={event => event.target.value && toggleFavorite(event.target.value)}><option value="">{copy.addFavorite}</option>{stationOptions.filter(station => !favoriteCodes.includes(station.code)).map(station => <option value={station.code} key={station.code}>{station.name}</option>)}</select></div>
-    </div></div>
+  return <aside className="journeyPlannerPanel uiPanel" aria-label={en ? "Journey planner" : "Reisplanner"}>
+    <header className="uiPanelHeader"><div><span className="radarEyebrow">LIVEOPWEG</span><h2>{en ? "Plan your journey" : "Plan je reis"}</h2></div><button className="radarClose" onClick={onClose} aria-label={en ? "Close journey planner" : "Sluit reisplanner"}>×</button></header>
+    <p>{en ? "Train journeys and official replacement transport, advised by NS." : "Treinreizen en officieel vervangend vervoer, geadviseerd door NS."}</p>
+    <form onSubmit={event => { event.preventDefault(); void search(); }}>
+      <StationPicker stations={stations} value={from} label={en ? "From" : "Van"} onChange={value => { invalidate(); setFrom(value); }} />
+      <button className="uiSwap" type="button" onClick={() => { invalidate(); setFrom(to); setTo(from); }} aria-label={en ? "Swap stations" : "Stations omwisselen"}>⇅</button>
+      <StationPicker stations={stations} value={to} label={en ? "To" : "Naar"} onChange={value => { invalidate(); setTo(value); }} />
+      <label className="uiField">{en ? "Departure" : "Vertrek"}<input type="datetime-local" value={when} onChange={event => { invalidate(); setWhen(event.target.value); }} /></label><small>{when ? (en ? "Time in your device’s timezone." : "Tijd in de tijdzone van je apparaat.") : (en ? "Leave now. Set a time to plan ahead." : "Vertrek nu. Kies een tijd om vooruit te plannen.")}</small>
+      <div className="uiActions"><button className="radarPrimary" disabled={!valid || loading}>{loading ? (en ? "Searching…" : "Zoeken…") : (en ? "Find journeys" : "Zoek reizen")}</button><button type="button" disabled={!valid} onClick={save}>{en ? "Save route" : "Route bewaren"}</button></div>
+    </form>
+    {route && <div className="uiSavedRoute"><span>{route.originName} → {route.destinationName}</span><button onClick={() => { try { localStorage.removeItem(routeKey); setStorageError(false); } catch { setStorageError(true); } onRouteChange(null); }}>{en ? "Remove" : "Verwijderen"}</button></div>}
+    {storageError && <p role="status">{en ? "Your browser could not save this route." : "Je browser kon deze route niet bewaren."}</p>}
+    {favorites.length > 0 && <div className="uiFavoriteChips">{stations.filter(s => favorites.includes(s.code)).map(s => <button key={s.code} onClick={() => { invalidate(); if (!origin) setFrom(s.name); else setTo(s.name); }}>{s.name} ★</button>)}</div>}
+    {error && <div className="uiNotice" role="alert"><p>{en ? "Journey advice is temporarily unavailable. Please try again." : "Reisadviezen zijn tijdelijk niet beschikbaar. Probeer het opnieuw."}</p><button onClick={() => void search()}>{en ? "Try again" : "Opnieuw proberen"}</button></div>}
+    {results && !results.journeys.length && <p role="status">{en ? "No journeys found for this time and route." : "Geen reizen gevonden voor deze route en dit tijdstip."}</p>}
+    <div className="uiAdviceResults">{results?.journeys.map(journey => <article key={journey.id} className={`uiAdvice ${journey.cancelled ? "cancelled" : ""}`}>
+      <button className="uiResultButton" aria-expanded={expanded === journey.id} onClick={() => setExpanded(expanded === journey.id ? null : journey.id)}><strong>{clock(journey.legs[0]!.origin.actualAt ?? journey.legs[0]!.origin.plannedAt)} → {clock(journey.legs.at(-1)!.destination.actualAt ?? journey.legs.at(-1)!.destination.plannedAt)}</strong><span>{journey.durationMinutes !== null ? `${journey.durationMinutes} min · ` : ""}{journey.transfers} {en ? "changes" : "overstappen"}{journey.cancelled ? (en ? " · Cancelled" : " · Vervalt") : ""}</span></button>
+      {expanded === journey.id && <div className="uiResultDetail">{journey.messages.map((message, i) => <p key={i} className="uiNotice">{message}</p>)}{journey.legs.map((leg, index) => <section key={leg.id} className="uiAdviceLeg">{index > 0 && <p className="uiTransfer">{transfer(journey.legs[index - 1]!, leg)}</p>}<strong>{leg.mode === "WALK" ? (en ? "Walk" : "Lopen") : leg.service} {leg.trainNumber}</strong>{leg.cancelled && <span className="tpLate">{en ? "Cancelled" : "Vervalt"}</span>}<p>{clock(leg.origin.actualAt ?? leg.origin.plannedAt)} · {leg.origin.name}{platform(leg.origin)}</p><p>{clock(leg.destination.actualAt ?? leg.destination.plannedAt)} · {leg.destination.name}{platform(leg.destination)}</p>{leg.messages.map((message, i) => <p key={i}>{message}</p>)}{leg.mode === "TRAIN" && leg.trainNumber && liveTrainNumbers.has(leg.trainNumber) && !leg.cancelled && <button onClick={() => onSelectTrain(leg.trainNumber!)}>{en ? "View train on radar" : "Bekijk trein op radar"}</button>}</section>)}</div>}
+    </article>)}</div>
+    <small className="uiSourceNote">{results ? `${en ? "Journey advice" : "Reisadvies"}: NS · ${clock(results.fetchedAt)}` : (en ? "Travel information may change. Check your journey before departure." : "Reisinformatie kan wijzigen. Controleer je reis voor vertrek.")}</small>
   </aside>;
 }

@@ -19,11 +19,13 @@ test("server-renders de treinenkaart zonder overlappend meldingenpaneel", async 
 
   const html = await response.text();
   assert.match(html, /<title>Liveopweg/);
-  assert.match(html, /href="\/meldingen"/);
+  assert.match(html, /Treinradar/);
+  assert.match(html, /Spoormeldingen/);
+  assert.match(html, /Favorieten/);
+  assert.doesNotMatch(html, /Live verbonden|WebSocket ·|Status databronnen/);
   assert.match(html, /href="\/instellingen"/);
-  assert.match(html, /Treinenkaart/);
-  assert.match(html, /Live treinen/);
-  assert.match(html, /Overwegen/);
+  assert.match(html, /Meer/);
+  assert.match(html, /Reisplanner/);
   assert.match(html, /Hoofdnavigatie/);
   assert.doesNotMatch(html, /class="radarStatusBar"/);
   assert.doesNotMatch(html, /99\+/);
@@ -35,7 +37,7 @@ test("server-renders de treinenkaart zonder overlappend meldingenpaneel", async 
   assert.match(html, /Inzoomen op kaart/);
   assert.match(html, /Uitzoomen op kaart/);
   assert.match(html, /Kaartbediening/);
-  assert.match(html, /Sluit kaartlagen/);
+  assert.match(html, /Kaartlagen/);
   assert.match(html, /Zoek trein, station of materieel/);
   assert.match(html, /aria-label="Zoek trein, station of materieel"/);
   assert.match(html, /role="combobox"/);

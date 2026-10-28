@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { AppNavigation } from "../AppNavigation";
 import { useLanguage } from "../LanguageContext";
 import { useTheme } from "../ThemeContext";
 
@@ -22,7 +22,7 @@ function Icon({ name }: { name: IconName }) {
 
 export function SettingsScreen() {
   const { theme, toggleTheme } = useTheme();
-  const { language, setLanguage, t } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const copy = language === "en" ? {
     nav: "Main navigation", trains: "Trains", notifications: "Notifications", settings: "Settings",
     intro: "Adjust LiveOpWeg to suit you. Choose map layers directly on each map.",
@@ -79,16 +79,8 @@ export function SettingsScreen() {
     }
   }
 
-  return <main className="settingsPage">
-    <aside className="settingsSidebar" aria-label={copy.nav}>
-      <Link className="settingsBrand" href="/" aria-label="LiveOpWeg startpagina"><Image src="/liveopweg-logo.png" alt="LiveOpWeg" width={925} height={195} priority /></Link>
-      <nav className="settingsNav">
-        <Link href="/"><Icon name="train" /><span>{copy.trains}</span></Link>
-        <Link href="/meldingen"><Icon name="bell" /><span>{copy.notifications}</span></Link>
-        <Link href="/instellingen" className="active" aria-current="page"><Icon name="settings" /><span>{copy.settings}</span></Link>
-      </nav>
-      <small>{t("settings.always_on_way")}</small>
-    </aside>
+  return <main className="settingsPage radarShell">
+    <AppNavigation active="settings" />
     <div className="settingsMain">
       <header className="settingsIntro"><span>LiveOpWeg</span><h1>{copy.settings}</h1><p>{copy.intro}</p></header>
       <div className="settingsGrid">
@@ -99,7 +91,7 @@ export function SettingsScreen() {
           <div className="settingsRow"><div><strong>{copy.interface}</strong><small>{copy.savedDevice}</small></div><div className="settingsChoices" role="group" aria-label={copy.languageTitle}><button type="button" className={language === "nl" ? "selected" : ""} aria-pressed={language === "nl"} onClick={() => setLanguage("nl")}>Nederlands</button><button type="button" className={language === "en" ? "selected" : ""} aria-pressed={language === "en"} onClick={() => setLanguage("en")}>English</button></div></div>
         </section>
         <section className="settingsCard"><div className="settingsCardHeading"><span className="settingsCardIcon"><Icon name="bell" /></span><div><h2>{copy.browserNotifications}</h2><p>{copy.browserNotificationsDetail}</p></div></div>
-          <div className="settingsRow"><div><strong>{copy.delayNotifications}</strong><small>{copy.browserPermission}</small></div><button className={`settingsSwitch ${notificationsEnabled ? "on" : ""}`} type="button" role="switch" aria-checked={notificationsEnabled} onClick={updateNotifications}><span /></button></div>
+          <div className="settingsRow"><div><strong>{copy.delayNotifications}</strong><small>{copy.browserPermission}</small></div><button className={`settingsSwitch ${notificationsEnabled ? "on" : ""}`} type="button" role="switch" aria-label={copy.delayNotifications} aria-checked={notificationsEnabled} onClick={updateNotifications}><span /></button></div>
           {notificationMessage && <p className="settingsFeedback" role="status">{notificationMessage}</p>}
         </section>
         <section className="settingsCard settingsCardLinks"><div className="settingsCardHeading"><span className="settingsCardIcon"><Icon name="map" /></span><div><h2>{copy.mapsFilters}</h2><p>{copy.mapsDetail}</p></div></div><div className="settingsLinks"><Link href="/">{copy.trainMap} <span>{copy.trainMapDetail}</span></Link><Link href="/meldingen">{copy.alertsMap} <span>{copy.alertsMapDetail}</span></Link></div></section>

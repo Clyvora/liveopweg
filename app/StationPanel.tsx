@@ -1,147 +1,75 @@
 "use client";
-
 import { useEffect, useState } from "react";
-import { stationCatalogSource, type RailStation } from "../packages/domain-rail/stations";
+import type { RailStation } from "../packages/domain-rail/stations";
 import { stationBoardSchema, type StationBoard, type StationBoardEntry } from "../packages/protocol/station";
-import { parseTimestamp, realtimeHttpUrl } from "./realtime-url";
+import { realtimeHttpUrl } from "./realtime-url";
+import { useLanguage } from "./LanguageContext";
+import { useFavoriteStations } from "./useFavoriteStations";
 
-const clock = (value: string) => new Intl.DateTimeFormat("nl-NL", {
-  hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam",
-}).format(new Date(value));
-
-export function boardEntryStatus(entry: StationBoardEntry): string {
-  if (entry.cancelled) return "Vervalt";
+export function boardEntryStatus(entry: StationBoardEntry, en = false): string {
+  if (entry.cancelled) return en ? "Cancelled" : "Vervalt";
   if (entry.delaySeconds !== null && entry.delaySeconds >= 60) return `+${Math.floor(entry.delaySeconds / 60)} min`;
-  if (entry.trackChanged) return "Spoor gewijzigd";
-  if (entry.delaySeconds === null) return "Volgens planning";
-  return entry.delaySeconds < 0 ? "Eerder" : "Op tijd";
+  if (entry.trackChanged) return en ? "Platform changed" : "Spoor gewijzigd";
+  if (entry.delaySeconds === null) return en ? "Scheduled" : "Volgens planning";
+  return entry.delaySeconds < 0 ? (en ? "Early" : "Eerder") : (en ? "On time" : "Op tijd");
 }
-
-export function StationPanel({ station, now, availableVehicleIds, catalogFetchedAt, onClose, onSelectVehicle }: {
-  station: RailStation;
-  now: number;
-  availableVehicleIds: Set<string>;
-  catalogFetchedAt?: string | null;
-  onClose: () => void;
-  onSelectVehicle: (vehicleId: string) => void;
+export type StationPanelMemory = Map<string, { board: StationBoard | null; tab: "departures" | "arrivals"; selected: string | null }>;
+export function StationPanel({ station, now, availableVehicleIds, onClose, onSelectVehicle, memory }: {
+  station: RailStation; now: number; availableVehicleIds: Set<string>; catalogFetchedAt?: string | null; onClose: () => void; onSelectVehicle: (vehicleId: string) => void; memory: StationPanelMemory;
 }) {
-  const [board, setBoard] = useState<StationBoard | null>(null);
-  const [error, setError] = useState(false);
-  const [tab, setTab] = useState<"departures" | "arrivals">("departures");
-  const [expanded, setExpanded] = useState(false);
-  const [shared, setShared] = useState(false);
-
+  const { language } = useLanguage(); const en = language === "en";
+  const { favorites, toggle, error: favoriteError, retry: retryFavorites } = useFavoriteStations();
+  const [board, setBoard] = useState<StationBoard | null>(memory.get(station.code)?.board ?? null); const [error, setError] = useState(false);
+  const [tab, setTab] = useState<"departures" | "arrivals">(memory.get(station.code)?.tab ?? "departures");
+  const [selected, setSelected] = useState<string | null>(memory.get(station.code)?.selected ?? null); const [revision, setRevision] = useState(0);
+  useEffect(() => { memory.set(station.code, { board, tab, selected }); }, [memory, station.code, board, tab, selected]);
+  const [shareMessage, setShareMessage] = useState("");
+  const clock = (value: string) => new Date(value).toLocaleTimeString(en ? "en-GB" : "nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" });
   useEffect(() => {
-    let disposed = false;
-    let activeRequest: AbortController | null = null;
-    async function refresh() {
-      activeRequest?.abort();
-      const controller = new AbortController();
-      activeRequest = controller;
-      const timeout = window.setTimeout(() => controller.abort(), 8_000);
+    let disposed = false; let active: AbortController | null = null;
+    const refresh = async () => {
+      if (active || document.visibilityState === "hidden") return;
+      const controller = new AbortController(); active = controller;
       try {
-        const response = await fetch(realtimeHttpUrl(`/v1/stations/${encodeURIComponent(station.code)}/board`), { signal: controller.signal });
-        if (!response.ok) throw new Error("Stationbord niet beschikbaar");
-        const result = stationBoardSchema.parse(await response.json());
-        if (result.stationCode !== station.code) throw new Error("Onverwacht station");
-        if (!disposed) { setBoard(result); setError(false); }
-      } catch (error) {
-        if (!disposed && !(error instanceof DOMException && error.name === "AbortError")) {
-          console.warn(`[StationPanel] Failed to fetch board for ${station.code}:`, error);
-          setError(true);
-        }
-      } finally { window.clearTimeout(timeout); }
-    }
-    void refresh();
-    const timer = window.setInterval(() => { void refresh(); }, 15_000);
-    return () => { disposed = true; activeRequest?.abort(); window.clearInterval(timer); };
-  }, [station.code]);
-
-  const generatedAtTime = parseTimestamp(board?.generatedAt);
-  const stale = !board?.sourceHealthy || error || generatedAtTime === null || now - generatedAtTime > 45_000;
-  const entries = (board?.[tab] ?? []).filter((entry) => {
-    const expectedTime = parseTimestamp(entry.expectedAt);
-    return expectedTime !== null && expectedTime >= now;
-  });
-  const delayed = entries.filter((entry) => !entry.cancelled && (entry.delaySeconds ?? 0) >= 60).length;
-  const activity = Array.from({ length: 4 }, (_, index) => {
-    const from = now + index * 15 * 60_000;
-    const until = from + 15 * 60_000;
-    const events = [...(board?.arrivals ?? []), ...(board?.departures ?? [])];
-    return new Set(events.filter((entry) => {
-      const time = parseTimestamp(entry.expectedAt);
-      return time !== null && !entry.cancelled && time >= from && time < until;
-    }).map((entry) => `${entry.trainNumber}:${entry.expectedAt}`)).size;
-  });
-  const maxActivity = Math.max(1, ...activity);
-  const totalActivity = activity.reduce((sum, value) => sum + value, 0);
-  const activityLabel = totalActivity >= 24 ? "Veel treinbewegingen" : totalActivity >= 10 ? "Regelmatig treinverkeer" : "Rustig treinverkeer";
-  async function shareStation() {
-    const url = new URL(window.location.href);
-    url.search = `?station=${encodeURIComponent(station.code)}`;
-    const data = { title: `${station.name} · Liveopweg`, text: `Bekijk ${station.name} live op Liveopweg`, url: url.toString() };
+        const response = await fetch(realtimeHttpUrl(`/v1/stations/${encodeURIComponent(station.code)}/board`), { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8_000)]), cache: "no-store" });
+        if (!response.ok) throw new Error("station_unavailable");
+        const value = stationBoardSchema.parse(await response.json());
+        if (value.stationCode.toUpperCase() !== station.code.toUpperCase()) throw new Error("station_mismatch");
+        if (!disposed) { setBoard(value); setError(false); }
+      } catch { if (!disposed) setError(true); }
+      finally { active = null; }
+    };
+    void refresh(); const interval = setInterval(() => void refresh(), 15_000);
+    const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { disposed = true; active?.abort(); clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
+  }, [station.code, revision]);
+  const stale = error || !board?.sourceHealthy || now - Date.parse(board?.generatedAt ?? "") > 45_000;
+  const entries = (board?.[tab] ?? []).filter(entry => Date.parse(entry.expectedAt) >= now);
+  const share = async () => {
+    const url = new URL(window.location.href); url.search = `?station=${station.code}`;
     try {
-      if (navigator.share) await navigator.share(data);
-      else await navigator.clipboard.writeText(data.url);
-      setShared(true); window.setTimeout(() => setShared(false), 1800);
-    } catch { /* Delen geannuleerd. */ }
-  }
-
-  return <aside className={`stationPanel ${expanded ? "expanded" : ""}`} aria-label={`Station ${station.name}`}>
-    <header className="stationPanelHeader">
-      <div>
-        <p className="stationEyebrow"><svg viewBox="0 0 24 24" aria-hidden="true" width="10" height="10"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Station · {station.code}</p>
-        <h2>{station.name}</h2>
-        <p className={`stationFeedState ${stale ? "stale" : ""}`} role="status">
-          <i />{error ? "Verbinding onderbroken · opnieuw proberen…" : !board ? "Ritten ophalen…" : stale ? "Ritbron nog niet actueel" : "Live ritinformatie"}
-        </p>
-      </div>
-      <div className="panelHeaderActions"><button className="panelShare" onClick={() => void shareStation()} aria-label={`Deel ${station.name}`}>{shared ? "Gekopieerd" : "Delen"}</button><button className="stationClose" onClick={onClose} aria-label="Sluit stationinformatie">×</button></div>
-    </header>
-    <div className="stationTabs" role="tablist" aria-label="Stationbord">
-      <button id="station-departures-tab" role="tab" aria-selected={tab === "departures"} aria-controls="station-board" onClick={() => { setTab("departures"); setExpanded(false); }}>Vertrek</button>
-      <button id="station-arrivals-tab" role="tab" aria-selected={tab === "arrivals"} aria-controls="station-board" onClick={() => { setTab("arrivals"); setExpanded(false); }}>Aankomst</button>
-      <span>Komende 60 min</span>
+      if (navigator.share) await navigator.share({ title: `${station.name} · Liveopweg`, url: url.toString() });
+      else { await navigator.clipboard.writeText(url.toString()); setShareMessage(en ? "Link copied" : "Link gekopieerd"); }
+    } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setShareMessage(en ? "Sharing is unavailable in this browser." : "Delen is niet beschikbaar in deze browser."); }
+  };
+  return <aside className="stationPanel uiPanel" aria-label={`Station ${station.name}`}>
+    <header className="uiPanelHeader"><div><span className="radarEyebrow">STATION · {station.code}</span><h2>{station.name}</h2></div><button className="radarClose" onClick={onClose} aria-label={en ? "Close station" : "Sluit stationinformatie"}>×</button></header>
+    <div className="uiActions"><button onClick={() => toggle(station.code)} aria-pressed={favorites.includes(station.code)}>{favorites.includes(station.code) ? "★" : "☆"} {en ? "Favorite" : "Favoriet"}</button><button onClick={() => void share()}>{en ? "Share" : "Delen"}</button></div>
+    {shareMessage && <p role="status">{shareMessage}</p>}{favoriteError && <div className="uiNotice" role="status"><p>{en ? "Favorites are kept for this session. Your browser could not save them." : "Je favorieten blijven deze sessie bewaard. Je browser kon ze niet opslaan."}</p><button onClick={retryFavorites}>{en ? "Try saving again" : "Opnieuw opslaan"}</button></div>}
+    <div className="uiTabs" role="tablist" aria-label={en ? "Station board" : "Stationbord"}>{(["departures", "arrivals"] as const).map(kind => <button key={kind} id={`station-${kind}-tab`} role="tab" aria-selected={tab === kind} aria-controls="station-board" tabIndex={tab === kind ? 0 : -1} onKeyDown={event => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); const next = kind === "departures" ? "arrivals" : "departures"; setTab(next); document.getElementById(`station-${next}-tab`)?.focus(); } }} onClick={() => { setTab(kind); setSelected(null); }}>{kind === "departures" ? (en ? "Departures" : "Vertrek") : (en ? "Arrivals" : "Aankomst")}</button>)}</div>
+    {stale && board && <p className="uiNotice" role="status">{en ? "These times may be out of date." : "Deze tijden kunnen verouderd zijn."}</p>}
+    {error && <div className="uiNotice" role="alert"><p>{en ? "The station board is temporarily unavailable." : "Het stationbord is tijdelijk niet beschikbaar."}</p><button onClick={() => setRevision(value => value + 1)}>{en ? "Try again" : "Opnieuw proberen"}</button></div>}
+    {!board && !error && <p role="status">{en ? "Loading departures…" : "Ritten ophalen…"}</p>}
+    <div id="station-board" role="tabpanel" aria-labelledby={`station-${tab}-tab`}>
+      {board && !entries.length && <p>{en ? "No journeys received for the next hour. This does not mean no trains are running." : "Geen ritten ontvangen voor het komende uur. Dit betekent niet dat er geen treinen rijden."}</p>}
+      <ul className="uiResultList">{entries.map(entry => {
+        const canFollow = !stale && !entry.cancelled && entry.vehicleId !== null && availableVehicleIds.has(entry.vehicleId);
+        return <li key={entry.id}><button className="uiResultButton stationResult" aria-expanded={selected === entry.id} onClick={() => setSelected(selected === entry.id ? null : entry.id)}><time dateTime={entry.expectedAt}>{clock(entry.expectedAt)}</time><span><strong>{entry.direction}</strong><small>{entry.serviceType} {entry.trainNumber}</small></span><span>{en ? "Platform" : "Spoor"} {entry.track ?? "—"}</span><small className={entry.cancelled || (entry.delaySeconds ?? 0) >= 60 ? "tpLate" : ""}>{boardEntryStatus(entry, en)}</small></button>
+          {selected === entry.id && <div className="uiResultDetail"><p>{entry.serviceType} {entry.trainNumber} · {entry.operator ?? "—"}</p>{entry.trackChanged && <p>{en ? "Platform changed" : "Spoor gewijzigd"}: {entry.plannedTrack ?? "—"} → {entry.track ?? "—"}</p>}<button disabled={!canFollow} onClick={() => { if (entry.vehicleId && canFollow) onSelectVehicle(entry.vehicleId); }}>{en ? "View on radar" : "Bekijk op radar"}</button>{!canFollow && <p>{en ? "No current live position available for this train." : "Voor deze trein is geen actuele livepositie beschikbaar."}</p>}</div>}
+        </li>;
+      })}</ul>
     </div>
-    <div className="stationBoardSummary">
-      <span>{board ? `${entries.length} ontvangen ritten` : "Verbinding maken"}</span>
-      {delayed > 0 && <span className="stationDelayCount">{delayed} vertraagd</span>}
-    </div>
-    {board && <section className="stationActivity" aria-label={`Stationsactiviteit: ${activityLabel}`}>
-      <div><strong>Treinactiviteit</strong><span>{activityLabel} · komende uur</span></div>
-      <div className="activityBars" aria-hidden="true">{activity.map((value, index) => <i key={index} style={{ height: `${Math.max(12, value / maxActivity * 100)}%` }} />)}</div>
-      <b>{totalActivity}</b>
-    </section>}
-    <section className="stationFacilities">
-      <h3>Voorzieningen</h3>
-      <p>Betrouwbare actuele informatie over voorzieningen is niet beschikbaar.</p>
-    </section>
-    <div className="stationBoardColumns" aria-hidden="true"><span>Tijd</span><span>{tab === "departures" ? "Richting" : "Vanuit"}</span><span>Spoor</span></div>
-    <div id="station-board" role="tabpanel" aria-labelledby={`station-${tab}-tab`} className="stationBoardList" tabIndex={0}>
-      {!board && !error && <p className="stationBoardEmpty">Actuele {tab === "departures" ? "vertrekken" : "aankomsten"} worden opgehaald.</p>}
-      {error && !board && <p className="stationBoardEmpty">Het stationbord is tijdelijk niet bereikbaar. We proberen het automatisch opnieuw.</p>}
-      {board && entries.length === 0 && <p className="stationBoardEmpty">Nog geen {tab === "departures" ? "vertrekken" : "aankomsten"} ontvangen voor het komende uur. Dit betekent niet dat er geen treinen rijden.</p>}
-      {entries.map((entry) => {
-        const canFollow = !stale && entry.vehicleId !== null && availableVehicleIds.has(entry.vehicleId);
-        return <button key={entry.id} className={`stationBoardRow ${entry.cancelled ? "cancelled" : ""}`} disabled={!canFollow}
-          onClick={() => { if (canFollow && entry.vehicleId) onSelectVehicle(entry.vehicleId); }}
-          aria-label={`${entry.serviceType} ${entry.trainNumber}, ${entry.direction}, ${clock(entry.expectedAt)}, spoor ${entry.track ?? "onbekend"}, ${boardEntryStatus(entry)}${canFollow ? ", volg trein op de kaart" : ", geen livepositie beschikbaar"}`}>
-          <span className="stationTime"><time dateTime={entry.expectedAt}>{clock(entry.expectedAt)}</time>
-            {entry.plannedAt && (entry.delaySeconds ?? 0) >= 60 && <del>{clock(entry.plannedAt)}</del>}
-          </span>
-          <span className="stationTrip"><strong title={entry.direction}>{entry.direction}</strong><span>{entry.serviceType} {entry.trainNumber} · {entry.operator ?? "Vervoerder onbekend"}</span>
-            <small className={entry.cancelled || (entry.delaySeconds ?? 0) >= 60 ? "warning" : entry.trackChanged ? "changed" : ""}>{boardEntryStatus(entry)}{entry.trackChanged && (entry.delaySeconds ?? 0) >= 60 ? " · spoor gewijzigd" : ""}{canFollow ? " · Volg trein ↗" : ""}</small>
-          </span>
-          <span className={`stationTrack ${entry.trackChanged ? "changed" : ""}`} title={entry.trackChanged ? `Gepland spoor ${entry.plannedTrack}` : undefined}>{entry.track ?? "—"}{entry.trackChanged && <small>gewijzigd</small>}</span>
-        </button>;
-      })}
-    </div>
-    {entries.length > 3 && <button className={`stationExpand ${entries.length === 4 ? "smallOnly" : ""}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>{expanded ? "Minder ritten" : "Meer ritten"}<span>{expanded ? "−" : "+"}</span></button>}
-    <footer className="stationPanelFooter">
-      <p>Op basis van ontvangen ritberichten; mogelijk niet alle ritten beschikbaar.{stale && board ? " Laatst ontvangen bord: " + clock(board.generatedAt) + "." : ""}</p>
-      {catalogFetchedAt
-        ? <a href="https://www.ns.nl/reisinformatie/ns-api" target="_blank" rel="noreferrer" title={`Catalogus opgehaald ${clock(catalogFetchedAt)}`}>Actuele stationdata: NS · {clock(catalogFetchedAt)}</a>
-        : <a href={stationCatalogSource.url} target="_blank" rel="noreferrer" title={`Stationslijst ${stationCatalogSource.version} · ${stationCatalogSource.license}`}>Stationdata: Rijden de Treinen / NS · {stationCatalogSource.version}</a>}
-    </footer>
+    <small className="uiSourceNote">{en ? "Received journey information · next 60 minutes" : "Ontvangen ritinformatie · komende 60 minuten"}</small>
   </aside>;
 }

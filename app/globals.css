@@ -156,14 +156,9 @@ h1 em { color:var(--orange); font-family:Georgia,serif; font-weight:400; }
 .mapAttribution { position:absolute; z-index:2; right:8px; bottom:7px; background:rgba(255,255,255,.84); padding:3px 5px; border-radius:3px; color:#334; font-size:9px; }
 .trainMarker { width:38px; height:38px; border:3px solid white; border-radius:50%; background:var(--orange); color:white; box-shadow:0 5px 18px rgba(10,37,32,.34); display:grid; place-items:center; cursor:pointer; }
 .trainMarker span { font:800 10px/1 var(--font-geist-mono); }
-.observationPanel { position:absolute; z-index:60; top:80px; right:16px; bottom:16px; width:min(380px,calc(100% - 32px)); display:flex; flex-direction:column; overflow-y:auto; padding:20px; border:1px solid rgba(255,255,255,.7); border-radius:var(--radius-xl); background:rgba(255,253,247,.92); box-shadow:var(--shadow-xl); backdrop-filter:blur(24px) saturate(1.8); -webkit-backdrop-filter:blur(24px) saturate(1.8); scrollbar-width:thin; animation:slideLeft .3s ease; }
-[data-theme="dark"] .observationPanel { background:rgba(26,37,40,.92); border-color:rgba(255,255,255,.1); }
-.observationPanel::-webkit-scrollbar { width:5px; }
-.observationPanel::-webkit-scrollbar-thumb { background:rgba(22,37,40,.15); border-radius:999px; }
 .selectedTrainHeader { margin-bottom:16px; }
 .selectedTrainHeader .panelKicker { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--green); margin:0 0 6px; }
 .selectedTrainHeader h2 { margin:0; font-size:28px; font-weight:800; letter-spacing:-.04em; line-height:1.05; }
-.observationPanel>p:not(.panelKicker) { color:#647173; line-height:1.55; font-size:14px; }
 .timestampGrid { margin-top:28px; display:grid; grid-template-columns:1fr auto; gap:13px 18px; padding:20px 0; border-top:1px solid #dfe2dc; border-bottom:1px solid #dfe2dc; font-size:12px; }
 .timestampGrid span { color:#748083; }.timestampGrid strong { font-family:var(--font-geist-mono); font-size:11px; }
 .followButton { align-self:flex-start; margin-top:12px; border:0; background:var(--green); color:white; border-radius:999px; padding:10px 14px; font-weight:700; cursor:pointer; }
@@ -198,7 +193,7 @@ h1 em { color:var(--orange); font-family:Georgia,serif; font-weight:400; }
 .journeyFooter { display:flex; justify-content:space-between; gap:20px; padding-top:22px; border-top:1px solid rgba(255,255,255,.14); color:#7f8e8b; font:600 9px/1.4 var(--font-geist-mono); text-transform:uppercase; letter-spacing:.06em; }
 @media (max-width:1100px) { .roadToggles { grid-template-columns:repeat(3,1fr); } }
 @media (max-width:1050px) { .fleetTools { grid-template-columns:180px 1fr; }.trainResults { grid-column:1/-1; } }
-@media (max-width:850px) { .hero,.roadOverview,.workspace,.journeyHeader { grid-template-columns:1fr; }.hero{padding-top:50px}.workspace{min-height:auto}.mapWrap,.mapPlaceholder{min-height:430px}.observationPanel{min-height:360px}.journeyFacts{grid-template-columns:repeat(3,1fr)} }
+@media (max-width:850px) { .hero,.roadOverview,.workspace,.journeyHeader { grid-template-columns:1fr; }.hero{padding-top:50px}.workspace{min-height:auto}.mapWrap,.mapPlaceholder{min-height:430px}.journeyFacts{grid-template-columns:repeat(3,1fr)} }
 @media (max-width:560px) { .shell{padding:16px}.sourcePill{font-size:0}.sourcePill:after{content:"NDOV";font-size:10px}h1{font-size:50px}.hero{gap:30px}.waitingMarker{font-size:11px}.nlSilhouette{font-size:220px} }
 @media (max-width:560px) { .journeyFacts{grid-template-columns:1fr}.routeList li{grid-template-columns:22px minmax(120px,1fr) 60px}.routeList .track{display:none}.journeyFooter{flex-direction:column} }
 @media (max-width:560px) { .fleetTools{grid-template-columns:1fr}.trainResults{grid-column:auto}.fleetTools>div:first-child strong{font-size:30px}.mapLabel{max-width:calc(100% - 40px);line-height:1.35} }
@@ -262,28 +257,6 @@ h1 em { color:var(--orange); font-family:Georgia,serif; font-weight:400; }
   min-height:100%;
 }
 .trainOverlay { position:absolute; z-index:1; inset:0; width:100%; height:100%; pointer-events:none; }
-.observationPanel {
-  position:absolute;
-  z-index:12;
-  top:88px;
-  right:clamp(16px,2vw,28px);
-  bottom:24px;
-  width:min(360px,calc(100% - 32px));
-  min-height:0;
-  overflow-y:auto;
-  padding:22px;
-  border:1px solid rgba(255,255,255,.62);
-  border-radius:20px;
-  background:rgba(255,253,247,.93);
-  box-shadow:0 22px 60px rgba(10,37,32,.24);
-  backdrop-filter:blur(20px);
-  scrollbar-width:thin;
-}
-.observationPanel h2 { margin:9px 0 7px; font-size:26px; }
-.observationPanel>p:not(.panelKicker) { margin:0; font-size:12px; }
-.observationPanel .timestampGrid { margin-top:16px; padding:14px 0; gap:9px 14px; }
-.observationPanel .positionComparison { margin-top:12px; }
-.observationPanel .matchPanel { margin-top:10px; }
 .fleetTools {
   position:absolute;
   z-index:14;
@@ -340,12 +313,6 @@ h1 em { color:var(--orange); font-family:Georgia,serif; font-weight:400; }
 }
 .fleetTools .trainResults button { width:100%; }
 .mapLegend span:nth-child(n+4) { display:none; }
-.observationPanel {
-  bottom:auto;
-  width:min(330px,calc(100% - 32px));
-  max-height:calc(100svh - 112px);
-  padding:18px;
-}
 .trainQuickFacts {
   display:grid;
   grid-template-columns:repeat(3,1fr);
@@ -398,22 +365,6 @@ h1 em { color:var(--orange); font-family:Georgia,serif; font-weight:400; }
   .mapLegend { top:146px; right:12px; left:12px; gap:5px; }
   .mapLegend span { padding:7px 8px; font-size:8px; }
   .mapLegend span:nth-child(n+4) { display:none; }
-  .observationPanel {
-    top:auto;
-    right:12px;
-    bottom:14px;
-    width:calc(100% - 24px);
-    max-height:38svh;
-    padding:16px;
-    border-radius:18px;
-  }
-  .observationPanel .timestampGrid { display:grid; }
-  .observationPanel .positionComparison,
-  .observationPanel .matchPanel,
-  .observationPanel .confidenceDetails,
-  .observationPanel .provenance { display:block; }
-  .observationPanel h2 { margin:6px 0 4px; font-size:23px; }
-  .observationPanel>p:not(.panelKicker) { margin:0; line-height:1.4; }
   .mapLabel { bottom:calc(38svh + 28px); left:12px; max-width:calc(100% - 24px); }
   .mapAttribution { max-width:64%; line-height:1.25; }
   .hero { padding-top:56px; }
@@ -577,20 +528,6 @@ body { background:var(--cream); }
 .mapActions svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .mapActions strong { min-width:22px; padding:4px 6px; border-radius:999px; background:#e8eef3; color:#526774; font-size:8px; }
 .mapAttribution { right:6px; bottom:5px; max-width:58%; background:rgba(255,255,255,.72); color:#60717c; font-size:7px; line-height:1.25; }
-
-.observationPanel {
-  top:auto;
-  right:20px;
-  bottom:20px;
-  width:340px;
-  max-height:min(520px,calc(100svh - 40px));
-  padding:17px;
-  border:1px solid rgba(255,255,255,.8);
-  border-radius:15px;
-  background:rgba(255,255,255,.97);
-  box-shadow:0 18px 48px rgba(20,41,61,.2);
-  backdrop-filter:blur(10px);
-}
 .selectedTrainHeader { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
 .panelHeaderActions { display:flex; align-items:center; gap:7px; }
 .panelShare {
@@ -649,44 +586,6 @@ body { background:var(--cream); }
 .routeStop time { font:700 9px/1 var(--font-geist-mono); }
 .routeTimeline>small { display:block; margin-top:7px; color:#8998a1; font-size:7px; line-height:1.4; }
 
-.mapDrawer {
-  position:fixed;
-  z-index:40;
-  top:16px;
-  left:16px;
-  bottom:auto;
-  width:min(410px,calc(100% - 32px));
-  max-height:calc(100svh - 32px);
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  margin:0;
-  padding:46px 10px 10px;
-  overflow-y:auto;
-  border:1px solid rgba(255,255,255,.82);
-  border-radius:16px;
-  background:#f4f7f8;
-  box-shadow:0 24px 70px rgba(16,42,67,.28);
-  transform:translateX(calc(-100% - 32px));
-  opacity:0;
-  visibility:hidden;
-  transition:transform .22s ease,opacity .18s ease,visibility .22s;
-}
-.mapDrawer.open { transform:translateX(0); opacity:1; visibility:visible; }
-.mapDrawer .drawerClose { position:absolute; top:10px; right:10px; }
-.mapDrawer .roadLayerPanel,.mapDrawer .roadEventCard {
-  border:1px solid var(--ui-line);
-  border-radius:12px;
-  background:white;
-  box-shadow:none;
-  padding:16px;
-}
-.mapDrawer .roadLayerHeading { align-items:center; }
-.mapDrawer .roadLayerHeading h2,.mapDrawer .roadEventCard h2 { margin-top:6px; font-size:22px; }
-.mapDrawer .roadToggles { grid-template-columns:1fr 1fr; gap:6px; margin-top:14px; }
-.mapDrawer .roadToggles label { padding:10px 9px; border-radius:8px; }
-.mapDrawer .roadSourceNote { margin-top:11px; }
-
 @media (max-width:760px) {
   .topbar { top:15px; left:14px; right:14px; height:34px; }
   .brandLogo { width:122px; }
@@ -707,20 +606,10 @@ body { background:var(--cream); }
   .fleetTools .trainResults { top:48px; left:78px; max-height:250px; }
   .mapActions { top:116px; left:12px; }
   .mapActions button { height:36px; padding:0 10px; }
-  .observationPanel {
-    right:10px;
-    bottom:12px;
-    width:calc(100% - 20px);
-    max-height:48svh;
-    padding:14px;
-    border-radius:14px;
-  }
   .selectedTrainHeader h2 { font-size:20px; }
   .trainQuickFacts { margin-top:11px; }
   .observationDetails { margin-top:8px; }
   .mapAttribution { max-width:70%; }
-  .mapDrawer { top:8px; left:8px; bottom:auto; width:calc(100% - 16px); max-height:calc(100svh - 16px); border-radius:14px; }
-  .mapDrawer .roadToggles { grid-template-columns:1fr 1fr; }
 }
 
 @media (max-width:390px) {
@@ -753,37 +642,14 @@ body {
 .mapWrap,
 .liveMap { height:100%; min-height:0; }
 .fleetTools .trainResults { max-height:min(280px,calc(100dvh - 140px)); }
-.observationPanel { max-height:calc(100dvh - 170px); }
 
 @media (max-width:760px) {
   .workspace { min-height:0; }
   .topbar { top:max(12px,env(safe-area-inset-top)); }
-  .observationPanel {
-    bottom:max(12px,env(safe-area-inset-bottom));
-    max-height:min(48dvh,420px);
-  }
   .fleetTools .trainResults { max-height:min(250px,calc(100dvh - 126px)); }
 }
 
 /* Compact treindetail, opgebouwd als een rustig radar-informatiepaneel. */
-.observationPanel {
-  width:360px;
-  padding:0;
-  overflow-y:auto;
-  border:1px solid rgba(255,255,255,.9);
-  border-radius:16px;
-  background:rgba(255,255,255,.98);
-  box-shadow:0 20px 55px rgba(16,42,67,.24);
-}
-.observationPanel::before {
-  content:"";
-  position:sticky;
-  z-index:2;
-  top:0;
-  display:block;
-  height:4px;
-  background:#2877d4;
-}
 .selectedTrainHeader {
   padding:14px 16px 12px;
   border-bottom:1px solid #e4eaee;
@@ -915,23 +781,6 @@ body {
 .searchGroupLabel { margin:5px 9px; color:#72838e; font-size:9px; font-weight:700; }
 .stationSearchResult strong::before { content:"▣"; margin-right:7px; color:#2877d4; }
 .stationTooltip .maplibregl-popup-content { padding:8px 12px; border-radius:8px; color:#183d59; font:700 11px/1.3 Arial,sans-serif; }
-.stationPanel {
-  position:absolute;
-  z-index:13;
-  right:20px;
-  bottom:20px;
-  display:flex;
-  flex-direction:column;
-  width:390px;
-  max-height:calc(100dvh - 60px);
-  overflow:hidden;
-  border:1px solid #e1e9ef;
-  border-top:4px solid #2877d4;
-  border-radius:16px;
-  background:#fff;
-  color:#19364b;
-  box-shadow:0 20px 55px rgba(16,42,67,.24);
-}
 .stationPanelHeader { display:flex; justify-content:space-between; gap:12px; padding:15px 16px 12px; }
 .stationPanelHeader>div { min-width:0; }
 .stationEyebrow { margin:0 0 7px; color:#69808f; font:700 9px/1.2 Arial,sans-serif; letter-spacing:.08em; text-transform:uppercase; }
@@ -958,8 +807,6 @@ body {
 .stationBoardColumns { padding:0 16px 8px; color:#81929c; font:700 8px/1.1 Arial,sans-serif; text-transform:uppercase; letter-spacing:.09em; }
 .stationBoardColumns>span:last-child { text-align:center; }
 .stationBoardList { min-height:60px; max-height:290px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
-.stationPanel.expanded .stationBoardList { max-height:440px; }
-.stationPanel:not(.expanded) .stationBoardRow:nth-child(n+5) { display:none; }
 .stationBoardRow { width:100%; align-items:center; min-height:68px; padding:11px 16px; border:0; border-top:1px solid #edf1f4; background:#fff; color:inherit; text-align:left; font-family:inherit; cursor:pointer; }
 .stationBoardRow:disabled { opacity:0.5; cursor:not-allowed; }
 .stationBoardRow:not(:disabled):hover { background:#f1f7fc; }
@@ -1048,37 +895,17 @@ body {
 .mapActions button { height:clamp(46px,2.8vw,58px); padding:0 16px; border-radius:14px; font-size:clamp(12px,.52vw,15px); }
 .mapActions svg { width:20px; height:20px; }
 .mapActions strong { font-size:10px; }
-.mapDrawer {
-  top:auto;
-  left:clamp(22px,1.7vw,42px);
-  bottom:clamp(84px,5.6vw,112px);
-  width:clamp(390px,22vw,520px);
-  max-height:calc(100dvh - 150px);
-  padding:50px 12px 12px;
-  transform:translateY(calc(100% + 140px));
-}
-.mapDrawer.open { transform:translateY(0); }
-.mapDrawer .roadLayerPanel { padding:18px; }
 .layerToggleSection { margin-top:18px; }
 .layerToggleSection h3 { margin:0 0 9px; color:#6a7d88; font:800 9px/1 var(--font-geist-mono); letter-spacing:.1em; text-transform:uppercase; }
-.mapDrawer .mapLayerToggles { grid-template-columns:repeat(3,1fr); }
-.mapDrawer .mapLayerToggles label { grid-template-columns:auto 1fr; }
-.mapDrawer .roadToggles span { font-size:11px; }
-
-.observationPanel { right:clamp(22px,1.7vw,42px); bottom:clamp(22px,1.7vw,42px); width:clamp(390px,20vw,500px); }
-.stationPanel { right:clamp(22px,1.7vw,42px); width:clamp(420px,22vw,560px); }
 
 @media (min-width:2200px) {
   .railAlertsHeader { padding:20px 22px 16px; }
   .railAlertCard { margin:15px; padding:20px; }
   .railFeedSummary { padding:0 22px 20px; font-size:13px; }
   .railFeedSummary strong { font-size:13px; }
-  .mapDrawer .roadToggles label { min-height:46px; }
-  .mapDrawer .roadToggles span { font-size:13px; }
-  .mapDrawer .roadToggles strong { font-size:13px; }
 }
 
-@media (max-width:900px) {
+@media (max-width:1023px) {
   .topbar { top:12px; left:12px; right:12px; height:38px; }
   .brandLogo { width:128px; }
   .fleetTools { top:62px; left:12px; width:calc(100% - 24px); grid-template-columns:76px minmax(0,1fr); gap:7px; }
@@ -1093,28 +920,19 @@ body {
   .railAlertCard p { font-size:11px; }
   .mapActions { left:12px; bottom:12px; }
   .mapActions button { height:44px; border-radius:12px; font-size:12px; }
-  .mapDrawer { left:8px; bottom:64px; width:calc(100% - 16px); max-height:calc(100dvh - 82px); }
-  .mapDrawer .mapLayerToggles { grid-template-columns:1fr 1fr; }
 }
 .stationPanelFooter p { margin:0; color:#8798a2; font-size:9px; line-height:1.4; }
 .stationPanelFooter a { display:inline-block; margin-top:5px; color:#7e93a1; font-size:8px; text-decoration:none; }
 .stationPanelHeader,.stationTabs,.stationBoardSummary,.stationActivity,.stationBoardColumns,.stationExpand,.stationPanelFooter { flex-shrink:0; }
 
 @media (max-width:760px) {
-  .stationPanel { right:10px; bottom:max(12px,env(safe-area-inset-bottom)); width:calc(100% - 20px); max-height:min(60dvh,calc(100dvh - 170px)); }
-  .stationPanel.expanded { max-height:calc(100dvh - 170px); }
   .stationPanelHeader { padding:12px 14px 10px; }
   .stationPanelHeader h2 { font-size:22px; }
-  .stationPanel:not(.expanded) .stationBoardRow:nth-child(n+4) { display:none; }
-  .stationBoardList,.stationPanel.expanded .stationBoardList { max-height:none; }
+  .stationBoardList { max-height:none; }
   .stationExpand.smallOnly { display:flex; }
 }
 
 @media (max-width:760px) {
-  .observationPanel {
-    width:calc(100% - 20px);
-    max-height:min(52dvh,450px);
-  }
   .selectedTrainHeader { padding:12px 14px 10px; }
   .selectedTrainHeader h2 { font-size:21px; }
   .nextStopCard,
@@ -1323,13 +1141,6 @@ body {
 .mapStyleMenu b { color:#1268d7; text-align:center; }
 .mapAttribution { right:calc(var(--radar-feed) + 34px); bottom:4px; }
 
-.mapDrawer { left:calc(var(--radar-sidebar) + 22px); bottom:88px; z-index:31; }
-.mapDrawer .roadLayerPanel { width:100%; }
-.observationPanel,.stationPanel {
-  z-index:26; top:18px; right:18px; bottom:18px; width:var(--radar-feed); max-height:none;
-  border-radius:18px; box-shadow:var(--radar-shadow);
-}
-
 @media (min-width:3000px) {
   .sideNav button { min-height:64px; font-size:17px; }
   .brandBlock p { font-size:14px; }
@@ -1358,7 +1169,7 @@ body {
   .quickFilters button span { display:none; }
 }
 
-@media (max-width:900px) {
+@media (max-width:1023px) {
   :root { --radar-sidebar:0px; --radar-feed:calc(100% - 20px); }
   .topbar {
     inset:0 0 auto 0; width:auto; height:56px; padding:0 13px; flex-direction:row; align-items:center;
@@ -1389,8 +1200,6 @@ body {
   .mapStyleCurrent .mapStylePreview { width:34px; height:32px; }
   .mapStyleMenu { bottom:51px; width:180px; }
   .mapAttribution { right:8px; bottom:58px; max-width:70%; }
-  .mapDrawer { left:8px; bottom:64px; width:calc(100% - 16px); max-height:calc(100dvh - 82px); }
-  .observationPanel,.stationPanel { top:auto; right:10px; bottom:10px; width:calc(100% - 20px); max-height:min(60dvh,520px); }
 }
 
 @media (max-width:560px) {
@@ -1400,7 +1209,7 @@ body {
 }
 
 /* Focused live-radar layout: more map, less chrome. */
-@media (min-width:901px) {
+@media (min-width:1024px) {
   :root { --radar-sidebar:88px; --radar-feed:clamp(360px,18vw,430px); }
   .topbar { width:var(--radar-sidebar); padding:18px 10px 14px; align-items:center; }
   .brandBlock { display:grid; place-items:center; }
@@ -1425,7 +1234,7 @@ body {
   .quickFilters .trafficFilter i { background:#e64b45; }
   .quickFilters .alertsFilter i { background:#2379d7; }
   .railAlertsPanel.liveFeedPanel { inset:12px 12px 12px auto; }
-  .mapActions,.mapLegendCompact,.mapDrawer { left:calc(var(--radar-sidebar) + 16px); }
+  .mapActions,.mapLegendCompact { left:calc(var(--radar-sidebar) + 16px); }
   .mapZoomControls,.mapStylePicker { right:calc(var(--radar-feed) + 28px); }
   .mapAttribution { right:calc(var(--radar-feed) + 28px); }
 }
@@ -1455,7 +1264,7 @@ body {
   .feedSectionTitle span { font-size:10px; }
 }
 
-@media (max-width:1500px) and (min-width:901px) {
+@media (max-width:1500px) and (min-width:1024px) {
   :root { --radar-sidebar:76px; --radar-feed:350px; }
   .topbar { padding-left:7px; padding-right:7px; }
   .brandBlock .brandLogo { width:64px; }
@@ -1464,7 +1273,7 @@ body {
   .quickFilters button span { display:inline; }
 }
 
-@media (max-width:900px) {
+@media (max-width:1023px) {
   .brandBlock .brand { display:block; }
   .networkSummary { margin:8px 10px; padding:7px; }
   .networkSummary div { padding:7px 5px; }
@@ -1502,7 +1311,7 @@ body {
 .radarStatusBar span { color:#b9cad7; font-size:9px; white-space:nowrap; }
 
 
-@media (min-width:901px) {
+@media (min-width:1024px) {
   .topbar { inset:0 auto 0 0; width:var(--radar-sidebar); height:auto; padding:19px 0 16px; display:flex; flex-direction:column; justify-content:flex-start; border:0; border-radius:0; background:linear-gradient(180deg,#0c2d49,#0a243b); box-shadow:7px 0 26px rgba(13,39,60,.16); }
   .railBrand { flex:none; height:72px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,.1); }
   .sideNav { width:100%; margin-top:18px; display:grid; gap:3px; }
@@ -1528,13 +1337,9 @@ body {
   .mapActions button { height:52px; padding:0 19px; border:1px solid rgba(255,255,255,.25); border-radius:11px; background:var(--rail-ink); color:#fff; box-shadow:0 10px 26px rgba(12,37,57,.2); }
   .mapActions button:hover { background:#123b5c; }
   .mapActions button svg { width:21px; height:21px; }
-  .mapDrawer { left:calc(var(--radar-sidebar) + 24px); bottom:84px; }
   .mapZoomControls { top:auto; right:18px; bottom:88px; border:1px solid #dbe4ea; border-radius:10px; box-shadow:0 10px 25px rgba(18,48,70,.14); }
   .mapStylePicker { right:18px; bottom:18px; }
   .mapAttribution { right:182px; bottom:5px; }
-
-  .observationPanel,.stationPanel { top:0; right:0; bottom:0; width:var(--radar-feed); max-height:none; border:0; border-left:1px solid #dce5eb; border-radius:0; box-shadow:-8px 0 30px rgba(16,42,67,.14); }
-  .observationPanel::before { display:none; }
   .selectedTrainHeader { position:sticky; z-index:3; top:0; padding:20px 18px 15px; background:#fff; }
   .selectedTrainHeader h2 { font-size:24px; }
   .panelShare { padding:7px 10px; }
@@ -1546,9 +1351,9 @@ body {
   .nextStopCard { margin:14px 18px 0; }
   .routeTimeline { margin:16px 18px 0; padding:0 0 12px; }
 
-  .shell:has(.liveFeedPanel.open) .mapZoomControls,.shell:has(.observationPanel) .mapZoomControls,.shell:has(.stationPanel) .mapZoomControls { right:calc(var(--radar-feed) + 18px); }
-  .shell:has(.liveFeedPanel.open) .mapStylePicker,.shell:has(.observationPanel) .mapStylePicker,.shell:has(.stationPanel) .mapStylePicker { right:calc(var(--radar-feed) + 18px); }
-  .shell:has(.liveFeedPanel.open) .mapAttribution,.shell:has(.observationPanel) .mapAttribution,.shell:has(.stationPanel) .mapAttribution { right:calc(var(--radar-feed) + 185px); }
+  .shell:has(.liveFeedPanel.open) .mapZoomControls { right:calc(var(--radar-feed) + 18px); }
+  .shell:has(.liveFeedPanel.open) .mapStylePicker { right:calc(var(--radar-feed) + 18px); }
+  .shell:has(.liveFeedPanel.open) .mapAttribution { right:calc(var(--radar-feed) + 185px); }
 }
 
 @media (min-width:2200px) {
@@ -1567,7 +1372,7 @@ body {
   .trainHero { height:125px; }
 }
 
-@media (max-width:900px) {
+@media (max-width:1023px) {
   :root { --radar-sidebar:0px; --radar-feed:100%; }
   .topbar { inset:auto 8px 8px; width:auto; height:60px; padding:0; display:block; border:1px solid rgba(255,255,255,.16); border-radius:14px; background:#0b2842; box-shadow:0 12px 34px rgba(9,31,48,.3); }
   .railBrand,.sidebarLive { display:none; }
@@ -1589,11 +1394,9 @@ body {
   .railAlertsPanel.liveFeedPanel.open { opacity:1; visibility:visible; pointer-events:auto; transform:translateY(0); }
   .mapActions { left:10px; bottom:78px; }
   .mapActions button { height:45px; background:var(--rail-ink); color:#fff; }
-  .mapDrawer { bottom:136px; }
   .mapZoomControls { top:auto; right:10px; bottom:132px; }
   .mapStylePicker { right:10px; bottom:78px; }
   .mapAttribution { display:none; }
-  .observationPanel,.stationPanel { right:8px; bottom:76px; width:calc(100% - 16px); max-height:min(68dvh,610px); border-radius:14px; }
   .trainHero { height:88px; }
   .trainQuickFacts { grid-template-columns:repeat(3,1fr); }
   .trainQuickFacts div:nth-child(n) { border-top:0; }
@@ -1601,46 +1404,9 @@ body {
 }
 
 /* Journey Planner */
-.journeyPlannerPanel {
-  position: absolute; z-index: 27; top: 18px; right: 18px; bottom: 18px;
-  width: var(--radar-feed); max-height: none; display: flex; flex-direction: column;
-  overflow: hidden; border: 1px solid rgba(255,255,255,.94); border-radius: 18px;
-  background: rgba(255,255,255,.975); box-shadow: var(--radar-shadow);
-}
-.jpHeader { flex: none; padding: 17px 18px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e8eef2; }
-.jpHeader h2 { margin: 0; font-size: 18px; }
-.jpHeader button { width: 30px; height: 30px; border: 0; border-radius: 8px; background: #edf3f7; color: #42596a; font-size: 20px; cursor: pointer; }
-.jpBody { flex: 1; min-height: 0; overflow-y: auto; padding: 18px; }
-.jpSearch { display: grid; gap: 12px; }
-.jpField { display: grid; gap: 6px; }
-.jpField label { font-size: 11px; color: #5f7381; font-weight: 600; }
-.jpInputWrap { position: relative; display: flex; align-items: center; }
-.jpInputWrap svg { position: absolute; left: 12px; width: 18px; height: 18px; fill: none; stroke: #7b8d98; stroke-width: 1.8; }
-.jpInputWrap input { width: 100%; height: 48px; padding: 0 14px 0 38px; border: 1px solid #dde6ec; border-radius: 11px; background: #fff; font-size: 14px; }
-.jpSuggestions { display: grid; gap: 4px; border: 1px solid #e1e9ee; border-radius: 10px; overflow: hidden; }
-.jpSuggestions button { padding: 10px 12px; display: flex; justify-content: space-between; border: 0; border-bottom: 1px solid #e8eef2; background: #fff; font-size: 12px; text-align: left; cursor: pointer; }
-.jpSuggestions button:hover { background: #f3f8fc; }
-.jpSuggestions button:last-child { border-bottom: 0; }
-.jpSuggestions strong { color: #17334b; }
-.jpSuggestions span { color: #7b8d98; font-size: 10px; }
-.jpSearchBtn { height: 48px; border: 0; border-radius: 11px; background: #1268d7; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
-.jpSearchBtn:disabled { opacity: 0.5; cursor: not-allowed; }
-.jpResults { margin-top: 18px; }
-.jpResults h3 { margin: 0 0 12px; font-size: 13px; color: #5f7381; }
-.jpResult { padding: 12px; border: 1px solid #e1e9ee; border-radius: 10px; margin-bottom: 8px; }
-.jpResult.delayed { border-color: #f3c2bf; background: #fff8f7; }
-.jpResult.cancelled { border-color: #ddd; background: #f5f5f5; opacity: 0.7; }
-.jpTimes { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; color: #17334b; }
-.jpArrow { color: #7b8d98; }
-.jpMeta { display: flex; gap: 10px; margin-top: 6px; font-size: 11px; color: #5f7381; }
-.jpDuration { font-weight: 600; }
-.jpDelay { color: #d74b42; font-weight: 600; }
-.jpCancelled { color: #999; text-decoration: line-through; }
 
 /* Delay Statistics */
-.delayStatsPanel {
-  position: absolute; z-index: 27; top: 18px; right: 18px;
-  width: var(--radar-feed); max-height: none; padding: 18px;
+.delayStatsPanel { padding: 18px;
   border: 1px solid rgba(255,255,255,.94); border-radius: 18px;
   background: rgba(255,255,255,.975); box-shadow: var(--radar-shadow);
 }
@@ -1661,23 +1427,6 @@ body {
 .dsBarCount { font-size: 10px; font-weight: 700; color: #17334b; }
 
 /* Keep the selected train details on the map's right edge on desktop. */
-@media (min-width: 901px) {
-  .shell > .workspace > .observationPanel.trainPanel {
-    position: fixed;
-    inset: 18px 18px 18px auto;
-    width: min(var(--radar-feed), calc(100vw - var(--radar-sidebar) - 36px));
-    max-height: none;
-    border-radius: 16px;
-  }
-}
-
-@media (max-width: 900px) {
-  .shell > .workspace > .observationPanel.trainPanel {
-    position: absolute;
-    right: 10px;
-    left: 10px;
-  }
-}
 
 /* Notification Toggle */
 .notificationToggle { position: absolute; z-index: 22; bottom: 18px; left: calc(var(--radar-sidebar) + 22px); }
@@ -1688,10 +1437,6 @@ body {
 /* Station Facilities */
 .stationFacilities { padding: 12px 18px; border-bottom: 1px solid #e8eef2; }
 .stationFacilities h3 { margin: 0 0 10px; font-size: 12px; color: #5f7381; }
-.sfGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.sfItem { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border-radius: 8px; background: #f4f8fb; font-size: 8px; color: #5f7381; text-align: center; }
-.sfItem svg { width: 18px; height: 18px; fill: none; stroke: #1268d7; stroke-width: 1.6; }
-.sfHours { margin: 8px 0 0; font-size: 9px; color: #7b8d98; }
 
 /* Donkere thema-overschrijvingen voor de control-room redesign en de panelen
    die in globals.css onderaan het bestand staan. Deze blokken hebben geen
@@ -1708,12 +1453,6 @@ body {
   .networkSummary div { background:#10181b; }
   .networkSummary strong { color:#e8f0f2; }
   .feedSectionTitle { color:#9fb2ba; }
-  .journeyPlannerPanel { background:rgba(26,37,40,.97); }
-  .jpBody { background:transparent; }
-  .jpSearch,.jpField,.jpInputWrap,.jpSuggestions,.jpResult { background:#1a2528; border-color:rgba(255,255,255,.08); }
-  .jpSuggestions button { background:#1a2528; color:#e8f0f2; border-color:rgba(255,255,255,.06); }
-  .jpSuggestions button:hover { background:#243136; }
-  .jpSearchBtn { background:var(--blue); }
   .delayStatsPanel { background:rgba(26,37,40,.97); }
   .dsCard { background:#1a2528; }
   .dsOnTime { background:#143326; }
@@ -1722,15 +1461,6 @@ body {
   .dsMax { background:#3a1420; }
   .dsBar,.dsBarWrap { background:transparent; }
   .stationFacilities { border-color:rgba(255,255,255,.08); }
-  .sfGrid { background:#10181b; }
-  .sfItem { background:#1a2528; color:#9fb2bc; }
-  .sfItem svg { stroke:var(--blue); }
-  .sfHours { color:#8a9ba3; }
-  .mapDrawer,.mapDrawer .roadLayerPanel,.mapDrawer .roadEventCard { background:#1a2528; border-color:rgba(255,255,255,.08); }
-  .mapDrawer .roadLayerHeading h2,.mapDrawer .roadEventCard h2 { color:#e8f0f2; }
-  .mapDrawer .roadToggles label { background:#1a2528; border-color:rgba(255,255,255,.08); }
-  .mapDrawer .roadToggles label:has(input:checked) { background:#102a4a; }
-  .mapDrawer .roadToggles strong { color:var(--blue); }
   .mapStyleMenu { background:#1a2528; }
   .mapStyleMenu button { color:#cfd8dd; }
   .mapStyleMenu button:hover,.mapStyleMenu button[aria-checked="true"] { background:#102a4a; color:#fff; }
@@ -1761,9 +1491,8 @@ body {
 }
 
 /* Responsive */
-@media (max-width:900px) {
-  .journeyPlannerPanel, .delayStatsPanel { top: auto; right: 8px; bottom: 76px; left: 8px; width: auto; max-height: min(68dvh, 610px); border-radius: 14px; }
+@media (max-width:1023px) {
+  .delayStatsPanel { border-radius: 14px; }
   .notificationToggle { bottom: 80px; left: 10px; }
   .dsGrid { grid-template-columns: repeat(2, 1fr); }
-  .sfGrid { grid-template-columns: repeat(3, 1fr); }
 }

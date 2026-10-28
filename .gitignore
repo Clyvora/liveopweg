@@ -44,3 +44,5 @@ yarn-error.log*
 /.logs/
 *.tsbuildinfo
 /docs
+/.playwright-cli/
+/output/playwright/

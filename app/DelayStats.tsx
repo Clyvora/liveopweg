@@ -25,13 +25,13 @@ export function DelayStats({ vehicles, onClose }: { vehicles: RailObservation[];
     ? { title: "Live fleet", total: "Trains visible", moving: "Moving", fresh: "Fresh positions", max: "Highest measured speed", coverage: "With speed reading", of: "of", note: "Calculated from current vehicle observations. National delay statistics are not available from this feed." }
     : { title: "Live vloot", total: "Treinen zichtbaar", moving: "In beweging", fresh: "Actuele posities", max: "Hoogste gemeten snelheid", coverage: "Met snelheidsmeting", of: "van", note: "Berekend uit actuele treinposities. Landelijke vertragingscijfers zijn niet beschikbaar in deze gegevensfeed." };
 
-  return <section className="delayStatsPanel" aria-label={labels.title}>
-    <header className="dsHeader"><h3>{labels.title}</h3><button type="button" aria-label={language === "en" ? "Close statistics" : "Sluit statistieken"} onClick={onClose}>×</button></header>
+  return <section className="delayStatsPanel uiPanel" aria-label={labels.title}>
+    <header className="uiPanelHeader"><h3>{labels.title}</h3><button className="radarClose" type="button" aria-label={language === "en" ? "Close statistics" : "Sluit statistieken"} onClick={onClose}>×</button></header>
     <div className="dsGrid">
       <div className="dsCard dsOnTime"><span>{labels.total}</span><strong>{stats.total}</strong></div>
       <div className="dsCard dsDelayed"><span>{labels.moving}</span><strong>{stats.moving}</strong></div>
       <div className="dsCard dsAvg"><span>{labels.fresh}</span><strong>{stats.fresh}</strong></div>
-      <div className="dsCard dsMax"><span>{labels.max}</span><strong>{stats.maxSpeed === null ? "—" : `${stats.maxSpeed} km/u`}</strong></div>
+      <div className="dsCard dsMax"><span>{labels.max}</span><strong>{stats.maxSpeed === null ? "—" : `${stats.maxSpeed} ${language === "en" ? "km/h" : "km/u"}`}</strong></div>
     </div>
     <p className="dsDataNote">{labels.coverage}: {stats.measured} {labels.of} {stats.total}. {labels.note}</p>
   </section>;

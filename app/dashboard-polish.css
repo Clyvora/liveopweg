@@ -6,14 +6,6 @@
 .notificationToggle button { min-height:36px; border-color:#dce6ed; color:#18364e; }
 .radarStatusBar { max-width:calc(100% - var(--radar-sidebar) - 48px); }
 .dsDataNote { margin:2px 0 0; color:#65798a; font-size:11px; line-height:1.5; }
-.dsHeader { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
-.delayStatsPanel .dsHeader h3 { margin:0; }
-.dsHeader button { width:30px; height:30px; border:0; border-radius:8px; background:#edf3f7; color:#42596a; font-size:20px; cursor:pointer; }
-.jpSourceNotice { padding:18px; border:1px solid #dce7ef; border-radius:12px; background:#f6f9fc; color:#17334b; }
-.jpSourceNotice strong { font-size:14px; line-height:1.4; }
-.jpSourceNotice p { margin:10px 0 18px; color:#5f7381; font-size:12px; line-height:1.5; }
-.jpSourceNotice a { display:inline-flex; align-items:center; min-height:42px; padding:0 14px; border-radius:9px; background:#1268d7; color:#fff; font-size:12px; font-weight:700; text-decoration:none; }
-.jpSourceNotice a:hover { background:#0c55b5; }
 
 @media (min-width:2200px) {
   :root { --radar-sidebar:170px; }
@@ -81,8 +73,6 @@
 .mapZoomControls { bottom:84px; }
 .mapZoomControls button { width:40px; height:40px; font-size:22px; }
 .mapStylePicker { bottom:22px; }
-.observationPanel { border-color:rgba(255,255,255,.96); box-shadow:0 20px 55px rgba(16,42,67,.22); }
-.mapDrawer { top:82px; left:24px; }
 .mapAttribution { bottom:6px; }
 .maplibregl-canvas { image-rendering:auto; }
 /* MapLibre positions its canvas absolutely: paint containment on this
@@ -94,7 +84,7 @@
 .mapZoomControls button:active, .mapActions button:active, .mapStyleCurrent:active {
   transform: translateY(1px) scale(.97);
 }
-.observationPanel, .mapDrawer, .delayStatsPanel, .journeyPlannerPanel {
+.delayStatsPanel {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
@@ -109,7 +99,6 @@
   .sourcePill { padding:6px 7px; letter-spacing:.04em; }
   .fleetTools { top:72px; left:12px; }
   .mapActions { top:124px; left:12px; }
-  .mapDrawer { top:60px; left:8px; }
   .mapZoomControls { right:12px; bottom:92px; }
   .mapStylePicker { right:12px; bottom:18px; }
 }
@@ -251,7 +240,7 @@
   box-shadow:0 8px 24px rgba(17,43,66,.12);
   backdrop-filter:blur(16px) saturate(1.25);
 }
-.observationPanel, .nearbyPanel, .mapDrawer, .delayStatsPanel, .journeyPlannerPanel {
+.nearbyPanel, .delayStatsPanel {
   border-color:color-mix(in srgb, var(--ink) 12%, transparent);
   box-shadow:0 14px 36px rgba(17,43,66,.16);
 }
@@ -305,17 +294,6 @@
 .favoriteStations>div { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px; }
 .favoriteStations button { padding:6px 8px; border:1px solid #dce7ef; border-radius:8px; background:#fff; color:#315269; font-size:10px; cursor:pointer; }
 .favoriteStations select { width:100%; min-height:34px; padding:0 8px; border:1px solid #dce7ef; border-radius:8px; background:#fff; color:#315269; font-size:11px; }
-.jpCoverageNotice { margin:10px 0; color:#607686; font-size:11px; line-height:1.45; }
-.jpSearchMessage { margin:10px 0; padding:10px 12px; border-radius:9px; background:#f1f6f9; color:#405a6d; font-size:12px; line-height:1.45; }
-.jpResults { display:grid; gap:8px; margin-top:14px; }
-.jpResults h3 { margin:0 0 2px; color:#17334b; font-size:13px; }
-.jpConnection { display:grid; gap:8px; padding:12px; border:1px solid #dce7ef; border-radius:11px; background:#fff; color:#29475c; }
-.jpConnectionSummary { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; }
-.jpConnectionSummary span { color:#607686; font-size:10px; text-align:right; }
-.jpTransfer { margin:0; color:#586f80; font-size:11px; }
-.jpJourneyLeg { display:grid; grid-template-columns:1fr auto; gap:4px 8px; padding-top:8px; border-top:1px solid #edf1f4; font-size:11px; }
-.jpJourneyLeg strong { text-align:right; }
-.jpJourneyLeg button { grid-column:1 / -1; min-height:32px; border:1px solid #cbdced; border-radius:8px; background:#f3f8fc; color:#155b9d; font-size:11px; font-weight:700; cursor:pointer; }
 .feedHealthList { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
 .feedHealthItem { display:inline-flex; align-items:center; gap:5px; min-height:22px; padding:2px 6px; border:1px solid #dbe5eb; border-radius:7px; background:#fff; color:#526879; font-size:9px; white-space:nowrap; }
 .feedHealthItem i { width:6px; height:6px; border-radius:50%; background:#8899a4; }
@@ -325,21 +303,7 @@
 .feedHealthItem.stale i, .feedHealthItem.degraded i { background:#d58a17; }
 .feedHealthItem.offline i, .feedHealthItem.unknown i { background:#bb4e4e; }
 .sidebarLive .feedHealthItem { text-shadow:none; }
-[data-theme="dark"] .jpResults h3 { color:#eff6fa; }
-[data-theme="dark"] .jpConnection { border-color:#345063; background:#1b3649; color:#eaf3f8; }
-[data-theme="dark"] .jpJourneyLeg { border-color:#345063; }
-[data-theme="dark"] .jpJourneyLeg button { border-color:#365a76; background:#213f56; color:#c8e1f6; }
-[data-theme="dark"] .jpCoverageNotice, [data-theme="dark"] .jpTransfer, [data-theme="dark"] .jpConnectionSummary span { color:#a8bfcd; }
-[data-theme="dark"] .jpSearchMessage { background:#213c4f; color:#d6e6ef; }
 [data-theme="dark"] .feedHealthItem { border-color:#385064; background:#1b3649; color:#d4e3ec; }
-.tpHistory { margin:12px 16px 0; padding:12px; border:1px solid #dce7ef; border-radius:11px; background:#f8fbfd; }
-.tpHistory>div { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
-.tpHistory>div span { color:#17334b; font-size:11px; font-weight:800; }
-.tpHistory>div small { color:#7a8c98; font-size:9px; }
-.tpHistory ol { display:grid; gap:6px; margin:10px 0 0; padding:0; list-style:none; }
-.tpHistory li { display:grid; grid-template-columns:6px 42px 1fr; align-items:center; gap:7px; color:#718390; font-size:9px; }
-.tpHistory li i { width:6px; height:6px; border-radius:50%; background:#2877d4; }
-.tpHistory li b { overflow:hidden; color:#526879; font:500 9px/1.2 var(--font-geist-mono); text-overflow:ellipsis; white-space:nowrap; }
 .followedRouteBadge {
   position:absolute;
   top:92px;

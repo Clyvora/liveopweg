@@ -13,9 +13,9 @@ export function trainClock(value: string | null | undefined) {
   const parsed = parseTimestamp(value);
   return parsed !== null ? clock.format(new Date(parsed)) : "—";
 }
-export function trainDelay(seconds: number | null | undefined) {
+export function trainDelay(seconds: number | null | undefined, language = "nl") {
   if (seconds == null) return "—";
-  if (seconds === 0) return "Op tijd";
+  if (seconds === 0) return language === "en" ? "On time" : "Op tijd";
   if (Math.abs(seconds) < 60) return seconds > 0 ? "+<1 min" : "−<1 min";
   return `${seconds > 0 ? "+" : "−"}${Math.round(Math.abs(seconds) / 60)} min`;
 }
@@ -32,49 +32,43 @@ function getETA(stop: Stop, now: number): number | null {
 }
 
 function Delay({ seconds }: { seconds: number | null | undefined }) {
-  return <span className={seconds != null && seconds > 0 ? "tpLate" : "tpDelay"}>{trainDelay(seconds)}</span>;
+  const { language } = useLanguage();
+  return <span className={seconds != null && seconds > 0 ? "tpLate" : "tpDelay"}>{trainDelay(seconds, language)}</span>;
 }
 function FactIcon({ kind }: { kind: "speed" | "clock" | "stop" }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true">{kind === "clock" ? <><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></> : kind === "stop" ? <path d="M5 19V13M10 19V9M15 19V5M20 19V2" /> : <><path d="M4 19a9 9 0 1 1 16 0M12 13l4-5M5 12h2M7 6l1 2M12 4v2M19 12h-2" /><circle cx="12" cy="14" r="1.5" /></>}</svg>;
 }
 
-export function TrainPanel({ observation, journey, now, positionHistory = [], onClose, isFollowing, canFollow, onToggleFollow }: { observation: RailObservation; journey: RailJourney | null; now: number; positionHistory?: Array<{ at: number; latitude: number; longitude: number }>; onClose: () => void; isFollowing: boolean; canFollow: boolean; onToggleFollow: () => void }) {
+export function TrainPanel({ observation, journey, now, onClose, isFollowing, canFollow, onToggleFollow }: { observation: RailObservation; journey: RailJourney | null; now: number; positionHistory?: Array<{ at: number; latitude: number; longitude: number }>; onClose: () => void; isFollowing: boolean; canFollow: boolean; onToggleFollow: () => void }) {
   const [expanded, setExpanded] = useState(true);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const stock = identifyRollingStock(observation.materialNumber);
   // Include added stops as well as planned ones; cancelled stops remain visible in the timeline.
   const stops = journey?.stops
     .filter(stop => stop.calls.planned || stop.calls.actual)
     .sort((a, b) => a.order - b.order) ?? [];
   const next = nextTrainStop(stops, now);
-  const first = stops[0]; const last = stops.at(-1);
+  const last = stops.at(-1);
   const arrival = next?.arrival.actualAt ?? next?.departure.actualAt ?? next?.arrival.plannedAt ?? next?.departure.plannedAt;
   const delay = next?.arrival.exactDelaySeconds ?? next?.departure.exactDelaySeconds;
   const track = next?.arrival.actualTrack ?? next?.departure.actualTrack ?? next?.arrival.plannedTrack ?? next?.departure.plannedTrack;
-  const category = journey?.trainCategory.name ?? journey?.trainCategory.code ?? "Trein";
+  const category = journey?.trainCategory.name ?? journey?.trainCategory.code ?? (language === "en" ? "Train" : "Trein");
   return <aside className="observationPanel trainPanel" aria-label={t("train.close")}>
-    <header className="tpHeader"><div><h2>{category} {observation.trainNumber}</h2><p>{journey?.operator ?? t("train.unknown_operator")}<span>·</span>{category}<span>·</span>{t("train.number")} {observation.trainNumber}</p></div><div className="tpHeaderActions"><button className={`tpFollowButton ${isFollowing ? "active" : ""}`} type="button" aria-pressed={isFollowing} aria-label={!canFollow ? "Live treinpositie niet beschikbaar" : isFollowing ? "Stop met trein volgen" : "Volg trein op de kaart"} disabled={!canFollow} onClick={onToggleFollow}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36M3 4v5h5" /><circle cx="12" cy="12" r="2.5" /><path d="M12 3v2m0 14v2m9-9h-2M5 12H3" /></svg>{!canFollow ? "Geen live positie" : isFollowing ? "Volgen actief" : "Volg trein"}</button><button className="tpCloseButton" type="button" onClick={onClose} aria-label={t("train.close")}>×</button></div></header>
+    <header className="tpHeader"><div><h2>{category} {observation.trainNumber}</h2><p>{journey?.destination.actual || journey?.destination.planned || last?.station.longName ? `${language === "en" ? "to" : "naar"} ${journey?.destination.actual ?? journey?.destination.planned ?? last?.station.longName}` : t("train.unknown_destination")}</p></div><button className="tpCloseButton" type="button" onClick={onClose} aria-label={t("train.close")}>×</button></header>
     <div className="tpScroll">
+      {!canFollow && <p className="uiNotice" role="status">{language === "en" ? "No current live position is available. Previously received train details remain accessible." : "Er is geen actuele livepositie beschikbaar. Eerder ontvangen treininformatie blijft beschikbaar."}</p>}
       <div className="tpIllustration" key={observation.vehicleId}>
         {/* eslint-disable-next-line @next/next/no-img-element -- Vinext does not provide next/image; this is a small local asset. */}
-        <img src={`/trains/side-${stock.family}.png`} alt={stock.family === "unknown" ? t("train.unknown_type") : `Zijaanzicht ${stock.label}`} width={190} height={112} />
+        <img src={`/trains/side-${stock.family}.png`} alt={stock.family === "unknown" ? t("train.unknown_type") : `${language === "en" ? "Side view" : "Zijaanzicht"} ${stock.label}`} width={190} height={112} />
       </div>
-      <section className="tpRoute" aria-label={t("train.route")}>
-        <div><i /><strong>{first?.station.longName ?? t("train.unknown_origin")}</strong><time>{trainClock(first?.departure.actualAt ?? first?.departure.plannedAt)}</time></div>
-        <div><i /><strong>{last?.station.longName ?? journey?.destination.actual ?? journey?.destination.planned ?? t("train.unknown_destination")}</strong><time>{trainClock(last?.arrival.actualAt ?? last?.arrival.plannedAt)}</time>{last?.arrival.exactDelaySeconds != null && last.arrival.exactDelaySeconds > 0 && <Delay seconds={last.arrival.exactDelaySeconds} />}</div>
-      </section>
+      <div className="tpStockCaption">{stock.label} · {journey?.operator ?? t("train.unknown_operator")}</div>
       <section className="tpFacts" aria-label={t("train.route")}>
-        <div><FactIcon kind="speed" /><span>{t("train.speed")}</span><strong>{observation.speed ? `${Math.round(observation.speed.valueKmh)} km/u` : "—"}</strong></div>
+        <div><FactIcon kind="speed" /><span>{t("train.speed")}</span><strong>{observation.speed ? `${Math.round(observation.speed.valueKmh)} ${language === "en" ? "km/h" : "km/u"}` : "—"}</strong></div>
         <div><FactIcon kind="clock" /><span>{t("train.delay")}</span><strong><Delay seconds={delay} /></strong></div>
-        <div><FactIcon kind="stop" /><span>{t("train.nextStop")}</span><strong>{next?.station.shortName ?? next?.station.longName ?? "—"}</strong></div>
-      </section>
-      <section className="tpHistory" aria-label="Recente positiehistorie">
-        <div><span>Recente beweging</span><small>{positionHistory.length ? `Laatste ${positionHistory.length} posities` : "Nog geen historie beschikbaar"}</small></div>
-        {positionHistory.length > 1 && <ol>{positionHistory.slice(-6).map((point, index) => <li key={`${point.at}-${index}`}><i /><span>{new Intl.DateTimeFormat("nl-NL", { hour: "2-digit", minute: "2-digit" }).format(point.at)}</span><b>{point.latitude.toFixed(3)}, {point.longitude.toFixed(3)}</b></li>)}</ol>}
       </section>
       <section className="tpNext" aria-label={t("train.nextStop")}>
         <span>{t("train.nextStop")}</span>
-        <div><strong>{next?.station.longName ?? "Nog niet bekend"}</strong><b>Spoor {track ?? "—"}</b></div>
+        <div><strong>{next?.station.longName ?? (language === "en" ? "Not yet known" : "Nog niet bekend")}</strong><b>{language === "en" ? "Platform" : "Spoor"} {track ?? "—"}</b></div>
         <footer>
           <span>{t("train.arrival")}</span>
           <time>{trainClock(arrival)}</time>
@@ -95,6 +89,8 @@ export function TrainPanel({ observation, journey, now, positionHistory = [], on
           return <li key={`${stop.order}-${stop.station.code}`} className={`${active ? "next" : ""} ${cancelled ? "cancelled" : ""}`} aria-current={active ? "step" : undefined}><i /><div><strong>{stop.station.longName}</strong>{cancelled ? <small>{t("train.cancelled")}</small> : changedTrack && plannedTrack && changedTrack !== plannedTrack ? <small>{t("train.track_changed")} {changedTrack}</small> : null}{etaDisplay !== null && !cancelled && <small className={`tpStopETA ${etaDisplay === 0 ? "arrivalNow" : ""}`}>{etaDisplay === 0 ? t("train.arrived") : `${etaDisplay} ${t("time.minute")}`}</small>}</div><time>{trainClock(time)}</time>{!cancelled && stopDelay != null && stopDelay > 0 && <Delay seconds={stopDelay} />}</li>;
         })}{!stops.length && <li className="tpEmpty">{t("train.no_route")}</li>}</ol>}
       </section>
+
     </div>
+      <footer className="tpFooter"><button className={`tpFollowButton ${isFollowing ? "active" : ""}`} type="button" aria-pressed={isFollowing} aria-label={!canFollow ? (language === "en" ? "Live position unavailable" : "Live treinpositie niet beschikbaar") : isFollowing ? (language === "en" ? "Stop following train" : "Stop met trein volgen") : (language === "en" ? "Follow train on map" : "Volg trein op de kaart")} disabled={!canFollow} onClick={onToggleFollow}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36M3 4v5h5" /><circle cx="12" cy="12" r="2.5" /><path d="M12 3v2m0 14v2m9-9h-2M5 12H3" /></svg>{!canFollow ? (language === "en" ? "No live position" : "Geen live positie") : isFollowing ? (language === "en" ? "Following" : "Volgen actief") : (language === "en" ? "Follow train" : "Volg trein")}</button><p>{language === "en" ? "Positions are updated regularly. Times reflect received journey information." : "Posities worden regelmatig bijgewerkt. Tijden zijn gebaseerd op ontvangen ritinformatie."}</p></footer>
   </aside>;
 }

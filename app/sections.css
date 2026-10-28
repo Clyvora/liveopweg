@@ -12,13 +12,6 @@
 .trainPage .mapActions { top:auto; bottom:22px; align-items:center; height:auto; }
 .trainPage .radarStatusBar { max-width:calc(100% - var(--radar-sidebar) - 36px); }
 .trainPage .mapZoomControls,.trainPage .mapStylePicker { right:18px; }
-.trainPage .mapDrawer .mapLayerToggles { display:grid; grid-template-columns:1fr; gap:8px; }
-.trainPage .mapDrawer .mapLayerToggles label { min-height:54px; display:flex; align-items:center; gap:10px; border:1px solid #e2eaf0; border-radius:10px; background:#f8fafc; cursor:pointer; }
-.trainPage .mapDrawer .mapLayerToggles label:has(input:checked) { border-color:#bdd9fb; background:#eef6ff; }
-.trainPage .mapDrawer .mapLayerToggles input { width:16px; height:16px; order:3; margin-left:auto; accent-color:#1672e8; }
-.trainPage .mapDrawer .mapLayerToggles .trainLayerIcon { width:30px; height:30px; flex:none; display:grid; place-items:center; border-radius:8px; background:#dcecff; color:#1268d7; }
-.trainPage .mapDrawer .mapLayerToggles .trainLayerIcon .uiIcon { width:18px; height:18px; }
-.trainPage .mapDrawer .mapLayerToggles label > span:last-child { color:#244259; font-size:12px; font-weight:700; }
 
 .alertsPage .workspace { width:calc(100% - var(--radar-feed)); }
 .alertsPage .railAlertsPanel.liveFeedPanel { position:absolute; inset:0 0 0 auto; width:var(--radar-feed); max-height:none; border:0; border-left:1px solid #dce5eb; border-radius:0; box-shadow:none; background:#fff; opacity:1; visibility:visible; transform:none; pointer-events:auto; transition:none; }
@@ -65,22 +58,22 @@
 .settingsSidebar > small { margin-top:auto; color:#8faabd; font-size:9px; line-height:1.5; text-align:center; }
 .settingsMain { min-width:0; max-width:1330px; width:100%; padding:clamp(30px,4vw,68px); overflow-y:auto; }
 .settingsIntro { max-width:710px; margin-bottom:35px; }
-.settingsIntro > span { color:#1268d7; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+.settingsIntro > span { color:var(--ui-accent); font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
 .settingsIntro h1 { margin:6px 0 10px; color:#102b42; font-size:clamp(32px,2.3vw,46px); letter-spacing:-.04em; }
-.settingsIntro p { margin:0; color:#64798a; font-size:15px; line-height:1.6; }
+.settingsIntro p { margin:0; color:var(--ui-muted); font-size:15px; line-height:1.6; }
 .settingsGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
 .settingsCard { min-width:0; padding:24px; border:1px solid #e2e9ee; border-radius:16px; background:#fff; box-shadow:0 12px 28px #15354d0a; }
 .settingsCardHeading { display:flex; align-items:center; gap:13px; padding-bottom:20px; border-bottom:1px solid #eaf0f3; }
 .settingsCardIcon { width:43px; height:43px; flex:none; display:grid; place-items:center; border-radius:12px; background:#eaf3ff; color:#1268d7; }
 .settingsCardIcon .uiIcon { width:22px; height:22px; }
 .settingsCard h2 { margin:0 0 4px; font-size:17px; }
-.settingsCard p { margin:0; color:#687d8d; font-size:12px; line-height:1.4; }
+.settingsCard p { margin:0; color:var(--ui-muted); font-size:12px; line-height:1.4; }
 .settingsRow { min-height:90px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
 .settingsRow > div:first-child { display:grid; gap:5px; }
 .settingsRow strong { font-size:13px; }
-.settingsRow small { color:#7b8b98; font-size:11px; line-height:1.4; }
+.settingsRow small { color:var(--ui-muted); font-size:11px; line-height:1.4; }
 .settingsChoices { flex:none; padding:4px; display:flex; gap:3px; border:1px solid #e2eaf0; border-radius:10px; background:#f5f8fa; }
-.settingsChoices button { min-height:36px; padding:0 12px; border:0; border-radius:7px; background:transparent; color:#65798a; font:700 11px var(--font-geist-sans); cursor:pointer; }
+.settingsChoices button { min-height:36px; padding:0 12px; border:0; border-radius:7px; background:transparent; color:var(--ui-muted); font:700 11px var(--font-geist-sans); cursor:pointer; }
 .settingsChoices button.selected { background:#fff; color:#1268d7; box-shadow:0 2px 8px #163c591e; }
 .settingsSwitch { width:48px; height:28px; flex:none; padding:3px; border:0; border-radius:20px; background:#cbd7df; cursor:pointer; }
 .settingsSwitch.on { background:#1672e8; }
@@ -90,10 +83,10 @@
 .settingsLinks { display:grid; gap:8px; padding-top:17px; }
 .settingsLinks a { padding:13px 15px; display:flex; justify-content:space-between; gap:12px; border:1px solid #e3ebf0; border-radius:10px; color:#18324a; font-size:13px; font-weight:750; text-decoration:none; }
 .settingsLinks a:hover { border-color:#b8d7fb; background:#f5faff; }
-.settingsLinks span { color:#6c8191; font-size:11px; font-weight:500; }
+.settingsLinks span { color:var(--ui-muted); font-size:11px; font-weight:500; }
 
 @media (min-width:2200px) { .sideNav a,.settingsNav a { height:94px; gap:9px; font-size:13px; } .sideNav a .uiIcon,.settingsNav .uiIcon { width:30px; height:30px; } .settingsBrand strong { font-size:18px; } }
-@media (max-width:900px) {
+@media (max-width:1023px) {
   .sideNav { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .sideNav a { min-width:0; height:100%; padding:6px 1px; gap:5px; border-left:0; border-top:2px solid transparent; font-size:10px; }
   .sideNav a.active { border-top-color:#5ca0fa; }
@@ -117,7 +110,7 @@
   .alertFilterSection { padding:11px 13px; }
   .alertFilterSection > strong { margin-bottom:8px; }
   .alertFilterGrid { display:flex; gap:6px; overflow-x:auto; scrollbar-width:thin; }
-  .alertFilterGrid label { min-height:42px; min-width:max-content; padding:5px 9px; gap:6px; }
+  .alertFilterGrid label { min-height:44px; min-width:max-content; padding:5px 9px; gap:6px; }
   .alertFilterIcon { width:25px; height:25px; }
   .alertFilterName { overflow:visible; font-size:10px; text-overflow:clip; }
   .settingsPage { display:block; padding-bottom:72px; }
@@ -135,7 +128,7 @@
 @media (max-width:500px) { .settingsCard { padding:17px; } .settingsRow { align-items:flex-start; flex-direction:column; justify-content:center; padding-top:14px; } .settingsChoices { width:100%; } .settingsChoices button { flex:1; } .settingsLinks a { flex-direction:column; gap:4px; } }
 
 /* Keep the train navigation out of the map and selected-train panel on phones. */
-@media (max-width:900px) {
+@media (max-width:1023px) {
   .trainPage .topbar { position:fixed; inset:auto 8px calc(8px + env(safe-area-inset-bottom)); width:auto; height:60px; z-index:100; padding:0; display:block; }
   .trainPage .railBrand,.trainPage .sidebarLive { display:none; }
   .trainPage .sideNav { position:static; width:100%; height:100%; margin:0; padding:0 4px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); align-items:stretch; gap:0; }
@@ -144,7 +137,6 @@
   .trainPage .sideNav > a.active { border-top-color:#5ca0fa; border-left:0; }
   .trainPage .sideNav > a .uiIcon { width:20px; height:20px; }
   .trainPage .sideNav .navIconWrap b { display:none; }
-  .trainPage .observationPanel,.trainPage .stationPanel,.trainPage .journeyPlannerPanel,.trainPage .delayStatsPanel { z-index:85; bottom:calc(76px + env(safe-area-inset-bottom)); max-height:min(68dvh,610px); }
   .trainPage .trainResults { z-index:110; }
 }
 
@@ -154,15 +146,15 @@
 .positionLegend i.matched { background:#164a9a; }
 .positionLegend i.gps { background:#eaa53a; box-shadow:0 0 0 1px #a35d18; }
 [data-theme="dark"] .positionLegend { background:#1b3649; border-color:#385064; color:#d4e3ec; }
-@media (min-width:901px) {
+@media (min-width:1024px) {
   .trainPage .fleetTools { top:18px; left:calc(var(--radar-sidebar) + 24px); min-width:0; max-width:calc(100% - var(--radar-sidebar) - 48px); }
   .trainPage .mapActions { left:calc(var(--radar-sidebar) + 24px); }
 }
 @media (min-width:2200px) { .positionLegend { min-height:48px; padding-inline:17px; gap:17px; font-size:12px; } }
-@media (max-width:900px) { .positionLegend { min-height:45px; padding-inline:10px; gap:10px; font-size:9px; } }
+@media (max-width:1023px) { .positionLegend { min-height:45px; padding-inline:10px; gap:10px; font-size:9px; } }
 @media (max-width:560px) { .positionLegend { display:none; } }
 /* A calmer, editorial navigation system. The map remains the primary surface. */
-@media (min-width:901px) {
+@media (min-width:1024px) {
   :root { --radar-sidebar:184px; }
   .topbar,.settingsSidebar { background:#fff; border-right:1px solid #dfe7ed; box-shadow:4px 0 24px #193c5510; }
   .topbar { padding:17px 0; }
@@ -222,7 +214,7 @@
 .alertsPage .liveFeedItem .feedCopy small { font-size:10px; }
 .alertsPage .railFeedSummary { background:#fafcfd; color:#68808e; }
 
-@media (max-width:900px) {
+@media (max-width:1023px) {
   :root { --radar-sidebar:0px; }
   .topbar,.settingsSidebar { background:#fff; border:1px solid #dce7ee; box-shadow:0 8px 30px #102f4529; }
   .sideNav a,.settingsNav a { color:#6e8290; }
@@ -284,21 +276,14 @@
 
 /* The alerts workspace is already narrowed for its feed; don't subtract that
    width again or the right-side map controls overlap the bottom-left action. */
-@media (min-width:901px) {
+@media (min-width:1024px) {
   .alertsPage .mapZoomControls,.alertsPage .mapStylePicker { right:18px; }
   .alertsPage .mapAttribution { right:180px; }
 }
-[data-theme="dark"] .mapDrawer .roadLayerHeading > span { color:#c0d0dc; }
-[data-theme="dark"] .mapDrawer .roadSourceNote { color:#aebdc8; }
 
 /* Nearby panel and keyboard-friendly map search. */
 .trainPage .mapActions button.nearbyAction { display:flex; }
-.trainPage .mapDrawer .mapLayerToggles .trainLayerIcon.crossings { background:#fff2d5; color:#a86d00; }
-.trainPage .nearbyPanel { position:absolute; z-index:36; top:84px; right:calc(var(--radar-feed) + 18px); width:min(360px,calc(100vw - var(--radar-sidebar) - var(--radar-feed) - 36px)); max-height:min(72dvh,680px); overflow:auto; padding:16px; border:1px solid #dce7ef; border-radius:14px; background:rgba(255,255,255,.98); box-shadow:0 16px 44px #1230472b; color:#19384f; }
-.trainPage .nearbyPanel>header { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:13px; }
-.trainPage .nearbyPanel>header span { color:#2476d2; font-size:9px; font-weight:850; letter-spacing:.12em; }
-.trainPage .nearbyPanel h2 { margin:3px 0 0; font-size:17px; letter-spacing:-.02em; }
-.trainPage .nearbyPanel>header button { width:28px; height:28px; border:0; border-radius:7px; background:transparent; color:inherit; font-size:22px; cursor:pointer; }
+.trainPage .nearbyPanel { overflow:auto; padding:16px; border:1px solid #dce7ef; border-radius:14px; background:rgba(255,255,255,.98); box-shadow:0 16px 44px #1230472b; color:#19384f; }
 .trainPage .nearbyPanel section { padding-top:12px; border-top:1px solid #e8eef2; }
 .trainPage .nearbyPanel section+section { margin-top:8px; }
 .trainPage .nearbyPanel h3 { margin:0 0 7px; display:flex; align-items:center; gap:7px; font-size:11px; }
@@ -318,8 +303,7 @@
 [data-theme="dark"] .trainPage .nearbyPanel section { border-color:#385064; }
 [data-theme="dark"] .trainPage .nearbyResult:hover { background:#233f54; }
 [data-theme="dark"] .trainPage .fleetTools .clearSearchButton { background:#2c4556; color:#e7f1f6; }
-@media (max-width:900px) {
-  .trainPage .nearbyPanel { top:auto; right:10px; bottom:calc(146px + env(safe-area-inset-bottom)); left:10px; width:auto; max-height:43dvh; }
-  .trainPage .mapActions button.nearbyAction { max-width:42px; justify-content:center; padding:0 10px; }
+@media (max-width:1023px) {
+  .trainPage .mapActions button.nearbyAction { max-width:44px; justify-content:center; padding:0 10px; }
   .trainPage .mapActions button.nearbyAction span { display:none; }
 }

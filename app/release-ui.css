@@ -15,7 +15,7 @@
 [data-theme="dark"] .mapStatusNotice p { color:#b8cbd7; }
 [data-theme="dark"] .asyncPanelNotice button, [data-theme="dark"] .mobilePlannerActions button { border-color:#3a607b; background:#214663; color:#e4f1fc; }
 .mobilePlannerActions button:focus-visible, .asyncPanelNotice button:focus-visible { outline:3px solid #2581df; outline-offset:3px; }
-@media (max-width:900px) {
+@media (max-width:1023px) {
   .mobilePlannerActions { position:absolute; top:132px; left:12px; right:12px; z-index:30; display:flex; gap:8px; }
   .mobilePlannerActions button { box-shadow:0 4px 16px #1230471f; }
   .mapStatusNotice { top:188px; left:12px; width:min(350px,calc(100% - 24px)); padding:12px 14px; }

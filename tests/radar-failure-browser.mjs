@@ -1,0 +1,67 @@
+// Browser-only overrides, run after radar-browser.mjs through playwright-cli.
+// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+async (page) => {
+  const check=(value,label)=>{if(!value)throw new Error(label);};
+  const checks=[];
+  let fail=true;
+  await page.route('**/v1/rail/disruptions',route=>route.fulfill({status:fail?503:200,json:fail?{error:'ns_access_denied'}:{source:'NS',fetchedAt:new Date().toISOString(),stale:false,disruptions:[]}}));
+  await page.goto('http://localhost:3000/?panel=notices');
+  await page.getByRole('button',{name:'Opnieuw proberen',exact:true}).waitFor();
+  check(await page.getByText('Geen actieve meldingen binnen dit filter.',{exact:true}).count()===0,'Failure is never presented as no disruptions');
+  fail=false; await page.getByRole('button',{name:'Opnieuw proberen',exact:true}).click();
+  await page.getByText('Geen actieve meldingen binnen dit filter.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Sluit spoormeldingen'}).click();
+  const nav=page.getByRole('navigation',{name:'Hoofdnavigatie'});
+  await nav.getByRole('button',{name:'Stations',exact:true}).click();
+  await page.keyboard.press('Escape');
+  check(await page.getByRole('dialog').count()===0,'Escape closes top pane');
+  check(await nav.getByRole('button',{name:'Stations',exact:true}).evaluate(el=>el===document.activeElement),'Focus returns to opener');
+  checks.push('NS access failure → retry → honest empty; Escape and focus restoration');
+  await page.evaluate(()=>{window.__restoreStorage=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='liveopweg-favorite-stations')throw new DOMException('blocked','SecurityError');return window.__restoreStorage.call(this,k,v);};});
+  await nav.getByRole('button',{name:'Stations',exact:true}).click();
+  const favorite=page.getByRole('button',{name:/favoriet: Utrecht Centraal/i});
+  const saved=await favorite.getAttribute('aria-pressed');
+  if(saved==='true')await favorite.click();
+  await page.getByRole('button',{name:'Bewaar favoriet: Utrecht Centraal',exact:true}).click();
+  await page.getByRole('button',{name:'Opnieuw opslaan',exact:true}).waitFor();
+  await nav.getByRole('button',{name:'Favorieten',exact:true}).click();
+  await page.getByRole('button',{name:'Utrecht Centraal UT',exact:true}).waitFor();
+  await page.evaluate(()=>{Storage.prototype.setItem=window.__restoreStorage;});
+  await page.getByRole('button',{name:'Opnieuw opslaan',exact:true}).click();
+  check(await page.getByRole('button',{name:'Opnieuw opslaan',exact:true}).count()===0,'Storage retry recovers');
+  checks.push('blocked storage: shared session favorites and recovery');
+  await page.evaluate(()=>{navigator.geolocation.getCurrentPosition=(_ok,fail)=>fail({code:1,PERMISSION_DENIED:1});});
+  await page.getByRole('button',{name:'Bij mij in de buurt',exact:true}).click();
+  await page.getByText('Locatietoegang is geblokkeerd. Sta locatie toe in je browser en probeer opnieuw.',{exact:true}).waitFor();
+  checks.push('location denied without losing navigation');
+  await page.getByRole('button',{name:'Kaartlagen',exact:true}).click();
+  await page.getByText('Spoorlijnen',{exact:true}).click();
+  await page.screenshot({path:'output/playwright/layers.png'});
+  check(!(await page.getByRole('checkbox',{name:'Spoorlijnen',exact:true}).isChecked()),'Layer off');
+  await page.getByText('Spoorlijnen',{exact:true}).click();
+  await page.getByRole('button',{name:'Inzoomen op kaart',exact:true}).click();
+  await page.getByRole('button',{name:'Uitzoomen op kaart',exact:true}).click();
+  await page.getByRole('button',{name:'Kies kaartweergave',exact:true}).click();
+  await page.getByRole('menuitemradio',{name:'Nacht',exact:true}).click();
+  checks.push('layers, zoom, map style');
+  await page.goto('http://localhost:3000/instellingen');
+  // The development server sends the form before React's event handlers arrive.
+  await page.waitForFunction(() => [...document.querySelectorAll('button')].some(el => el.textContent === 'English' && Object.keys(el).some(key => key.startsWith('__reactProps$'))));
+  await page.getByRole('button',{name:'English',exact:true}).click();
+  await page.getByRole('heading',{name:'Settings',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Dark',exact:true}).click();
+  check(await page.locator('html').getAttribute('data-theme')==='dark','Theme setting');
+  await page.getByRole('link',{name:'Journey planner',exact:true}).click();
+  await page.getByRole('heading',{name:'Plan your journey',exact:true}).waitFor();
+  await page.setViewportSize({width:390,height:844});
+  const resize=page.getByRole('button',{name:'Expand or collapse panel',exact:true});
+  const rect=await resize.boundingBox();
+  await page.mouse.move(rect.x+rect.width/2,rect.y+rect.height/2);
+  await page.mouse.down();await page.mouse.move(rect.x+rect.width/2,rect.y-100,{steps:8});await page.mouse.up();
+  check(await resize.getAttribute('aria-expanded')==='true','Mobile drag expands');
+  await page.screenshot({path:'output/playwright/planner-390-dark-en.png'});
+  const touch=await page.evaluate(()=>[...document.querySelectorAll('button,a,input')].filter(el=>el.getClientRects().length&&getComputedStyle(el).visibility!=='hidden'&&getComputedStyle(el).opacity!=='0').map(el=>({label:el.getAttribute('aria-label')||el.textContent.trim().slice(0,50),w:el.getBoundingClientRect().width,h:el.getBoundingClientRect().height})).filter(r=>r.w<43.9||r.h<43.9));
+  checks.push('English navigation and planner, dark theme, mobile drag');
+  await page.evaluate(result=>{window.__radarFailureAcceptance=result;},{checks,touch});
+  return {checks,touch};
+}

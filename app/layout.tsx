@@ -1,9 +1,11 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import "./train-panel.css";
 import "./dashboard-polish.css";
 import "./sections.css";
 import "./release-ui.css";
+import "./radar.css";
+import "./ui.css";
+import "./train-panel.css";
 import { ThemeProvider } from "./ThemeContext";
 import { LanguageProvider } from "./LanguageContext";
 import type { Metadata } from "next";
