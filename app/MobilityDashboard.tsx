@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import NextImage from "next/image";
 import type { GeoJSONSource, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
@@ -27,18 +27,22 @@ import {
 import { parseTimestamp, realtimeHttpUrl, realtimeWebSocketUrl } from "./realtime-url";
 import { normalizeSearchText, railStations, searchStations, stationMinZoom, stationsForZoom, type RailStation } from "../packages/domain-rail/stations";
 import { stationCatalogSchema } from "../packages/protocol/station-catalog";
-import { StationPanel } from "./StationPanel";
-import { TrainPanel, nextTrainStop } from "./TrainPanel";
+import { nextTrainStop } from "./next-train-stop";
+import { AsyncPanel } from "./AsyncPanel";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
-import { JourneyPlanner, type FollowedRoute } from "./JourneyPlanner";
-import { DelayStats } from "./DelayStats";
+import type { FollowedRoute } from "./JourneyPlanner";
 import { delayNotificationKey } from "./delay-notification";
+import { describeFeedHealth } from "./feed-health";
+import { useFeedHealth } from "./useFeedHealth";
 import { useTheme } from "./ThemeContext";
 import { useLanguage } from "./LanguageContext";
 
+const StationPanel = lazy(() => import("./StationPanel").then(module => ({ default: module.StationPanel })));
+const TrainPanel = lazy(() => import("./TrainPanel").then(module => ({ default: module.TrainPanel })));
+const JourneyPlanner = lazy(() => import("./JourneyPlanner").then(module => ({ default: module.JourneyPlanner })));
+const DelayStats = lazy(() => import("./DelayStats").then(module => ({ default: module.DelayStats })));
+
 type ConnectionState = "verbinden" | "live" | "herstellen" | "offline";
-type FeedHealthEntry = { status: string; lastReceivedAt: string | null; lastCheckedAt?: string | null; pollSeconds?: number };
-type FeedHealthSnapshot = { positions: FeedHealthEntry; journeys: FeedHealthEntry; roads: FeedHealthEntry };
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
 type MapLayerKey = "trains" | "stations" | "railways" | "crossings";
 type BaseMapKey = "standard" | "light" | "satellite";
@@ -139,32 +143,6 @@ function distanceBetweenMeters(first: { latitude: number; longitude: number }, s
 
 function nearbyDistanceLabel(meters: number) {
   return meters < 1_000 ? `${Math.round(meters)} m` : `${(meters / 1_000).toLocaleString("nl-NL", { maximumFractionDigits: 1 })} km`;
-}
-
-function parseFeedHealth(value: unknown): FeedHealthSnapshot | null {
-  if (typeof value !== "object" || value === null || !("sources" in value)) return null;
-  const sources = value.sources;
-  if (typeof sources !== "object" || sources === null) return null;
-  const entry = (candidate: unknown, timestampKey: "lastEnvelopeReceivedAt" | "lastReceivedAt"): FeedHealthEntry => {
-    if (typeof candidate !== "object" || candidate === null || !("status" in candidate) || typeof candidate.status !== "string") {
-      return { status: "UNKNOWN", lastReceivedAt: null };
-    }
-    const record = candidate as Record<string, unknown>;
-    const received = record[timestampKey];
-    const checked = record.lastCheckedAt;
-    const pollSeconds = typeof record.pollSeconds === "number" ? record.pollSeconds : undefined;
-    return {
-      status: candidate.status,
-      lastReceivedAt: typeof received === "string" && Number.isFinite(Date.parse(received)) ? received : null,
-      ...(typeof checked === "string" && Number.isFinite(Date.parse(checked)) ? { lastCheckedAt: checked } : {}),
-      ...(pollSeconds === undefined ? {} : { pollSeconds }),
-    };
-  };
-  return {
-    positions: entry("positions" in sources ? sources.positions : null, "lastEnvelopeReceivedAt"),
-    journeys: entry("journeys" in sources ? sources.journeys : null, "lastEnvelopeReceivedAt"),
-    roads: entry("ndwActueelBeeld" in sources ? sources.ndwActueelBeeld : null, "lastReceivedAt"),
-  };
 }
 
 const nationalStrikeAlert = {
@@ -529,8 +507,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const [expectedRoute, setExpectedRoute] = useState<ExpectedRoute | null>(null);
   const [trackMatchesByVehicle, setTrackMatchesByVehicle] = useState<Record<string, RailTrackMatch>>({});
   const [connection, setConnection] = useState<ConnectionState>("verbinden");
-  const [feedHealth, setFeedHealth] = useState<FeedHealthSnapshot | null>(null);
-  const [feedHealthUnavailable, setFeedHealthUnavailable] = useState(false);
+  const { feedHealth, feedHealthUnavailable } = useFeedHealth();
   const [mapReady, setMapReady] = useState(false);
   const [query, setQuery] = useState("");
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
@@ -561,40 +538,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     syncNotificationSetting();
     window.addEventListener("storage", syncNotificationSetting);
     return () => window.removeEventListener("storage", syncNotificationSetting);
-  }, []);
-  useEffect(() => {
-    let stopped = false;
-    let controller: AbortController | null = null;
-    const refreshFeedHealth = async () => {
-      if (controller) return;
-      controller = new AbortController();
-      const requestController = controller;
-      try {
-        const response = await fetch(realtimeHttpUrl("/health"), {
-          signal: AbortSignal.any([requestController.signal, AbortSignal.timeout(10_000)]),
-          cache: "no-store",
-          headers: { accept: "application/json" },
-        });
-        if (!response.ok) throw new Error("health_request_failed");
-        const parsed = parseFeedHealth(await response.json());
-        if (!parsed) throw new Error("health_response_invalid");
-        if (!stopped) {
-          setFeedHealth(parsed);
-          setFeedHealthUnavailable(false);
-        }
-      } catch {
-        if (!stopped && !requestController.signal.aborted) setFeedHealthUnavailable(true);
-      } finally {
-        if (controller === requestController) controller = null;
-      }
-    };
-    void refreshFeedHealth();
-    const interval = window.setInterval(() => { void refreshFeedHealth(); }, 15_000);
-    return () => {
-      stopped = true;
-      window.clearInterval(interval);
-      controller?.abort();
-    };
   }, []);
   const [baseMap, setBaseMap] = useState<BaseMapKey>("standard");
   const [showMapStyles, setShowMapStyles] = useState(false);
@@ -1596,12 +1539,14 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     let closed = false;
     let latestSequence: number | null = null;
     let latestRoadSequence: number | null = null;
+    let reconnectAttempt = 0;
 
     const connect = () => {
       setConnection(latestSequence !== null || latestRoadSequence !== null ? "herstellen" : "verbinden");
       socket = new WebSocket(realtimeWebSocketUrl());
       socketRef.current = socket;
       socket.onopen = () => {
+        reconnectAttempt = 0;
         setConnection("live");
         // The server sends fresh fleet, match and road snapshots on every connection.
         // De voertuigselectie hoort echter bij de verbinding: zonder dit bericht
@@ -1617,14 +1562,15 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           return;
         }
 
-        const fleetSnapshot = railFleetSnapshotMessageSchema.safeParse(decoded);
-        if (fleetSnapshot.success) {
+        const messageType = typeof decoded === "object" && decoded !== null && "type" in decoded ? decoded.type : null;
+        const fleetSnapshot = messageType === "rail.fleet.snapshot" ? railFleetSnapshotMessageSchema.safeParse(decoded) : null;
+        if (fleetSnapshot?.success) {
           latestSequence = fleetSnapshot.data.sequence;
           setVehiclesById(toRecord(fleetSnapshot.data.data));
           return;
         }
-        const fleetBatch = railFleetBatchMessageSchema.safeParse(decoded);
-        if (fleetBatch.success) {
+        const fleetBatch = messageType === "rail.fleet.batch" ? railFleetBatchMessageSchema.safeParse(decoded) : null;
+        if (fleetBatch?.success) {
           // At-least-once levering kan een batch herhalen of te laat afleveren.
           // Zo'n batch mag de vloot nooit bevriezen: een reeds verwerkt of ouder
           // volgnummer wordt genegeerd en de batch wordt daarna altijd toegepast,
@@ -1651,15 +1597,15 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           setConnection("live");
           return;
         }
-        const matchSnapshot = railMatchSnapshotMessageSchema.safeParse(decoded);
-        if (matchSnapshot.success) {
+        const matchSnapshot = messageType === "rail.match.snapshot" ? railMatchSnapshotMessageSchema.safeParse(decoded) : null;
+        if (matchSnapshot?.success) {
           const matches = new Map(matchSnapshot.data.data.map((match) => [match.vehicleId, match]));
           trackMatchesRef.current = matches;
           setTrackMatchesByVehicle(Object.fromEntries(matches));
           return;
         }
-        const matchBatch = railMatchBatchMessageSchema.safeParse(decoded);
-        if (matchBatch.success) {
+        const matchBatch = messageType === "rail.match.batch" ? railMatchBatchMessageSchema.safeParse(decoded) : null;
+        if (matchBatch?.success) {
           const matches = new Map(trackMatchesRef.current);
           for (const vehicleId of matchBatch.data.removedVehicleIds) {
             matches.delete(vehicleId);
@@ -1671,28 +1617,28 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           setTrackMatchesByVehicle(Object.fromEntries(matches));
           return;
         }
-        const selection = railSelectionSnapshotMessageSchema.safeParse(decoded);
-        if (selection.success) {
+        const selection = messageType === "rail.selection.snapshot" ? railSelectionSnapshotMessageSchema.safeParse(decoded) : null;
+        if (selection?.success) {
           if (selection.data.vehicleId !== selectedVehicleIdRef.current) return;
           setSelectedVehicleId(selection.data.vehicleId);
           selectedVehicleIdRef.current = selection.data.vehicleId;
           setObservation(selection.data.data);
           return;
         }
-        const journeySnapshot = journeySnapshotMessageSchema.safeParse(decoded);
-        if (journeySnapshot.success) {
+        const journeySnapshot = messageType === "rail.journey.snapshot" ? journeySnapshotMessageSchema.safeParse(decoded) : null;
+        if (journeySnapshot?.success) {
           if (!selectedVehicleIdRef.current) return;
           setJourney(journeySnapshot.data.data);
           return;
         }
-        const roadSnapshot = roadSnapshotMessageSchema.safeParse(decoded);
-        if (roadSnapshot.success) {
+        const roadSnapshot = messageType === "road.event.snapshot" ? roadSnapshotMessageSchema.safeParse(decoded) : null;
+        if (roadSnapshot?.success) {
           latestRoadSequence = roadSnapshot.data.sequence;
           setRoadEventsById(Object.fromEntries(roadSnapshot.data.data.map((roadEvent) => [roadEvent.id, roadEvent])));
           return;
         }
-        const roadBatch = roadBatchMessageSchema.safeParse(decoded);
-        if (roadBatch.success) {
+        const roadBatch = messageType === "road.event.batch" ? roadBatchMessageSchema.safeParse(decoded) : null;
+        if (roadBatch?.success) {
           if (latestRoadSequence !== null && roadBatch.data.sequence <= latestRoadSequence) return;
           if (latestRoadSequence !== null && roadBatch.data.sequence !== latestRoadSequence + 1) {
             console.warn("[MobilityDashboard] Road sequence gap, requesting resync", {
@@ -1713,7 +1659,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       socket.onclose = () => {
         if (closed) return;
         setConnection("offline");
-        reconnectTimer = window.setTimeout(connect, 3_000);
+        const delay = Math.min(30_000, 1_000 * 2 ** Math.min(reconnectAttempt++, 5));
+        reconnectTimer = window.setTimeout(connect, delay + Math.random() * 500);
       };
       socket.onerror = () => socket?.close();
     };
@@ -1770,30 +1717,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const websocketStatus = language === "en"
     ? ({ verbinden: "Connecting", live: "Live", herstellen: "Reconnecting", offline: "Offline" } as const)[connection]
     : ({ verbinden: "Verbinden", live: "Live", herstellen: "Opnieuw verbinden", offline: "Offline" } as const)[connection];
-  const feedHealthItems = ([
-    { key: "positions", name: language === "en" ? "Positions" : "Treinposities", source: feedHealth?.positions ?? null, maxAgeSeconds: 60 },
-    { key: "journeys", name: language === "en" ? "Journeys" : "Ritten", source: feedHealth?.journeys ?? null, maxAgeSeconds: 300 },
-    { key: "roads", name: "NDW", source: feedHealth?.roads ?? null, maxAgeSeconds: Math.max(120, (feedHealth?.roads.pollSeconds ?? 60) * 2) },
-  ] as const).map((item) => {
-    const source = item.source;
-    const freshnessTimestamp = source ? (item.key === "roads" ? source.lastCheckedAt ?? source.lastReceivedAt : source.lastReceivedAt) : null;
-    let state: "healthy" | "stale" | "offline" | "degraded" | "waiting" | "unknown";
-    if (feedHealthUnavailable) state = "unknown";
-    else if (!source) state = "waiting";
-    else if (source.status === "DISCONNECTED") state = "offline";
-    else if (source.status === "STARTING") state = "waiting";
-    else if (source.status.startsWith("DEGRADED")) state = "degraded";
-    else if (source.status !== "HEALTHY") state = "unknown";
-    else if (!freshnessTimestamp || now - Date.parse(freshnessTimestamp) > item.maxAgeSeconds * 1_000) state = "stale";
-    else state = "healthy";
-    const statusText = language === "en"
-      ? ({ healthy: "Live", stale: "Stale", offline: "Offline", degraded: "Issue", waiting: "Waiting", unknown: "Unknown" } as const)[state]
-      : ({ healthy: "Live", stale: "Verouderd", offline: "Offline", degraded: "Probleem", waiting: "Wachten", unknown: "Onbekend" } as const)[state];
-    const lastSeen = freshnessTimestamp
-      ? new Date(freshnessTimestamp).toLocaleTimeString(language === "en" ? "en-GB" : "nl-NL", { hour: "2-digit", minute: "2-digit" })
-      : language === "en" ? "no data received" : "nog geen data ontvangen";
-    return { key: item.key, name: item.name, state, statusText, lastSeen };
-  });
+  const feedHealthItems = describeFeedHealth(feedHealth, feedHealthUnavailable, now, language);
 
   const roadFeedHealth = feedHealthItems.find((item) => item.key === "roads")!;
   const roadFeedLive = roadFeedHealth.state === "healthy" && connection === "live";
@@ -1814,7 +1738,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           {!isAlertsPage && <button className={`secondaryNavItem ${showDelayStats ? "active" : ""}`} type="button" onClick={openDelayStats}><UiIcon name="clock" /><span>Statistieken</span></button>}
         </nav>
         <div className="sidebarLive">
-          <div className={`sourcePill ${connection}`}><span /> WebSocket · {websocketStatus}</div>
+          <div className={`sourcePill ${connection}`}><span /> {language === "en" ? "Connection" : "Verbinding"} · {websocketStatus}</div>
           <div className="feedHealthList" aria-label={language === "en" ? "Data source status" : "Status databronnen"}>
             {feedHealthItems.map((item) => <span className={`feedHealthItem ${item.state}`} key={item.key} title={`${item.name}: ${item.statusText} · ${language === "en" ? "last update" : "laatste update"}: ${item.lastSeen}`} aria-label={`${item.name}: ${item.statusText}`}>
               <i aria-hidden="true" /><span className="feedHealthName">{item.name}</span><strong>{item.statusText}</strong>
@@ -1969,8 +1893,14 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         <div className="mapWrap">
           <div ref={mapElement} className="liveMap" aria-label={isAlertsPage ? "Kaart van Nederland met wegmeldingen" : "Kaart van Nederland met actuele treinposities"} aria-busy={!mapReady ? "true" : undefined} />
           {!isAlertsPage && <canvas ref={trainOverlayElement} className="trainOverlay" aria-hidden="true" />}
-          {!isAlertsPage && !vehicles.length && <div className="waitingMarker"><span /> Wachten op eerste vlootbatch</div>}
-          {!isAlertsPage && vehicles.length > 0 && mappedTrainCount === 0 && <div className="waitingMarker"><span /> Wachten op treinposities</div>}
+          {!isAlertsPage && (connection !== "live" || !vehicles.length || mappedTrainCount === 0) && <div className="mapStatusNotice" role="status">
+            <strong>{connection === "offline" || connection === "herstellen" ? (language === "en" ? "Connection interrupted" : "Verbinding onderbroken") : (language === "en" ? "Loading live trains" : "Live treinen ophalen")}</strong>
+            <p>{connection === "offline" || connection === "herstellen" ? (language === "en" ? "We are reconnecting automatically. Any positions shown may be out of date." : "We verbinden automatisch opnieuw. Getoonde posities kunnen verouderd zijn.") : (language === "en" ? "The map is ready to explore. Train positions appear as soon as updates arrive." : "Je kunt de kaart alvast verkennen. Treinposities verschijnen zodra er updates binnenkomen.")}</p>
+          </div>}
+          {!isAlertsPage && <nav className="mobilePlannerActions" aria-label={language === "en" ? "Travel tools" : "Reishulpmiddelen"}>
+            <button type="button" onClick={openJourneyPlanner} aria-pressed={showJourneyPlanner}>{language === "en" ? "Plan journey" : "Plan je reis"}</button>
+            <button type="button" onClick={openDelayStats} aria-pressed={showDelayStats}>{language === "en" ? "Live overview" : "Live overzicht"}</button>
+          </nav>}
           {isAlertsPage && <div className="alertMapHeading"><span>Meldingenkaart</span><strong>Nederland onderweg</strong><small>Alleen wegmeldingen · geen treinen</small></div>}
           <div className="mapActions" aria-label="Kaartbediening">
             {!isAlertsPage && <button type="button" onClick={() => setShowLayers(true)} aria-expanded={showLayers}><UiIcon name="sliders" /><span>Kaartlagen</span></button>}
@@ -2016,6 +1946,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             </>}
           </aside>}
         </div>
+        <AsyncPanel key={selectedStation?.code ?? selectedVehicleId ?? (showJourneyPlanner ? "planner" : "stats")}>
         {!isAlertsPage && selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} catalogFetchedAt={stationCatalogFetchedAt} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
         {!isAlertsPage && observation && !selectedStation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} positionHistory={positionHistory} isFollowing={isFollowingTrain} canFollow={displayTrains.some((train) => train.observation.vehicleId === observation.vehicleId)} onToggleFollow={() => setIsFollowingTrain((following) => !following)} onClose={clearVehicleSelection} />}
         {!isAlertsPage && showJourneyPlanner && <JourneyPlanner stations={stationCatalog} route={followedRoute} onRouteChange={updateFollowedRoute} onClose={() => setShowJourneyPlanner(false)} liveTrainNumbers={new Set(vehicles.map((vehicle) => vehicle.trainNumber))} onSelectTrain={(trainNumber) => {
@@ -2026,6 +1957,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           }
         }} />}
         {!isAlertsPage && showDelayStats && <DelayStats vehicles={vehicles} onClose={() => setShowDelayStats(false)} />}
+        </AsyncPanel>
       </section>
     </main>
   );

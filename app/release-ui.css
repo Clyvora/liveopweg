@@ -1,0 +1,23 @@
+/* Public-facing states and travel tools; loaded after the legacy map styles. */
+.mapStatusNotice, .asyncPanelNotice {
+  position:absolute; z-index:35; padding:16px 18px; border:1px solid #dce7ef;
+  border-radius:14px; background:#fff; color:#19384f; box-shadow:0 8px 28px #12304724;
+  font-size:13px; line-height:1.5;
+}
+.mapStatusNotice { top:90px; left:calc(var(--radar-sidebar) + 24px); width:min(350px,calc(100% - var(--radar-sidebar) - 48px)); pointer-events:none; }
+.mapStatusNotice strong { display:block; font-size:14px; }
+.mapStatusNotice p { margin:5px 0 0; color:#526c7d; font-size:12px; }
+.asyncPanelNotice { top:24px; right:24px; max-width:min(360px,calc(100% - 48px)); }
+.asyncPanelNotice p { margin:0 0 12px; }
+.asyncPanelNotice button, .mobilePlannerActions button { min-height:40px; padding:8px 14px; border:1px solid #bdd5ec; border-radius:9px; background:#eaf3ff; color:#155b9d; font:700 12px/1.3 var(--font-geist-sans); cursor:pointer; }
+.mobilePlannerActions { display:none; }
+[data-theme="dark"] .mapStatusNotice, [data-theme="dark"] .asyncPanelNotice { background:#183447; border-color:#345468; color:#eef6fb; }
+[data-theme="dark"] .mapStatusNotice p { color:#b8cbd7; }
+[data-theme="dark"] .asyncPanelNotice button, [data-theme="dark"] .mobilePlannerActions button { border-color:#3a607b; background:#214663; color:#e4f1fc; }
+.mobilePlannerActions button:focus-visible, .asyncPanelNotice button:focus-visible { outline:3px solid #2581df; outline-offset:3px; }
+@media (max-width:900px) {
+  .mobilePlannerActions { position:absolute; top:132px; left:12px; right:12px; z-index:30; display:flex; gap:8px; }
+  .mobilePlannerActions button { box-shadow:0 4px 16px #1230471f; }
+  .mapStatusNotice { top:188px; left:12px; width:min(350px,calc(100% - 24px)); padding:12px 14px; }
+  .asyncPanelNotice { top:auto; bottom:88px; right:12px; left:12px; max-width:none; }
+}

@@ -9,7 +9,7 @@
 .alertsPage .liveFeedItem.selected { background:#edf5ff; box-shadow:inset 3px 0 #237ce7; }
 @media(prefers-reduced-motion:reduce){.sideNav a,.settingsNav a,.settingsLinks a,.alertFilterGrid label,.liveFeedItem,.settingsSwitch span { transition:none; }}
 .trainPage .mapActions button:nth-child(n+2),.alertsPage .mapActions button:nth-child(n+2),.notificationToggle { display:none; }
-.trainPage .mapActions { bottom:22px; }
+.trainPage .mapActions { top:auto; bottom:22px; align-items:center; height:auto; }
 .trainPage .radarStatusBar { max-width:calc(100% - var(--radar-sidebar) - 36px); }
 .trainPage .mapZoomControls,.trainPage .mapStylePicker { right:18px; }
 .trainPage .mapDrawer .mapLayerToggles { display:grid; grid-template-columns:1fr; gap:8px; }
@@ -153,6 +153,11 @@
 .positionLegend i { width:9px; height:9px; border:2px solid #fff; border-radius:50%; box-shadow:0 0 0 1px #344c62; }
 .positionLegend i.matched { background:#164a9a; }
 .positionLegend i.gps { background:#eaa53a; box-shadow:0 0 0 1px #a35d18; }
+[data-theme="dark"] .positionLegend { background:#1b3649; border-color:#385064; color:#d4e3ec; }
+@media (min-width:901px) {
+  .trainPage .fleetTools { top:18px; left:calc(var(--radar-sidebar) + 24px); min-width:0; max-width:calc(100% - var(--radar-sidebar) - 48px); }
+  .trainPage .mapActions { left:calc(var(--radar-sidebar) + 24px); }
+}
 @media (min-width:2200px) { .positionLegend { min-height:48px; padding-inline:17px; gap:17px; font-size:12px; } }
 @media (max-width:900px) { .positionLegend { min-height:45px; padding-inline:10px; gap:10px; font-size:9px; } }
 @media (max-width:560px) { .positionLegend { display:none; } }

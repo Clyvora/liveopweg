@@ -85,7 +85,9 @@
 .mapDrawer { top:82px; left:24px; }
 .mapAttribution { bottom:6px; }
 .maplibregl-canvas { image-rendering:auto; }
-.maplibregl-canvas-container { contain:layout paint; }
+/* MapLibre positions its canvas absolutely: paint containment on this
+   zero-height wrapper clips every tile while the separate train overlay stays visible. */
+.maplibregl-canvas-container { contain:none; }
 .mapZoomControls button, .mapActions button, .mapStyleCurrent {
   transition: transform 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }

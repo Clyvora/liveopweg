@@ -19,15 +19,8 @@ export function trainDelay(seconds: number | null | undefined) {
   if (Math.abs(seconds) < 60) return seconds > 0 ? "+<1 min" : "−<1 min";
   return `${seconds > 0 ? "+" : "−"}${Math.round(Math.abs(seconds) / 60)} min`;
 }
-export function nextTrainStop(stops: Stop[], now: number) {
-  return stops.find(stop => {
-    if (stop.calls.actual === false && stop.calls.planned === true) return false;
-    if (!(stop.calls.actual ?? stop.calls.planned)) return false;
-    const time = stop.departure.actualAt ?? stop.departure.plannedAt ?? stop.arrival.actualAt ?? stop.arrival.plannedAt;
-    const parsed = parseTimestamp(time);
-    return parsed !== null && parsed >= now;
-  }) ?? null;
-}
+export { nextTrainStop } from "./next-train-stop";
+import { nextTrainStop } from "./next-train-stop";
 
 // Calculate ETA in minutes
 function getETA(stop: Stop, now: number): number | null {
