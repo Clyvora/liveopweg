@@ -4,6 +4,18 @@ import { parseTimestamp, realtimeHttpUrl, realtimeWebSocketUrl } from "./realtim
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("realtime URLs", () => {
+  it("preserves HTTPS when the configured gateway uses an HTTP URL", () => {
+    vi.stubGlobal("window", { location: new URL("https://frontend.example/") });
+    vi.stubEnv("NEXT_PUBLIC_REALTIME_URL", "https://gateway.example/v1/realtime");
+    expect(realtimeWebSocketUrl()).toBe("wss://gateway.example/v1/realtime");
+    expect(realtimeHttpUrl("/health")).toBe("https://gateway.example/health");
+  });
+  it("converts a configured development HTTP gateway to WebSocket", () => {
+    vi.stubGlobal("window", { location: new URL("http://localhost:3000/") });
+    vi.stubEnv("NEXT_PUBLIC_REALTIME_URL", "http://localhost:8081/v1/realtime");
+    expect(realtimeWebSocketUrl()).toBe("ws://localhost:8081/v1/realtime");
+    expect(realtimeHttpUrl("/health")).toBe("http://localhost:8081/health");
+  });
   it("keeps the central gateway HTTP and WebSocket contracts on one configured host", () => {
     vi.stubGlobal("window", { location: new URL("https://frontend.example/") });
     vi.stubEnv("NEXT_PUBLIC_REALTIME_URL", "wss://gateway.example/v1/realtime");

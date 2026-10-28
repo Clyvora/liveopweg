@@ -37,6 +37,8 @@ import { useTheme } from "./ThemeContext";
 import { useLanguage } from "./LanguageContext";
 
 type ConnectionState = "verbinden" | "live" | "herstellen" | "offline";
+type FeedHealthEntry = { status: string; lastReceivedAt: string | null; lastCheckedAt?: string | null; pollSeconds?: number };
+type FeedHealthSnapshot = { positions: FeedHealthEntry; journeys: FeedHealthEntry; roads: FeedHealthEntry };
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
 type MapLayerKey = "trains" | "stations" | "railways" | "crossings";
 type BaseMapKey = "standard" | "light" | "satellite";
@@ -137,6 +139,32 @@ function distanceBetweenMeters(first: { latitude: number; longitude: number }, s
 
 function nearbyDistanceLabel(meters: number) {
   return meters < 1_000 ? `${Math.round(meters)} m` : `${(meters / 1_000).toLocaleString("nl-NL", { maximumFractionDigits: 1 })} km`;
+}
+
+function parseFeedHealth(value: unknown): FeedHealthSnapshot | null {
+  if (typeof value !== "object" || value === null || !("sources" in value)) return null;
+  const sources = value.sources;
+  if (typeof sources !== "object" || sources === null) return null;
+  const entry = (candidate: unknown, timestampKey: "lastEnvelopeReceivedAt" | "lastReceivedAt"): FeedHealthEntry => {
+    if (typeof candidate !== "object" || candidate === null || !("status" in candidate) || typeof candidate.status !== "string") {
+      return { status: "UNKNOWN", lastReceivedAt: null };
+    }
+    const record = candidate as Record<string, unknown>;
+    const received = record[timestampKey];
+    const checked = record.lastCheckedAt;
+    const pollSeconds = typeof record.pollSeconds === "number" ? record.pollSeconds : undefined;
+    return {
+      status: candidate.status,
+      lastReceivedAt: typeof received === "string" && Number.isFinite(Date.parse(received)) ? received : null,
+      ...(typeof checked === "string" && Number.isFinite(Date.parse(checked)) ? { lastCheckedAt: checked } : {}),
+      ...(pollSeconds === undefined ? {} : { pollSeconds }),
+    };
+  };
+  return {
+    positions: entry("positions" in sources ? sources.positions : null, "lastEnvelopeReceivedAt"),
+    journeys: entry("journeys" in sources ? sources.journeys : null, "lastEnvelopeReceivedAt"),
+    roads: entry("ndwActueelBeeld" in sources ? sources.ndwActueelBeeld : null, "lastReceivedAt"),
+  };
 }
 
 const nationalStrikeAlert = {
@@ -501,6 +529,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const [expectedRoute, setExpectedRoute] = useState<ExpectedRoute | null>(null);
   const [trackMatchesByVehicle, setTrackMatchesByVehicle] = useState<Record<string, RailTrackMatch>>({});
   const [connection, setConnection] = useState<ConnectionState>("verbinden");
+  const [feedHealth, setFeedHealth] = useState<FeedHealthSnapshot | null>(null);
+  const [feedHealthUnavailable, setFeedHealthUnavailable] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [query, setQuery] = useState("");
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
@@ -531,6 +561,40 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     syncNotificationSetting();
     window.addEventListener("storage", syncNotificationSetting);
     return () => window.removeEventListener("storage", syncNotificationSetting);
+  }, []);
+  useEffect(() => {
+    let stopped = false;
+    let controller: AbortController | null = null;
+    const refreshFeedHealth = async () => {
+      if (controller) return;
+      controller = new AbortController();
+      const requestController = controller;
+      try {
+        const response = await fetch(realtimeHttpUrl("/health"), {
+          signal: AbortSignal.any([requestController.signal, AbortSignal.timeout(10_000)]),
+          cache: "no-store",
+          headers: { accept: "application/json" },
+        });
+        if (!response.ok) throw new Error("health_request_failed");
+        const parsed = parseFeedHealth(await response.json());
+        if (!parsed) throw new Error("health_response_invalid");
+        if (!stopped) {
+          setFeedHealth(parsed);
+          setFeedHealthUnavailable(false);
+        }
+      } catch {
+        if (!stopped && !requestController.signal.aborted) setFeedHealthUnavailable(true);
+      } finally {
+        if (controller === requestController) controller = null;
+      }
+    };
+    void refreshFeedHealth();
+    const interval = window.setInterval(() => { void refreshFeedHealth(); }, 15_000);
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+      controller?.abort();
+    };
   }, []);
   const [baseMap, setBaseMap] = useState<BaseMapKey>("standard");
   const [showMapStyles, setShowMapStyles] = useState(false);
@@ -564,6 +628,9 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         // Eén hertekening zodra een sprite klaar is, zodat de marker meteen
         // van de compacte fallback naar het bovenaanzicht wisselt.
         sprite.onload = () => { overlayRenderRef.current?.(); };
+        // Als een sprite niet kan worden geladen (bijv. netwerkfout of 404),
+        // reset de vraagflag zodat een volgende zoektocht het opnieuw kan proberen.
+        sprite.onerror = () => { spritesRequestedRef.current = false; };
         sprite.src = source;
         sprites[family] = sprite;
       }
@@ -796,7 +863,10 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     if (!trainNumber) return;
     const vehicle = vehicles.find((candidate) => candidate.trainNumber === trainNumber);
     if (!vehicle) {
-      pendingTrainNumberRef.current = null;
+      // De eerste vlootbatch komt pas ná deze effectronde binnen. Geef de
+      // deep link daarom niet op voordat er überhaupt voertuigen zijn
+      // geladen; anders wordt ?train= verwijderd vóórat de trein gezien wordt.
+      if (vehicles.length > 0) pendingTrainNumberRef.current = null;
       return;
     }
     pendingTrainNumberRef.current = null;
@@ -1534,6 +1604,11 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       socket.onopen = () => {
         setConnection("live");
         // The server sends fresh fleet, match and road snapshots on every connection.
+        // De voertuigselectie hoort echter bij de verbinding: zonder dit bericht
+        // krijgt de client na een (her)verbinding geen verse selectie- en
+        // reisupdates meer, ook al staat de trein nog geselecteerd op de kaart.
+        const selectedVehicleId = selectedVehicleIdRef.current;
+        if (selectedVehicleId) socket?.send(JSON.stringify({ protocolVersion: 2, type: "select", vehicleId: selectedVehicleId }));
       };
       socket.onmessage = (event) => {
         let decoded: unknown;
@@ -1692,6 +1767,36 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const strikeValidUntil = parseTimestamp(nationalStrikeAlert.validUntil);
   const strikeIsActive = strikeValidUntil !== null && now <= strikeValidUntil;
   const gpsOnlyTrainCount = Math.max(0, mappedTrainCount - matchedTrainCount);
+  const websocketStatus = language === "en"
+    ? ({ verbinden: "Connecting", live: "Live", herstellen: "Reconnecting", offline: "Offline" } as const)[connection]
+    : ({ verbinden: "Verbinden", live: "Live", herstellen: "Opnieuw verbinden", offline: "Offline" } as const)[connection];
+  const feedHealthItems = ([
+    { key: "positions", name: language === "en" ? "Positions" : "Treinposities", source: feedHealth?.positions ?? null, maxAgeSeconds: 60 },
+    { key: "journeys", name: language === "en" ? "Journeys" : "Ritten", source: feedHealth?.journeys ?? null, maxAgeSeconds: 300 },
+    { key: "roads", name: "NDW", source: feedHealth?.roads ?? null, maxAgeSeconds: Math.max(120, (feedHealth?.roads.pollSeconds ?? 60) * 2) },
+  ] as const).map((item) => {
+    const source = item.source;
+    const freshnessTimestamp = source ? (item.key === "roads" ? source.lastCheckedAt ?? source.lastReceivedAt : source.lastReceivedAt) : null;
+    let state: "healthy" | "stale" | "offline" | "degraded" | "waiting" | "unknown";
+    if (feedHealthUnavailable) state = "unknown";
+    else if (!source) state = "waiting";
+    else if (source.status === "DISCONNECTED") state = "offline";
+    else if (source.status === "STARTING") state = "waiting";
+    else if (source.status.startsWith("DEGRADED")) state = "degraded";
+    else if (source.status !== "HEALTHY") state = "unknown";
+    else if (!freshnessTimestamp || now - Date.parse(freshnessTimestamp) > item.maxAgeSeconds * 1_000) state = "stale";
+    else state = "healthy";
+    const statusText = language === "en"
+      ? ({ healthy: "Live", stale: "Stale", offline: "Offline", degraded: "Issue", waiting: "Waiting", unknown: "Unknown" } as const)[state]
+      : ({ healthy: "Live", stale: "Verouderd", offline: "Offline", degraded: "Probleem", waiting: "Wachten", unknown: "Onbekend" } as const)[state];
+    const lastSeen = freshnessTimestamp
+      ? new Date(freshnessTimestamp).toLocaleTimeString(language === "en" ? "en-GB" : "nl-NL", { hour: "2-digit", minute: "2-digit" })
+      : language === "en" ? "no data received" : "nog geen data ontvangen";
+    return { key: item.key, name: item.name, state, statusText, lastSeen };
+  });
+
+  const roadFeedHealth = feedHealthItems.find((item) => item.key === "roads")!;
+  const roadFeedLive = roadFeedHealth.state === "healthy" && connection === "live";
 
   return (
     <main className={`shell ${isAlertsPage ? "alertsPage" : "trainPage"}`}>
@@ -1708,7 +1813,14 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           {!isAlertsPage && <button className={`secondaryNavItem ${showJourneyPlanner ? "active" : ""}`} type="button" onClick={openJourneyPlanner}><UiIcon name="queue" /><span>Reisplanner</span></button>}
           {!isAlertsPage && <button className={`secondaryNavItem ${showDelayStats ? "active" : ""}`} type="button" onClick={openDelayStats}><UiIcon name="clock" /><span>Statistieken</span></button>}
         </nav>
-        <div className="sidebarLive"><div className={`sourcePill ${connection}`}><span /> {connection === "live" ? "Live" : connection}</div></div>
+        <div className="sidebarLive">
+          <div className={`sourcePill ${connection}`}><span /> WebSocket · {websocketStatus}</div>
+          <div className="feedHealthList" aria-label={language === "en" ? "Data source status" : "Status databronnen"}>
+            {feedHealthItems.map((item) => <span className={`feedHealthItem ${item.state}`} key={item.key} title={`${item.name}: ${item.statusText} · ${language === "en" ? "last update" : "laatste update"}: ${item.lastSeen}`} aria-label={`${item.name}: ${item.statusText}`}>
+              <i aria-hidden="true" /><span className="feedHealthName">{item.name}</span><strong>{item.statusText}</strong>
+            </span>)}
+          </div>
+        </div>
       </header>
 
       {isAlertsPage && <aside className="railAlertsPanel liveFeedPanel open" aria-label="Actuele meldingen">
@@ -1731,11 +1843,11 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         <div className="networkSummary" aria-label="Landelijk live-overzicht">
           <div><strong>{currentRoadEvents.length}</strong><span>actuele meldingen</span></div>
           <div><strong>{roadCounts.incidents + roadCounts.closures}</strong><span>ernstige meldingen</span></div>
-          <div><strong className={connection === "live" ? "statusLive" : ""}>{connection === "live" ? "Live" : "Wachten"}</strong><span>gegevensfeed</span></div>
+          <div><strong className={roadFeedLive ? "statusLive" : ""}>{connection === "live" ? roadFeedHealth.statusText : websocketStatus}</strong><span>NDW gegevensfeed</span></div>
         </div>
         <div className="feedSectionTitle"><strong>Laatste updates</strong><span>{recentRoadEvents.length} zichtbaar</span></div>
         <div className="liveFeedList">
-          {!recentRoadEvents.length && <p className="alertFeedEmpty">{connection === "live" ? "Geen meldingen binnen de gekozen filters." : "Wachten op de live meldingenfeed. De kaart wordt automatisch bijgewerkt zodra de verbinding er is."}</p>}
+          {!recentRoadEvents.length && <p className="alertFeedEmpty">{roadFeedLive ? "Geen meldingen binnen de gekozen filters." : "De actuele verkeersinformatie is nog niet beschikbaar. We proberen de verbinding automatisch opnieuw."}</p>}
           {strikeIsActive && <a className="liveFeedItem strike" href={nationalStrikeAlert.url} target="_blank" rel="noreferrer">
             <span className="feedIcon"><UiIcon name="warning" /></span><span className="feedCopy"><strong>{nationalStrikeAlert.title}</strong><small>NS · heel Nederland</small></span><b>Vandaag</b><span className="feedArrow"><UiIcon name="chevron" /></span>
           </a>}
@@ -1759,7 +1871,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           <p>{nationalStrikeAlert.body}</p>
           <div><span>Bijgewerkt {formatJourneyClock(nationalStrikeAlert.updatedAt)}</span><a href={nationalStrikeAlert.url} target="_blank" rel="noreferrer">Bekijk bij NS ↗</a></div>
         </article>}
-        <div className="railFeedSummary"><span><i className={connection === "live" ? "live" : ""} /> {connection === "live" ? "NDW live" : "NDW verbinden"}</span><strong>Geen treiniconen op deze kaart</strong></div>
+        <div className="railFeedSummary"><span><i className={roadFeedLive ? "live" : ""} /> NDW · {connection === "live" ? roadFeedHealth.statusText : websocketStatus}</span><strong>Geen treiniconen op deze kaart</strong></div>
       </aside>}
 
       {!isAlertsPage && <section className={`roadOverview mapDrawer ${showLayers ? "open" : ""}`} aria-label="Kaartlagen" aria-hidden={!showLayers}>
@@ -1906,7 +2018,13 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         </div>
         {!isAlertsPage && selectedStation && <StationPanel key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} catalogFetchedAt={stationCatalogFetchedAt} onClose={() => { setSelectedStation(null); replaceSelectionUrl(); }} onSelectVehicle={selectVehicle} />}
         {!isAlertsPage && observation && !selectedStation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} positionHistory={positionHistory} isFollowing={isFollowingTrain} canFollow={displayTrains.some((train) => train.observation.vehicleId === observation.vehicleId)} onToggleFollow={() => setIsFollowingTrain((following) => !following)} onClose={clearVehicleSelection} />}
-        {!isAlertsPage && showJourneyPlanner && <JourneyPlanner stations={stationCatalog} route={followedRoute} onRouteChange={updateFollowedRoute} onClose={() => setShowJourneyPlanner(false)} />}
+        {!isAlertsPage && showJourneyPlanner && <JourneyPlanner stations={stationCatalog} route={followedRoute} onRouteChange={updateFollowedRoute} onClose={() => setShowJourneyPlanner(false)} liveTrainNumbers={new Set(vehicles.map((vehicle) => vehicle.trainNumber))} onSelectTrain={(trainNumber) => {
+          const vehicle = vehicles.find((candidate) => candidate.trainNumber === trainNumber);
+          if (vehicle) {
+            selectVehicle(vehicle.vehicleId);
+            setShowJourneyPlanner(false);
+          }
+        }} />}
         {!isAlertsPage && showDelayStats && <DelayStats vehicles={vehicles} onClose={() => setShowDelayStats(false)} />}
       </section>
     </main>

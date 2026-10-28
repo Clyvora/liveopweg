@@ -15,7 +15,11 @@ const LIVEOPWEG_REALTIME_URL = "wss://site--liveopweg-api--fpbs4m4lfsvq.code.run
 
 export function realtimeWebSocketUrl(): string {
   const configured = configuredRealtimeUrl();
-  if (configured) return configured.toString();
+  if (configured) {
+    if (configured.protocol === "https:") configured.protocol = "wss:";
+    if (configured.protocol === "http:") configured.protocol = "ws:";
+    return configured.toString();
+  }
   if (isLocalDevelopmentHost()) {
     return `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8081/v1/realtime`;
   }
@@ -25,7 +29,7 @@ export function realtimeWebSocketUrl(): string {
 
 export function realtimeHttpUrl(pathname: string): string {
   const url = configuredRealtimeUrl() ?? new URL(realtimeWebSocketUrl());
-  url.protocol = url.protocol === "wss:" ? "https:" : "http:";
+  url.protocol = url.protocol === "wss:" || url.protocol === "https:" ? "https:" : "http:";
   url.pathname = pathname;
   url.search = "";
   url.hash = "";

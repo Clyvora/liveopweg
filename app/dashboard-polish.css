@@ -282,8 +282,9 @@
   color:#17334b;
   font:500 12px/1.2 var(--font-geist-sans);
 }
-.routeActions { display:flex; gap:8px; margin-top:14px; }
+.routeActions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
 .routeActions button {
+  flex:1 1 112px;
   min-height:38px;
   padding:0 13px;
   border:0;
@@ -302,6 +303,33 @@
 .favoriteStations>div { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px; }
 .favoriteStations button { padding:6px 8px; border:1px solid #dce7ef; border-radius:8px; background:#fff; color:#315269; font-size:10px; cursor:pointer; }
 .favoriteStations select { width:100%; min-height:34px; padding:0 8px; border:1px solid #dce7ef; border-radius:8px; background:#fff; color:#315269; font-size:11px; }
+.jpCoverageNotice { margin:10px 0; color:#607686; font-size:11px; line-height:1.45; }
+.jpSearchMessage { margin:10px 0; padding:10px 12px; border-radius:9px; background:#f1f6f9; color:#405a6d; font-size:12px; line-height:1.45; }
+.jpResults { display:grid; gap:8px; margin-top:14px; }
+.jpResults h3 { margin:0 0 2px; color:#17334b; font-size:13px; }
+.jpConnection { display:grid; gap:8px; padding:12px; border:1px solid #dce7ef; border-radius:11px; background:#fff; color:#29475c; }
+.jpConnectionSummary { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; }
+.jpConnectionSummary span { color:#607686; font-size:10px; text-align:right; }
+.jpTransfer { margin:0; color:#586f80; font-size:11px; }
+.jpJourneyLeg { display:grid; grid-template-columns:1fr auto; gap:4px 8px; padding-top:8px; border-top:1px solid #edf1f4; font-size:11px; }
+.jpJourneyLeg strong { text-align:right; }
+.jpJourneyLeg button { grid-column:1 / -1; min-height:32px; border:1px solid #cbdced; border-radius:8px; background:#f3f8fc; color:#155b9d; font-size:11px; font-weight:700; cursor:pointer; }
+.feedHealthList { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
+.feedHealthItem { display:inline-flex; align-items:center; gap:5px; min-height:22px; padding:2px 6px; border:1px solid #dbe5eb; border-radius:7px; background:#fff; color:#526879; font-size:9px; white-space:nowrap; }
+.feedHealthItem i { width:6px; height:6px; border-radius:50%; background:#8899a4; }
+.feedHealthItem strong { font-size:9px; font-weight:700; }
+.feedHealthName { font-weight:600; }
+.feedHealthItem.healthy i { background:#18935d; }
+.feedHealthItem.stale i, .feedHealthItem.degraded i { background:#d58a17; }
+.feedHealthItem.offline i, .feedHealthItem.unknown i { background:#bb4e4e; }
+.sidebarLive .feedHealthItem { text-shadow:none; }
+[data-theme="dark"] .jpResults h3 { color:#eff6fa; }
+[data-theme="dark"] .jpConnection { border-color:#345063; background:#1b3649; color:#eaf3f8; }
+[data-theme="dark"] .jpJourneyLeg { border-color:#345063; }
+[data-theme="dark"] .jpJourneyLeg button { border-color:#365a76; background:#213f56; color:#c8e1f6; }
+[data-theme="dark"] .jpCoverageNotice, [data-theme="dark"] .jpTransfer, [data-theme="dark"] .jpConnectionSummary span { color:#a8bfcd; }
+[data-theme="dark"] .jpSearchMessage { background:#213c4f; color:#d6e6ef; }
+[data-theme="dark"] .feedHealthItem { border-color:#385064; background:#1b3649; color:#d4e3ec; }
 .tpHistory { margin:12px 16px 0; padding:12px; border:1px solid #dce7ef; border-radius:11px; background:#f8fbfd; }
 .tpHistory>div { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
 .tpHistory>div span { color:#17334b; font-size:11px; font-weight:800; }
