@@ -1,6 +1,13 @@
 function configuredRealtimeUrl(): URL | null {
   const configured = process.env.NEXT_PUBLIC_REALTIME_URL;
-  return configured ? new URL(configured, window.location.origin) : null;
+  if (!configured?.trim()) return null;
+  try {
+    const url = new URL(configured.trim(), window.location.origin);
+    if (!["http:","https:","ws:","wss:"].includes(url.protocol) || url.username || url.password) return null;
+    if (url.pathname === "/") url.pathname = "/v1/realtime";
+    url.hash = "";
+    return url;
+  } catch { return null; }
 }
 
 function isLocalDevelopmentHost(): boolean {

@@ -1,108 +1,101 @@
-/* The radar surface owns its layout; legacy screens retain their own styles. */
-.radarShell { --radar-sidebar:210px; --radar-feed:390px; --radar-ink:#102c48; --radar-line:#e3eaf1; color:var(--radar-ink); }
-.radarShell .topbar { position:fixed; inset:0 auto 0 0; width:var(--radar-sidebar); height:100dvh; padding:26px 0 18px; display:flex; flex-direction:column; border:0; border-right:1px solid var(--radar-line); border-radius:0; background:#fff; box-shadow:none; transition:background-color .2s,border-color .2s; }
-.radarShell .radarBrand { display:flex; flex-direction:column; align-items:flex-start; height:auto; min-height:90px; padding:0 24px 26px; border:0; text-decoration:none; }
-.radarWordmark { color:#102b46; font:bold italic 33px/1.2 var(--font-geist-sans),Arial,sans-serif; letter-spacing:-1.8px; }
-.radarWordmark>span { color:#efb000; }
-.radarBrandCaption { margin-top:8px; color:var(--ui-muted); font-size:10px; font-weight:700; letter-spacing:.34em; }
-.radarShell .sideNav { display:flex; flex-direction:column; flex:1; gap:7px; margin:18px 0 0; padding:0 10px; width:100%; }
-.radarShell .sideNav>a,.radarShell .sideNav>button { position:relative; display:flex; flex-direction:row; justify-content:flex-start; align-items:center; width:100%; min-height:49px; height:auto; margin:0; padding:12px 14px; gap:14px; border:0; border-radius:9px; color:#153652; background:transparent; text-align:left; font:650 13px/1.25 var(--font-geist-sans),Arial,sans-serif; text-decoration:none; cursor:pointer; }
-.radarShell .sideNav>a>span:last-child,.radarShell .sideNav>button>span:last-child { font:inherit; }
-.radarShell .sideNav .uiIcon { width:22px; height:22px; flex:none; stroke-width:1.7; }
-.radarShell .sideNav .active { color:#1568dc; background:#edf4ff; }
-.radarShell .sideNav .active:before { content:""; position:absolute; left:-10px; height:30px; width:4px; border-radius:0 4px 4px 0; background:#2378ef; }
-.radarShell .sideNav>a:hover,.radarShell .sideNav>button:hover { background:#f2f6fa; }
-.radarStar { width:22px; text-align:center; font:29px/1 Arial,sans-serif; }
-.radarShell .sideNav .radarSecondary { margin-top:18px; color:var(--ui-muted); }
-.radarShell .sideNav .radarSettingsLink { margin-top:auto; }
-.radarSidebarFoot { padding:20px 24px 0; color:var(--ui-muted); font-size:11px; }
-.radarSidebarFoot span,.radarSidebarFoot small { display:block; }
-.radarSidebarFoot small { margin-top:5px; font-size:10px; line-height:1.6; }
-.radarShell .workspace { width:100%; }
-.radarShell .fleetTools { top:24px; left:calc(var(--radar-sidebar) + 24px); width:clamp(280px,33vw,530px); min-width:0; max-width:calc(100% - var(--radar-sidebar) - 48px); padding:0; background:none; box-shadow:none; backdrop-filter:none; border:0; }
-.radarShell .fleetTools input { height:54px; padding-left:48px; border:1px solid #e2e9ef; border-radius:10px; background-color:#fff; box-shadow:0 3px 16px #16334e12; color:#183c59; font-size:15px; }
-.radarShell .fleetTools .trainResults { top:64px; left:0; right:0; width:100%; border-radius:12px; }
-.radarTopMeta { position:absolute; z-index:25; top:24px; left:calc(var(--radar-sidebar) + clamp(280px,33vw,530px) + 38px); display:flex; align-items:center; gap:12px; }
-.radarTopMeta button { height:54px; display:flex; align-items:center; gap:9px; padding:0 16px; border:1px solid #e2e9ef; border-radius:10px; background:#fff; color:#193a55; box-shadow:0 3px 16px #16334e12; cursor:pointer; font:500 12px/1.2 var(--font-geist-sans),Arial,sans-serif; white-space:nowrap; }
-.radarTopMeta strong { font-size:17px; }
-.radarTopMeta .uiIcon { width:19px; height:19px; }
-.radarTopMeta .radarNoticeChip { position:fixed; top:94px; left:calc(var(--radar-sidebar) + 24px); height:44px; color:#a64b00; border-color:#f5c79c; background:#fff8ef; }
-.radarTopMeta .radarMobilePlanner { display:none; }
-.radarShell:has(.mapStatusNotice) .radarNoticeChip { display:none; }
-.radarSearchIcon { position:absolute; z-index:1; top:16px; left:17px; width:22px; height:22px; fill:none; stroke:#375a78; stroke-width:1.8; pointer-events:none; }
-.radarShell .mapActions { inset:auto auto 26px calc(var(--radar-sidebar) + 24px); height:auto; align-items:center; padding:0; border:0; background:none; box-shadow:none; backdrop-filter:none; }
-.radarShell .mapActions>button { height:44px; padding:0 13px; background:#fff; color:#24445f; border:1px solid #e3eaf1; border-radius:8px; box-shadow:0 3px 12px #16334e12; }
-.radarShell .positionLegend { min-height:44px; padding:0 16px; background:#fff; border:1px solid #e3eaf1; border-radius:8px; box-shadow:0 3px 12px #16334e12; font-size:11px; color:#24445f; }
-.radarShell .mapZoomControls { right:24px; bottom:112px; width:46px; overflow:hidden; border:1px solid #e3eaf1; border-radius:9px; box-shadow:0 3px 12px #16334e12; }
-.radarShell .mapZoomControls button { width:44px; height:44px; background:#fff; color:#173650; border:0; }
-.radarShell .mapStylePicker { bottom:28px; right:24px; }
-.radarShell .mapStyleCurrent { min-height:54px; border-radius:9px; background:#fff; color:#24445f; }
-.radarShell .mapAttribution { right:12px; bottom:3px; font-size:9px; }
-.radarShell .mapStatusNotice { top:94px; left:calc(var(--radar-sidebar) + 24px); background:#fffffff5; color:#1a3b56; border-color:#dde7ef; box-shadow:0 3px 16px #16334e12; }
-.radarShell .mapStatusNotice p { color:#597185; }
-.radarCard { display:flex; flex-direction:column; padding:24px; overflow:auto; border:1px solid #e3eaf1; border-radius:14px; background:#fff; color:#193a55; box-shadow:0 8px 30px #15375315; }
-.radarCard header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
-.radarCard h2 { margin:7px 0 0; font-size:26px; letter-spacing:-.035em; }
-.radarEyebrow { color:var(--ui-muted); font-size:10px; font-weight:700; letter-spacing:.16em; }
-.radarClose { width:30px; height:30px; border:0; border-radius:6px; background:transparent; color:#173954; font-size:27px; cursor:pointer; }
-.radarCard>p { color:var(--ui-muted); font-size:13px; line-height:1.7; }
-.radarDirectorySearch { min-height:44px; padding:0 12px; border:1px solid #dce6ef; border-radius:8px; background:#f8fafc; color:#183c59; font:inherit; }
-.radarDirectory ul { list-style:none; padding:0; margin:16px 0 0; overflow:auto; }
-.radarDirectory li { display:flex; align-items:center; border-bottom:1px solid #edf1f5; }
-.radarDirectory li>button:first-child { flex:1; padding:14px 2px; text-align:left; background:none; border:0; color:#193a55; cursor:pointer; }
-.radarDirectory strong,.radarDirectory small { display:block; }
-.radarDirectory small { margin-top:5px; color:var(--ui-muted); font-size:10px; }
-.radarFavorite { width:36px; height:36px; border:0; border-radius:8px; background:transparent; color:var(--ui-muted); font-size:25px; cursor:pointer; }
-.radarFavorite[aria-pressed="true"] { color:#dc9f00; }
-.radarNoticeIllustration { display:grid; place-items:center; min-height:125px; margin-top:24px; border-radius:12px; background:#fff7e9; color:#d98b19; }
-.radarNoticeIllustration .uiIcon { width:52px; height:52px; }
-.radarPrimary { min-height:46px; border:0; border-radius:8px; background:#153a58; color:white; font-weight:700; cursor:pointer; }
-.radarRoadLink { margin-top:18px; color:#5d7d98; text-decoration:none; font-size:12px; text-align:center; }
-.radarShell button:focus-visible,.radarShell a:focus-visible { outline:3px solid #4c91ec; outline-offset:2px; }
-.radarShell .mobilePlannerActions { display:none; }
+/* Reference layout: slim horizontal navigation over an unobstructed map. */
+.radarShell { --app-header:56px; --radar-sidebar:0px; --radar-feed:396px; position:relative; isolation:isolate; width:100%; height:100dvh; min-height:480px; overflow:hidden; background:#eef1f5; }
+.workspace { position:absolute; inset:var(--app-header) 0 0; }
+.mapWrap { position:absolute; inset:0; overflow:hidden; background:#eef1f5; }
+.liveMap,.trainOverlay { position:absolute; inset:0; width:100%; height:100%; }
+.trainOverlay { z-index:2; pointer-events:none; }
+.appNavigation { position:fixed; inset:0 0 auto; z-index:90; height:var(--app-header); display:flex; align-items:center; gap:44px; padding:0 28px; border-bottom:1px solid var(--ui-border); color:var(--ui-text); background:var(--ui-surface); }
+.radarBrand { display:flex; flex:none; align-items:center; gap:11px; color:var(--ui-text); text-decoration:none; }
+.radarBrandGlyph { width:30px; height:28px; color:var(--ui-text); }
+.radarWordmark { font:700 26px/1 var(--font-ui); letter-spacing:-.055em; }
+.sideNav { display:flex; align-self:stretch; align-items:stretch; gap:12px; min-width:0; }
+.sideNav>a,.sideNav>button { position:relative; display:flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 12px; border:0; border-bottom:3px solid transparent; border-radius:0; background:transparent; color:var(--ui-text); text-decoration:none; white-space:nowrap; font:500 16px/1.3 var(--font-ui); }
+.sideNav .uiIcon { display:none; }
+.sideNav>a:hover,.sideNav>button:hover { background:var(--ui-muted-surface); }
+.sideNav .active { border-bottom-color:var(--ui-accent); color:var(--ui-text); font-weight:650; }
+.sideNav .radarMoreButton { display:none; }
+.navigationUtilities { display:flex; align-items:center; gap:4px; margin-left:auto; }
+.navigationUtilities>a,.navigationUtilities>button { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--ui-text); }
+.navigationUtilities>a:hover,.navigationUtilities>button:hover { background:var(--ui-muted-surface); }
+.navigationUtilities .uiIcon { width:23px; height:23px; }
+.fleetTools { position:absolute; top:80px; left:20px; z-index:60; width:376px; max-width:calc(100% - 40px); }
+.fleetTools>label { display:flex; position:relative; align-items:center; }
+.fleetTools input { width:100%; height:48px; padding:0 42px; background:var(--ui-surface); color:var(--ui-text); border:1px solid var(--ui-border); border-radius:7px; box-shadow:var(--ui-shadow); font-size:14px; }
+.fleetTools input::placeholder { color:var(--ui-muted); opacity:1; }
+.radarSearchIcon { position:absolute; z-index:1; width:20px; height:20px; left:14px; fill:none; stroke:var(--ui-text); stroke-width:1.8; pointer-events:none; }
+.clearSearchButton { position:absolute; right:2px; width:44px; height:44px; border:0; background:transparent; color:var(--ui-muted); font-size:23px; }
+.searchShortcut { display:none; }
+.trainResults { position:absolute; top:50px; left:0; right:0; max-height:calc(100dvh - 180px); overflow:auto; padding:0; border:1px solid var(--ui-border); border-radius:7px; background:var(--ui-surface); box-shadow:var(--ui-shadow); }
+.trainResults>button { display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%; min-height:48px; padding:9px 14px; border:0; border-bottom:1px solid var(--ui-border); border-radius:0; background:transparent; text-align:left; font-size:13px; }
+.trainResults>button:last-child { border-bottom:0; }
+.trainResults>button span { color:var(--ui-muted); font-size:11px; }
+.trainResults>button[aria-selected="true"],.trainResults>button:hover { background:var(--ui-muted-surface); }
+.searchGroupLabel { padding:7px 14px; margin:0; font-size:10px; font-weight:600; color:var(--ui-muted); }
+.radarTopMeta { position:absolute; z-index:25; left:180px; bottom:32px; }
+.radarTopMeta button { display:flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:0 10px; border:1px solid var(--ui-border); border-radius:6px; background:var(--ui-surface); color:var(--ui-muted); font-size:11px; box-shadow:none; background:var(--ui-surface); }
+.radarFleetCount strong { color:var(--ui-text); font-size:12px; font-weight:600; }
+.radarFleetCount .uiIcon { width:16px; height:16px; }
+.radarNoticeChip,.radarMobilePlanner { display:none!important; }
+.mapActions { position:absolute; z-index:25; bottom:32px; left:20px; display:flex; gap:8px; align-items:center; }
+.mapActions>button { display:flex; align-items:center; justify-content:center; gap:7px; min-width:44px; height:44px; padding:0 13px; border:1px solid var(--ui-border); border-radius:6px; color:var(--ui-text); background:var(--ui-surface); box-shadow:var(--ui-shadow); font-size:12px; font-weight:500; }
+.mapActions>button.nearbyAction { width:44px; padding:0; }
+.nearbyAction>span,.positionLegend { display:none; }
+.mapActions>button>svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.mapZoomControls { position:absolute; z-index:25; right:20px; bottom:16px; display:flex; flex-direction:column; border:1px solid var(--ui-border); border-radius:6px; background:var(--ui-surface); box-shadow:var(--ui-shadow); }
+.mapZoomControls button { width:44px; height:44px; padding:0; border:0; background:transparent; color:var(--ui-text); font-size:23px; }
+.mapZoomControls button+button { border-top:1px solid var(--ui-border); border-radius:0 0 6px 6px; }
+.mapStylePicker { position:absolute; z-index:35; left:180px; bottom:32px; }
+.mapStyleCurrent { display:flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:0 10px; border:1px solid var(--ui-border); border-radius:6px; background:var(--ui-surface); color:var(--ui-text); box-shadow:var(--ui-shadow); font-size:12px; }
+.mapStyleCurrent>svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.7; }
+.mapStylePreview { width:25px; height:25px; flex:none; border:1px solid var(--ui-border); border-radius:3px; background:linear-gradient(135deg,#b2d3ee 0 35%,#f2f3f5 35% 70%,#d2e1cf 70%); }
+.mapStylePreview.light { background:linear-gradient(135deg,#38414b 0 35%,#252a32 35% 70%,#536252 70%); }
+.mapStylePreview.satellite { background:linear-gradient(135deg,#52654e 0 35%,#9b9b74 35% 70%,#334d44 70%); }
+.mapStyleMenu { display:none; position:absolute; bottom:52px; left:0; width:190px; padding:4px; border:1px solid var(--ui-border); border-radius:6px; background:var(--ui-surface); box-shadow:var(--ui-shadow); }
+.mapStylePicker.open .mapStyleMenu { display:grid; }
+.mapStyleMenu button { display:flex; align-items:center; gap:9px; min-height:44px; padding:8px; border:0; background:transparent; color:var(--ui-text); text-align:left; font-size:12px; }
+.mapStyleMenu button:hover,.mapStyleMenu button[aria-checked="true"] { background:var(--ui-muted-surface); }
+.mapStyleMenu b { margin-left:auto; color:var(--ui-accent); }
+.mapAttribution { position:absolute; bottom:3px; left:10px; z-index:5; max-width:calc(100% - 24px); padding:1px 4px; border-radius:2px; background:var(--ui-surface); color:var(--ui-muted); font-size:9px; }
+.mapStatusNotice { position:absolute; top:90px; left:20px; z-index:20; width:340px; max-width:calc(100% - 40px); padding:13px 15px; border:1px solid var(--ui-border); border-radius:6px; background:var(--ui-surface); color:var(--ui-text); box-shadow:var(--ui-shadow); font-size:13px; }
+.mapStatusNotice p { color:var(--ui-muted); font-size:12px; margin:5px 0 0; line-height:1.6; }
+.followedRouteBadge { position:absolute; top:90px; left:20px; z-index:19; max-width:360px; display:grid; gap:3px; min-height:52px; padding:9px 12px; border:1px solid var(--ui-border); border-radius:6px; background:var(--ui-surface); text-align:left; box-shadow:var(--ui-shadow); }
+.followedRouteBadge span { display:flex; align-items:center; gap:6px; color:var(--ui-muted); font-size:11px; }
+.followedRouteBadge strong { font-size:12px; }
+.mapWrap:has(.mapStatusNotice) .followedRouteBadge { top:260px; }
+.mobilePlannerActions { display:none; }
+.maplibregl-popup-content { padding:10px 12px; color:var(--ui-text); background:var(--ui-surface); border:1px solid var(--ui-border); border-radius:6px; font:12px/1.5 var(--font-ui); box-shadow:var(--ui-shadow); }
+.stationMapPopup strong { display:block; font-size:13px; }
+.stationMapPopup span { color:var(--ui-muted); font-size:11px; }
 @media (min-width:1024px) {
-  .radarShell.radarPanelOpen .mapZoomControls,.radarShell.radarPanelOpen .mapStylePicker { right:calc(var(--radar-feed) + 42px); }
-  .radarShell:has(.trainPanel) .fleetTools,.radarShell:has(.trainPanel) .mapActions { left:calc(var(--radar-sidebar) + 24px); }
-  .radarPanelOpen .radarTopMeta { display:flex; }
+  .radarPanelOpen .fleetTools { max-width:calc(100vw - var(--radar-feed) - 60px); }
+  .radarPanelOpen:not(:has(.trainPanel)) .mapZoomControls { right:calc(var(--radar-feed) + 32px); }
 }
-@media (min-width:1024px) and (max-width:1350px) { .radarShell.radarPanelOpen .radarTopMeta { display:none; } }
-[data-theme="dark"] .radarShell .topbar,[data-theme="dark"] .radarShell .radarCard,[data-theme="dark"] .radarShell .observationPanel.trainPanel,[data-theme="dark"] .radarShell .tpHeader { background:#10283b; border-color:#294256; color:#e6f0f7; }
-[data-theme="dark"] .radarShell .radarWordmark,[data-theme="dark"] .radarShell .sideNav>a,[data-theme="dark"] .radarShell .sideNav>button,[data-theme="dark"] .radarShell .tpHeader h2,[data-theme="dark"] .radarShell .tpFacts strong,[data-theme="dark"] .radarShell .radarClose { color:#e6f0f7; }
-[data-theme="dark"] .radarShell .sideNav .active { background:#193e60; color:#9ac7ff; }
-[data-theme="dark"] .radarShell .sideNav>a:hover,[data-theme="dark"] .radarShell .sideNav>button:hover { background:#1c3a51; }
-[data-theme="dark"] .radarShell .radarDirectory li>button:first-child { color:#e6f0f7; }
-[data-theme="dark"] .radarShell .radarDirectory li,[data-theme="dark"] .radarShell .tpStockCaption { border-color:#294256; }
-[data-theme="dark"] .radarShell .radarDirectorySearch,[data-theme="dark"] .radarShell .tpNext { background:#1a364c; border-color:#294256; color:#e6f0f7; }
-[data-theme="dark"] .radarShell .tpHeader p,[data-theme="dark"] .radarShell .tpStockCaption,[data-theme="dark"] .radarShell .tpJourneyToggle,[data-theme="dark"] .radarShell .tpJourney li strong,[data-theme="dark"] .radarShell .radarCard>p,[data-theme="dark"] .radarShell .tpFooter p { color:#abc1d1; }
-[data-theme="dark"] .radarShell .radarTopMeta button,[data-theme="dark"] .radarShell .mapActions>button,[data-theme="dark"] .radarShell .positionLegend,[data-theme="dark"] .radarShell .mapZoomControls button,[data-theme="dark"] .radarShell .mapStyleCurrent { background:#14344c; color:#d9eaf5; border-color:#294256; }
-[data-theme="dark"] .radarShell .radarSearchIcon { stroke:#c0d8eb; }
-@media (max-width:1100px) and (min-width:1024px) { .radarShell { --radar-sidebar:180px; --radar-feed:350px; } .radarShell .radarTopMeta { display:none; } }
+@media (min-width:1024px) and (max-width:1250px) {
+  .appNavigation { gap:20px; padding:0 16px; }
+  .sideNav { gap:2px; }
+  .sideNav>a,.sideNav>button { padding:0 9px; font-size:13px; }
+}
 @media (max-width:1023px) {
-  .radarShell { --radar-sidebar:0px; --radar-feed:100%; }
-  .radarShell .topbar { inset:auto 0 0; width:100%; height:70px; height:calc(70px + env(safe-area-inset-bottom)); padding:0 0 env(safe-area-inset-bottom); display:block; border:0; border-top:1px solid #dfe7ee; border-radius:0; box-shadow:0 -3px 18px #1738520a; }
-  .radarShell .radarBrand,.radarSidebarFoot { display:none; }
-  .radarShell .sideNav { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); width:100%; height:70px; gap:0; margin:0; padding:0 4px; }
-  .radarShell .sideNav>a,.radarShell .sideNav>button { display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:0; height:70px; width:100%; padding:6px 2px; gap:5px; font-size:9px; border-radius:0; text-align:center; }
-  .radarShell .sideNav .radarSecondary { display:none; }
-  .radarShell .sideNav .radarSettingsLink { margin:0; }
-  .radarShell .sideNav .active:before { inset:0 12px auto; height:3px; width:auto; }
-  .radarShell .radarStar { font-size:26px; }
-  .radarShell .fleetTools { top:14px; left:12px; right:12px; width:auto; max-width:none; }
-  .radarShell .fleetTools input { height:50px; font-size:13px; }
-  .radarShell .radarTopMeta { top:74px; left:12px; right:12px; gap:8px; }
-  .radarTopMeta button { height:44px; padding:0 10px; font-size:10px; }
-  .radarTopMeta strong { font-size:13px; }
-  .radarTopMeta .radarNoticeChip { display:none; }
-  .radarTopMeta .radarMobilePlanner { display:flex; }
-  .radarShell .mapStatusNotice { top:122px; left:12px; width:min(330px,calc(100% - 24px)); padding:12px; }
-  .radarShell .mapActions { inset:auto auto calc(84px + env(safe-area-inset-bottom)) 12px; flex-direction:row; }
-  .radarShell .mapActions>button { width:44px; height:44px; min-height:44px; padding:0; justify-content:center; }
-  .radarShell .mapActions>button span { display:none; }
-  .radarShell .positionLegend { display:none; }
-  .radarShell .mapZoomControls { bottom:calc(154px + env(safe-area-inset-bottom)); right:12px; }
-  .radarShell .mapStylePicker { right:12px; bottom:calc(84px + env(safe-area-inset-bottom)); }
-  .radarShell .mapStyleCurrent { min-height:44px; }
-  .radarShell .mapAttribution { bottom:calc(72px + env(safe-area-inset-bottom)); max-width:90%; font-size:7px; }
-  .radarShell .radarCard { padding:20px; }
-  .radarShell .radarDirectory ul { min-height:100px; }
+  .radarShell { --app-header:0px; --radar-feed:100%; min-height:420px; }
+  .appNavigation { inset:auto 0 0; height:calc(66px + env(safe-area-inset-bottom)); gap:0; padding:0 4px env(safe-area-inset-bottom); }
+  .radarBrand,.navigationUtilities,.sideNav .radarSecondary { display:none; }
+  .sideNav { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); width:100%; gap:0; }
+  .sideNav>a,.sideNav>button,.sideNav .radarMoreButton { display:flex; flex-direction:column; gap:4px; min-height:66px; padding:7px 1px; border-bottom:0; border-top:2px solid transparent; font-size:10px; }
+  .sideNav .active { border-top-color:var(--ui-accent); color:var(--ui-accent); }
+  .sideNav .uiIcon { display:block; width:21px; height:21px; }
+  .fleetTools { top:max(12px,env(safe-area-inset-top)); left:12px; right:12px; width:auto; max-width:none; }
+  .fleetTools input { height:48px; font-size:16px; }
+  .radarTopMeta { left:160px; bottom:calc(78px + env(safe-area-inset-bottom)); }
+  .mapActions { left:12px; bottom:calc(78px + env(safe-area-inset-bottom)); gap:6px; }
+  .mapActions>button { padding:0 10px; }
+  .mapZoomControls { right:12px; bottom:calc(78px + env(safe-area-inset-bottom)); }
+  .mapStylePicker { left:160px; bottom:calc(78px + env(safe-area-inset-bottom)); }
+  .mapStyleCurrent { font-size:11px; padding:0 8px; }
+  .mapStyleCurrent>svg:first-child { display:none; }
+  .mapStyleMenu { left:auto; right:0; }
+  .mapStatusNotice { top:74px; left:12px; max-width:calc(100% - 24px); width:340px; }
+  .mapAttribution { left:6px; bottom:calc(67px + env(safe-area-inset-bottom)); font-size:8px; }
+  .followedRouteBadge { top:74px; left:12px; max-width:calc(100% - 24px); }
+  .mapWrap:has(.mapStatusNotice) .followedRouteBadge { top:245px; }
+  .trainResults { max-height:calc(100dvh - 140px); }
 }

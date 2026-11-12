@@ -4,6 +4,14 @@ import { parseTimestamp, realtimeHttpUrl, realtimeWebSocketUrl } from "./realtim
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("realtime URLs", () => {
+  it("accepts a configured API origin without requiring the websocket path",()=>{
+    vi.stubGlobal("window",{location:new URL('https://frontend.example/')});vi.stubEnv('NEXT_PUBLIC_REALTIME_URL','https://gateway.example');
+    expect(realtimeWebSocketUrl()).toBe('wss://gateway.example/v1/realtime');
+  });
+  it("recovers from an invalid or unsupported gateway configuration",()=>{
+    vi.stubGlobal("window",{location:new URL('http://localhost:3000/')});
+    for(const value of ['http://[bad','javascript:alert(1)','https://user:secret@gateway.example']){vi.stubEnv('NEXT_PUBLIC_REALTIME_URL',value);expect(realtimeWebSocketUrl()).toBe('ws://localhost:8081/v1/realtime');}
+  });
   it("preserves HTTPS when the configured gateway uses an HTTP URL", () => {
     vi.stubGlobal("window", { location: new URL("https://frontend.example/") });
     vi.stubEnv("NEXT_PUBLIC_REALTIME_URL", "https://gateway.example/v1/realtime");

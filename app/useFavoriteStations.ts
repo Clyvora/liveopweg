@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { parseFavoriteStations, toggleFavoriteStation } from "./favorite-stations";
 const key = "liveopweg-favorite-stations";
 const eventName = "liveopweg:favorites";
 let sessionValue: string | null = null;
@@ -10,7 +11,6 @@ const subscribe = (listener: () => void) => {
 };
 const snapshot = () => { if (sessionValue !== null) return sessionValue; try { return localStorage.getItem(key) ?? "[]"; } catch { return "[]"; } };
 const notify = () => window.dispatchEvent(new Event(eventName));
-const parse = (raw: string): string[] => { try { const value: unknown = JSON.parse(raw); return Array.isArray(value) ? value.filter((code): code is string => typeof code === "string") : []; } catch { return []; } };
 function persist(raw: string) {
   try { localStorage.setItem(key, raw); sessionValue = null; storageFailed = false; }
   catch { sessionValue = raw; storageFailed = true; }
@@ -19,9 +19,9 @@ function persist(raw: string) {
 export function useFavoriteStations() {
   const raw = useSyncExternalStore(subscribe, snapshot, () => "[]");
   const error = useSyncExternalStore(subscribe, () => storageFailed, () => false);
+  const favorites = useMemo(() => parseFavoriteStations(raw), [raw]);
   const toggle = useCallback((code: string) => {
-    const current = parse(snapshot());
-    persist(JSON.stringify(current.includes(code) ? current.filter(item => item !== code) : [...current, code].slice(-6)));
+    persist(JSON.stringify(toggleFavoriteStation(parseFavoriteStations(snapshot()), code)));
   }, []);
-  return { favorites: parse(raw), toggle, error, retry: () => persist(snapshot()) };
+  return { favorites, toggle, error, retry: () => persist(snapshot()) };
 }

@@ -1,8 +1,5 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import "./dashboard-polish.css";
-import "./sections.css";
-import "./release-ui.css";
 import "./radar.css";
 import "./ui.css";
 import "./train-panel.css";

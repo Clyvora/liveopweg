@@ -14,11 +14,11 @@ export function useDisruptions() {
       if (active || document.visibilityState === "hidden") return;
       const controller = new AbortController(); active = controller;
       try { const value = await requestDisruptions(controller.signal); if (!disposed) { setData(value); setError(false); } }
-      catch { if (!disposed) setError(true); }
-      finally { active = null; }
+      catch { if (!disposed && !controller.signal.aborted) setError(true); }
+      finally { if (active === controller) active = null; }
     };
     void refresh();
-    const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
+    const onVisible = () => { if (document.visibilityState === "hidden") { active?.abort(); active = null; } else void refresh(); };
     document.addEventListener("visibilitychange", onVisible);
     const timer = window.setInterval(() => void refresh(), 60_000);
     return () => { disposed = true; active?.abort(); clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };

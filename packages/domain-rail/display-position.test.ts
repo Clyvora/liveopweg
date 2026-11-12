@@ -4,14 +4,16 @@ import { reliableTrainPosition, trainDisplayPosition } from "./display-position.
 
 const now = Date.parse("2026-09-13T12:00:00.000Z");
 const observation = {
+  observationId: "fix-1",
   vehicleId: "train-1",
   position: { longitude: 5.1001, latitude: 52.0801 },
   time: { sourceMeasuredAt: "2026-09-13T11:59:50.000Z", receivedAt: "2026-09-13T11:59:55.000Z" },
 } as RailObservation;
 const match = {
+  observationId: "fix-1",
   vehicleId: "train-1",
   status: "MATCHED_HIGH",
-  snappedPosition: { longitude: 5.12, latitude: 52.09 },
+  snappedPosition: { longitude: 5.10015, latitude: 52.08011 },
   edgeId: "edge-1",
   distanceMeters: 12,
   sourceMeasuredAt: "2026-09-13T11:59:50.000Z",
@@ -36,9 +38,9 @@ describe("reliableTrainPosition", () => {
     expect(reliableTrainPosition(observation, { ...match, sourceMeasuredAt: "2026-09-13T11:58:00.000Z" }, now)).toBeNull();
   });
 
-  it("keeps the last known track point while a newer fleet message is awaiting its match", () => {
+  it("rejects a previous measurement while a newer fix awaits its own match", () => {
     const newerObservation = { ...observation, observationId: "newer-fix" };
-    expect(reliableTrainPosition(newerObservation, match, now)).toEqual(match.snappedPosition);
+    expect(reliableTrainPosition(newerObservation, match, now)).toBeNull();
   });
 });
 
@@ -76,32 +78,21 @@ describe("trainDisplayPosition", () => {
     });
   });
 
-  it("uses the receipt time when the source measurement time is missing", () => {
-    const withoutMeasureTime = { ...observation, time: { ...observation.time, sourceMeasuredAt: null } };
-    expect(trainDisplayPosition(withoutMeasureTime, null, now)).toEqual({
-      position: { longitude: 5.1001, latitude: 52.0801 },
-      matched: false,
-      stale: false,
-    });
+  it("does not turn an unknown measurement time into a fresh position", () => {
+    const missing = { ...observation, time:{...observation.time,sourceMeasuredAt:null} };
+    expect(trainDisplayPosition(missing,null,now)).toBeNull();
   });
-
-  it("keeps old measurements visible but marks them as stale", () => {
-    // The realtime gateway owns fleet retention: it drops vehicles that stopped
-    // reporting. The client must not hide trains a second time, otherwise
-    // perfectly healthy trains disappear from the map.
-    const ancient = { ...observation, time: { ...observation.time, sourceMeasuredAt: "2026-09-13T11:50:00.000Z" } };
-    expect(trainDisplayPosition(ancient, null, now)).toEqual({
-      position: { longitude: 5.1001, latitude: 52.0801 },
-      matched: false,
-      stale: true,
-    });
-    expect(trainDisplayPosition(ancient, match, now)).toEqual({
-      position: match.snappedPosition,
-      matched: true,
-      stale: true,
-    });
+  it("expires old measurements when the connection stops without a removal", () => {
+    const ancient={...observation,time:{...observation.time,sourceMeasuredAt:"2026-09-13T11:50:00.000Z"}};
+    expect(trainDisplayPosition(ancient,null,now)).toBeNull();
+    expect(trainDisplayPosition(ancient,match,now)).toBeNull();
   });
-
+  it("rejects failed fixes, future times and suspicious jumps",()=>{
+    expect(trainDisplayPosition({...observation,gpsQuality:{fix:"0"}} as RailObservation,null,now)).toBeNull();
+    expect(trainDisplayPosition({...observation,time:{...observation.time,sourceMeasuredAt:"2026-09-13T12:01:00Z"}},null,now)).toBeNull();
+    expect(trainDisplayPosition(observation,{...match,status:"REJECTED_SUSPICIOUS_OBSERVATION"},now)).toBeNull();
+    expect(reliableTrainPosition(observation,{...match,snappedPosition:{longitude:6,latitude:53}},now)).toBeNull();
+  });
   it("honours the pipeline's own STALE quality flag", () => {
     // Een verse meettijd wil nog niet zeggen dat de pijplijn de meting goedkeurt;
     // het bronlabel is leidend boven de klok van de client.

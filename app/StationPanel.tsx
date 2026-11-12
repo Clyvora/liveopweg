@@ -5,6 +5,7 @@ import { stationBoardSchema, type StationBoard, type StationBoardEntry } from ".
 import { realtimeHttpUrl } from "./realtime-url";
 import { useLanguage } from "./LanguageContext";
 import { useFavoriteStations } from "./useFavoriteStations";
+import { AppIcon } from "./Icons";
 
 export function boardEntryStatus(entry: StationBoardEntry, en = false): string {
   if (entry.cancelled) return en ? "Cancelled" : "Vervalt";
@@ -36,11 +37,11 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
         const value = stationBoardSchema.parse(await response.json());
         if (value.stationCode.toUpperCase() !== station.code.toUpperCase()) throw new Error("station_mismatch");
         if (!disposed) { setBoard(value); setError(false); }
-      } catch { if (!disposed) setError(true); }
-      finally { active = null; }
+      } catch { if (!disposed && !controller.signal.aborted) setError(true); }
+      finally { if (active === controller) active = null; }
     };
     void refresh(); const interval = setInterval(() => void refresh(), 15_000);
-    const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
+    const onVisible = () => { if (document.visibilityState === "hidden") { active?.abort(); active = null; } else void refresh(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { disposed = true; active?.abort(); clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
   }, [station.code, revision]);
@@ -54,8 +55,8 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
     } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setShareMessage(en ? "Sharing is unavailable in this browser." : "Delen is niet beschikbaar in deze browser."); }
   };
   return <aside className="stationPanel uiPanel" aria-label={`Station ${station.name}`}>
-    <header className="uiPanelHeader"><div><span className="radarEyebrow">STATION · {station.code}</span><h2>{station.name}</h2></div><button className="radarClose" onClick={onClose} aria-label={en ? "Close station" : "Sluit stationinformatie"}>×</button></header>
-    <div className="uiActions"><button onClick={() => toggle(station.code)} aria-pressed={favorites.includes(station.code)}>{favorites.includes(station.code) ? "★" : "☆"} {en ? "Favorite" : "Favoriet"}</button><button onClick={() => void share()}>{en ? "Share" : "Delen"}</button></div>
+    <header className="uiPanelHeader"><div><span className="radarEyebrow">STATION · {station.code}</span><h2>{station.name}</h2></div><button className="radarClose" onClick={onClose} aria-label={en ? "Close station" : "Sluit stationinformatie"}><AppIcon name="close" /></button></header>
+    <div className="uiActions"><button onClick={() => toggle(station.code)} aria-pressed={favorites.includes(station.code)}>{favorites.includes(station.code) ? "★" : "☆"} {en ? "Favorite" : "Favoriet"}</button><button onClick={() => void share()}><AppIcon name="share" /> {en ? "Share" : "Delen"}</button></div>
     {shareMessage && <p role="status">{shareMessage}</p>}{favoriteError && <div className="uiNotice" role="status"><p>{en ? "Favorites are kept for this session. Your browser could not save them." : "Je favorieten blijven deze sessie bewaard. Je browser kon ze niet opslaan."}</p><button onClick={retryFavorites}>{en ? "Try saving again" : "Opnieuw opslaan"}</button></div>}
     <div className="uiTabs" role="tablist" aria-label={en ? "Station board" : "Stationbord"}>{(["departures", "arrivals"] as const).map(kind => <button key={kind} id={`station-${kind}-tab`} role="tab" aria-selected={tab === kind} aria-controls="station-board" tabIndex={tab === kind ? 0 : -1} onKeyDown={event => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); const next = kind === "departures" ? "arrivals" : "departures"; setTab(next); document.getElementById(`station-${next}-tab`)?.focus(); } }} onClick={() => { setTab(kind); setSelected(null); }}>{kind === "departures" ? (en ? "Departures" : "Vertrek") : (en ? "Arrivals" : "Aankomst")}</button>)}</div>
     {stale && board && <p className="uiNotice" role="status">{en ? "These times may be out of date." : "Deze tijden kunnen verouderd zijn."}</p>}
@@ -66,7 +67,7 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
       <ul className="uiResultList">{entries.map(entry => {
         const canFollow = !stale && !entry.cancelled && entry.vehicleId !== null && availableVehicleIds.has(entry.vehicleId);
         return <li key={entry.id}><button className="uiResultButton stationResult" aria-expanded={selected === entry.id} onClick={() => setSelected(selected === entry.id ? null : entry.id)}><time dateTime={entry.expectedAt}>{clock(entry.expectedAt)}</time><span><strong>{entry.direction}</strong><small>{entry.serviceType} {entry.trainNumber}</small></span><span>{en ? "Platform" : "Spoor"} {entry.track ?? "—"}</span><small className={entry.cancelled || (entry.delaySeconds ?? 0) >= 60 ? "tpLate" : ""}>{boardEntryStatus(entry, en)}</small></button>
-          {selected === entry.id && <div className="uiResultDetail"><p>{entry.serviceType} {entry.trainNumber} · {entry.operator ?? "—"}</p>{entry.trackChanged && <p>{en ? "Platform changed" : "Spoor gewijzigd"}: {entry.plannedTrack ?? "—"} → {entry.track ?? "—"}</p>}<button disabled={!canFollow} onClick={() => { if (entry.vehicleId && canFollow) onSelectVehicle(entry.vehicleId); }}>{en ? "View on radar" : "Bekijk op radar"}</button>{!canFollow && <p>{en ? "No current live position available for this train." : "Voor deze trein is geen actuele livepositie beschikbaar."}</p>}</div>}
+          {selected === entry.id && <div className="uiResultDetail"><p>{entry.serviceType} {entry.trainNumber} · {entry.operator ?? "—"}</p>{entry.trackChanged && <p>{en ? "Platform changed" : "Spoor gewijzigd"}: {entry.plannedTrack ?? "—"} → {entry.track ?? "—"}</p>}<button disabled={!canFollow} onClick={() => { if (entry.vehicleId && canFollow) onSelectVehicle(entry.vehicleId); }}>{en ? "View on radar" : "Bekijk op radar"}</button>{!canFollow && <p>{entry.cancelled ? (en ? "This service is cancelled." : "Deze rit vervalt.") : stale ? (en ? "The current position cannot be confirmed while the board is out of date." : "De actuele positie kan niet worden bevestigd zolang het stationbord verouderd is.") : (en ? "No current live position available for this train." : "Voor deze trein is geen actuele livepositie beschikbaar.")}</p>}</div>}
         </li>;
       })}</ul>
     </div>

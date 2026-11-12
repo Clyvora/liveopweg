@@ -30,10 +30,9 @@ test("server-renders de treinenkaart zonder overlappend meldingenpaneel", async 
   assert.doesNotMatch(html, /class="radarStatusBar"/);
   assert.doesNotMatch(html, /99\+/);
   assert.match(html, /Stations/);
-  assert.match(html, /Kies kaartweergave/);
-  assert.match(html, /Standaard/);
-  assert.match(html, /Nacht/);
-  assert.match(html, /Satelliet/);
+  // Base styles now live in the map menu; the initial radar has one map control.
+  assert.match(html, /aria-label="Kaartlagen"/);
+  assert.doesNotMatch(html, /class="mapStylePicker /);
   assert.match(html, /Inzoomen op kaart/);
   assert.match(html, /Uitzoomen op kaart/);
   assert.match(html, /Kaartbediening/);
@@ -64,6 +63,10 @@ test("server-renders een aparte meldingenkaart zonder treinlaag", async () => {
   assert.match(html, /Afsluitingen/);
   assert.match(html, /Veiligheidsmeldingen/);
   assert.match(html, /Alleen wegmeldingen · geen treinen/);
+  assert.match(html, /Kies kaartweergave/);
+  assert.match(html, /Standaard/);
+  assert.match(html, /Nacht/);
+  assert.match(html, /Satelliet/);
   assert.doesNotMatch(html, /class="trainOverlay"/);
   assert.doesNotMatch(html, /class="fleetTools"/);
 });

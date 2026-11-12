@@ -1,12 +1,14 @@
 // Computed-color checks supplement keyboard and touch checks; they do not replace screen-reader testing.
 // eslint-disable-next-line @typescript-eslint/no-unused-expressions
 async (page) => {
+  await page.goto('http://localhost:3000/?panel=planner');
+  await page.getByRole('combobox',{name:/^(From|Van)$/}).waitFor();
   const audit=()=>page.evaluate(()=>{
     const rgb=color=>color.match(/[\d.]+/g)?.slice(0,3).map(Number);
     const luminance=color=>rgb(color).map(c=>{c/=255;return c<=0.04045?c/12.92:((c+0.055)/1.055)**2.4;}).reduce((sum,c,i)=>sum+c*[.2126,.7152,.0722][i],0);
     return [...document.querySelectorAll('h1,h2,h3,p,small,strong,span,time,button,a,label')].filter(el=>!el.children.length&&el.textContent.trim()&&el.getClientRects().length&&!el.closest('[disabled],.radarWordmark')).flatMap(el=>{
       const s=getComputedStyle(el);
-      if(s.visibility==='hidden'||s.opacity==='0')return [];
+      if(s.visibility==='hidden'||s.opacity==='0'||s.clipPath==='inset(50%)')return [];
       let ancestor=el,bg='';
       while(ancestor){const value=getComputedStyle(ancestor).backgroundColor;if(value!=='rgba(0, 0, 0, 0)'&&value!=='transparent'){bg=value;break;}ancestor=ancestor.parentElement;}
       if(!bg)return [];

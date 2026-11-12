@@ -81,7 +81,7 @@ export function SettingsScreen() {
 
   return <main className="settingsPage radarShell">
     <AppNavigation active="settings" />
-    <div className="settingsMain">
+    <div className="settingsMain" id="main-content" tabIndex={-1}>
       <header className="settingsIntro"><span>LiveOpWeg</span><h1>{copy.settings}</h1><p>{copy.intro}</p></header>
       <div className="settingsGrid">
         <section className="settingsCard"><div className="settingsCardHeading"><span className="settingsCardIcon"><Icon name="sun" /></span><div><h2>{copy.appearance}</h2><p>{copy.appearanceDetail}</p></div></div>

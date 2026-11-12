@@ -1,4 +1,5 @@
 "use client";
+import { groupTrainServices } from "../packages/domain-rail/train-service";
 
 import { lazy, useReducer, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -8,6 +9,7 @@ import { trainDisplayPosition } from "../packages/domain-rail/display-position";
 import { identifyRollingStock } from "../packages/domain-rail/rolling-stock";
 import {
   journeySnapshotMessageSchema,
+  journeyDeltaMessageSchema,
   type RailJourney,
 } from "../packages/protocol/journey";
 import {
@@ -32,12 +34,16 @@ import { panelReducer, type Panel } from "./panel-navigation";
 import { uiCopy } from "./ui-copy";
 import { failedBaseMaps } from "./map-source-state";
 import { AppNavigation } from "./AppNavigation";
+import { AppIcon } from "./Icons";
+import { expectedRouteSchema, type ExpectedRoute } from "../packages/protocol/expected-route";
 import { PanelHost } from "./PanelHost";
 import { useDisruptions } from "./useDisruptions";
 import { RailNotices } from "./RailNotices";
 import { AsyncPanel } from "./AsyncPanel";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
-import type { FollowedRoute } from "./JourneyPlanner";
+import type { FollowedRoute } from "./saved-route";
+import { useSavedRoute } from "./useSavedRoute";
+import { journeyMatchesSelection } from "./journey-selection";
 import { delayNotificationKey } from "./delay-notification";
 import { useTheme } from "./ThemeContext";
 import { useLanguage } from "./LanguageContext";
@@ -53,13 +59,6 @@ type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "saf
 type MapLayerKey = "trains" | "stations" | "railways" | "crossings";
 type BaseMapKey = "standard" | "light" | "satellite";
 type UiIconName = "map" | "train" | "station" | "rail" | "crossing" | "car" | "bell" | "sliders" | "clock" | "settings" | "queue" | "warning" | "works" | "closure" | "shield" | "chevron";
-type ExpectedRoute = {
-  method: "EXPECTED_SHORTEST_TRACK_PATH";
-  exactSwitchPathKnown: false;
-  geometry: { type: "MultiLineString"; coordinates: [number, number][][] };
-  stops: Array<{ code: string; name: string; arrivalAt: string | null; departureAt: string | null; delaySeconds: number | null }>;
-  routedStops: number;
-};
 const fallbackMapStyle: StyleSpecification = {
   version: 8,
   sources: {
@@ -85,7 +84,8 @@ const fallbackMapStyle: StyleSpecification = {
     },
   },
   layers: [
-    { id: "base-standard", type: "raster", source: "base-standard", paint: { "raster-saturation": -0.45, "raster-contrast": -0.08 } },
+    { id: "atlas-paper", type: "background", paint: { "background-color": "#eef1f5" } },
+    { id: "base-standard", type: "raster", source: "base-standard", paint: { "raster-saturation": -0.45, "raster-contrast": -0.08, "raster-opacity": 0.92 } },
     { id: "base-light", type: "raster", source: "base-light", layout: { visibility: "none" }, paint: { "raster-saturation": -0.9, "raster-contrast": 0.18, "raster-brightness-min": 0.04, "raster-brightness-max": 0.45 } },
     { id: "base-satellite", type: "raster", source: "base-satellite", layout: { visibility: "none" }, paint: { "raster-saturation": -0.12, "raster-brightness-max": 0.92 } },
   ],
@@ -279,7 +279,7 @@ type TrainSprites = {
 };
 
 /** Alleen van dichtbij tonen we de uitgebreide materieelillustraties. */
-const SPRITE_ZOOM = 6;
+const SPRITE_ZOOM = 12;
 
 /**
  * Onder deze markeringsschaal is de compacte basisvorm niet te onderscheiden
@@ -330,12 +330,12 @@ function drawTrainIcon(
   stale: boolean,
   scale: number,
 ): void {
-  const selectedScale = selected ? Math.max(1.12, scale) : scale;
+  const selectedScale = selected ? Math.max(0.85, scale) : scale;
   const hasSprite = Boolean(sprite?.complete && sprite.naturalWidth > 0);
   // Compacte, langgerekte footprint zoals de treinmarkeringen op een
   // spoorkaart: herkenbaar op afstand zonder naastgelegen sporen te bedekken.
-  const width = (selected ? 13 : 11) * selectedScale;
-  const height = (selected ? 40 : 34) * selectedScale;
+  const height = (hasSprite ? (selected ? 76 : 64) : (selected ? 30 : 27)) * selectedScale;
+  const width = hasSprite && sprite ? height * sprite.naturalWidth / sprite.naturalHeight : (selected ? 10 : 9) * selectedScale;
   const halfWidth = width / 2;
   const halfHeight = height / 2;
 
@@ -445,8 +445,8 @@ function drawTrainIcon(
 
 export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "alerts" }) {
   const isAlertsPage = mode === "alerts";
-  const { theme, toggleTheme } = useTheme();
-  const { language, setLanguage, t } = useLanguage();
+  const { theme } = useTheme();
+  const { language, t } = useLanguage();
   const mapElement = useRef<HTMLDivElement>(null);
   const trainOverlayElement = useRef<HTMLCanvasElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -458,8 +458,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     slt: null,
   });
   const map = useRef<MapLibreMap | null>(null);
-  const initialZoomRef = useRef<number | null>(null);
-  const initialCenterRef = useRef<[number, number] | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const selectFromMapRef = useRef<(vehicleId: string) => void>(() => undefined);
   const trackMatchesRef = useRef(new Map<string, RailTrackMatch>());
@@ -468,9 +466,9 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   // kaart beweegt of de data verandert, in plaats van blind 60 fps door te
   // gaan en zo de hoofdthread met MapLibre te delen.
   const overlayRenderRef = useRef<(() => void) | null>(null);
-  const spritesRequestedRef = useRef(false);
   const spriteLoaderRef = useRef<() => void>(() => undefined);
   const selectedVehicleIdRef = useRef<string | null>(null);
+  const selectedTrainNumberRef = useRef<string | null>(null);
   const pendingTrainNumberRef = useRef<string | null>(null);
   const deepLinkHandledRef = useRef(false);
   const selectRoadFromMapRef = useRef<(eventId: string) => void>(() => undefined);
@@ -488,20 +486,22 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   }, [stationCatalog]);
   useEffect(() => {
     if (isAlertsPage) return;
+    let disposed = false;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8_000);
     void fetch(realtimeHttpUrl("/v1/stations/catalog"), { signal: controller.signal })
       .then((response) => response.ok ? response.json() : null)
       .then((payload) => {
-        if (!payload) return;
+        if (!payload || disposed) return;
         const catalog = stationCatalogSchema.parse(payload);
         setStationCatalog(catalog.stations);
         setStationCatalogFetchedAt(catalog.fetchedAt);
       })
       .catch(() => { /* De ingebouwde catalogus blijft beschikbaar als de live NS-catalogus niet bereikbaar is. */ })
-      .finally(() => { window.clearTimeout(timeout); setStationCatalogResolved(true); });
-    return () => { controller.abort(); window.clearTimeout(timeout); };
+      .finally(() => { window.clearTimeout(timeout); if (!disposed) setStationCatalogResolved(true); });
+    return () => { disposed = true; controller.abort(); window.clearTimeout(timeout); };
   }, [isAlertsPage]);
+  const [fleetReceived, setFleetReceived] = useState(false);
   const [vehiclesById, setVehiclesById] = useState<Record<string, RailObservation>>({});
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [observation, setObservation] = useState<RailObservation | null>(null);
@@ -516,6 +516,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   }, [trainMemory, observation, journey]);
   const [connection, setConnection] = useState<ConnectionState>("verbinden");
   const [mapReady, setMapReady] = useState(false);
+  const pendingMapFocus = useRef<(() => void) | null>(null);
+  useEffect(() => { if (mapReady) { pendingMapFocus.current?.(); pendingMapFocus.current = null; } }, [mapReady]);
   const [query, setQuery] = useState("");
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [isFollowingTrain, setIsFollowingTrain] = useState(false);
@@ -524,6 +526,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const closePanelRef = useRef<() => void>(() => undefined);
   const navigate = useCallback((panel: Panel) => { if (!restoringPanel.current) panelDispatch({ type: "open", panel }); }, []);
   const panel = navigation.current;
+  const activePanelRef = useRef(panel);
+  useEffect(() => { activePanelRef.current = panel; }, [panel]);
   const [panelScroll] = useState(() => new Map<string, number>());
   const [directoryQueries, setDirectoryQueries] = useState({ stations: "", favorites: "" });
   const { data: disruptions, error: disruptionsError, retry: retryDisruptions } = useDisruptions();
@@ -547,7 +551,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const setShowJourneyPlanner = useCallback((value: boolean) => panelDispatch(value ? { type: "open", panel: { kind: "planner" } } : { type: "dismiss", kinds: ["planner"] }), []);
   const radarSection = panel && ["stations", "favorites", "notices", "more"].includes(panel.kind) ? panel.kind : null;
   const setRadarSection = useCallback((kind: "stations" | "favorites" | "notices" | "more" | null) => panelDispatch(kind ? { type: "open", panel: { kind } } : { type: "dismiss", kinds: ["stations", "favorites", "notices", "more"] }), []);
-  const [followedRoute, setFollowedRoute] = useState<FollowedRoute | null>(null);
+  const { route: followedRoute, save: setFollowedRoute, error: savedRouteError, retry: retrySavedRoute } = useSavedRoute(stationCatalog);
   const [positionHistory, setPositionHistory] = useState<Array<{ at: number; latitude: number; longitude: number }>>([]);
   const showDelayStats = panel?.kind === "stats";
   const setShowDelayStats = useCallback((value: boolean) => panelDispatch(value ? { type: "open", panel: { kind: "stats" } } : { type: "dismiss", kinds: ["stats"] }), []);
@@ -566,7 +570,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     window.addEventListener("storage", syncNotificationSetting);
     return () => window.removeEventListener("storage", syncNotificationSetting);
   }, []);
-  const [baseMap, setBaseMap] = useState<BaseMapKey>("standard");
+  const [selectedMapStyle, setBaseMap] = useState<BaseMapKey | null>(null);
+  const baseMap = selectedMapStyle ?? (theme === "dark" ? "light" : "standard");
   const [mapSourceFailures, setMapSourceFailures] = useState<Record<string, boolean>>({});
   const mapBackgroundUnavailable = Boolean(mapSourceFailures[`base-${baseMap}`]);
   const [showMapStyles, setShowMapStyles] = useState(false);
@@ -590,11 +595,11 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       ["sng", "/train-sng-v1.png"],
       ["slt", "/train-slt-v1.png"],
     ];
+    const retryAfter: Partial<Record<keyof TrainSprites, number>> = {};
     const loadSprites = () => {
-      if (spritesRequestedRef.current) return;
-      spritesRequestedRef.current = true;
-      const sprites: TrainSprites = { virm: null, icng: null, icm: null, sng: null, slt: null };
+      const sprites = trainSpritesRef.current;
       for (const [family, source] of spriteSources) {
+        if (sprites[family] || Date.now() < (retryAfter[family] ?? 0)) continue;
         const sprite = new Image();
         sprite.decoding = "async";
         // Eén hertekening zodra een sprite klaar is, zodat de marker meteen
@@ -602,9 +607,9 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         sprite.onload = () => { overlayRenderRef.current?.(); };
         // Als een sprite niet kan worden geladen (bijv. netwerkfout of 404),
         // reset de vraagflag zodat een volgende zoektocht het opnieuw kan proberen.
-        sprite.onerror = () => { spritesRequestedRef.current = false; };
-        sprite.src = source;
+        sprite.onerror = () => { retryAfter[family] = Date.now()+60_000; sprites[family] = null; };
         sprites[family] = sprite;
+        sprite.src = source;
       }
       trainSpritesRef.current = sprites;
     };
@@ -612,7 +617,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
 
     return () => {
       spriteLoaderRef.current = () => undefined;
-      spritesRequestedRef.current = false;
+      for (const sprite of Object.values(trainSpritesRef.current)) { if (sprite) { sprite.onload = null; sprite.onerror = null; } }
       trainSpritesRef.current = {
         virm: null,
         icng: null,
@@ -626,21 +631,18 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     left.trainNumber.localeCompare(right.trainNumber, "nl", { numeric: true })
   )), [vehiclesById]);
 
-  // Precompute searchable data for vehicles to avoid repeated identifyRollingStock calls
-  const vehiclesWithSearchData = useMemo(() => {
-    return vehicles.map(vehicle => ({
-      ...vehicle,
-      searchableTrainNumber: normalizeSearchText(`trein ${vehicle.trainNumber} train ${vehicle.trainNumber}`),
-      searchableMaterialNumber: normalizeSearchText(vehicle.materialNumber ?? ""),
-      searchableVehicleId: normalizeSearchText(vehicle.vehicleId),
-      searchableRollingStockLabel: normalizeSearchText(identifyRollingStock(vehicle.materialNumber).label)
-    }));
-  }, [vehicles]);
-
-  const displayTrains = useMemo(() => vehicles.flatMap((observation) => {
+  const trainServices = useMemo(() => groupTrainServices(vehicles,now,selectedVehicleId),[vehicles,now,selectedVehicleId]);
+  const vehiclesWithSearchData = useMemo(() => trainServices.map(service => ({
+    ...service.primary,
+    searchableTrainNumber: normalizeSearchText(`trein ${service.trainNumber} train ${service.trainNumber}`),
+    searchableMaterialNumber: normalizeSearchText(service.units.map(unit=>unit.materialNumber??"").join(" ")),
+    searchableVehicleId: normalizeSearchText(service.units.map(unit=>unit.vehicleId).join(" ")),
+    searchableRollingStockLabel: normalizeSearchText(service.units.map(unit=>identifyRollingStock(unit.materialNumber).label).join(" ")),
+  })),[trainServices]);
+  const displayTrains = useMemo(() => trainServices.flatMap(({primary:observation}) => {
     const display = trainDisplayPosition(observation, trackMatchesByVehicle[observation.vehicleId], now);
-    return display ? [{ observation, position: display.position, matched: display.matched, stale: display.stale }] : [];
-  }), [vehicles, trackMatchesByVehicle, now]);
+    return display ? [{ observation, position:display.position, matched:display.matched, stale:display.stale }] : [];
+  }),[trainServices,trackMatchesByVehicle,now]);
   const mappedTrainCount = displayTrains.length;
   useEffect(() => { displayTrainsRef.current = displayTrains; }, [displayTrains]);
   useEffect(() => {
@@ -675,7 +677,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const nearbyTrains = useMemo(() => userLocation ? displayTrains
     .map((train) => ({ train, distance: distanceBetweenMeters(userLocation, train.position) }))
     .sort((left, right) => left.distance - right.distance).slice(0, 4) : [], [displayTrains, userLocation]);
-  const availableVehicleIds = useMemo(() => new Set(displayTrains.filter(train => !train.stale).map(train => train.observation.vehicleId)), [displayTrains]);
+  const availableVehicleIds = useMemo(() => new Set(vehicles.filter(vehicle => { const display=trainDisplayPosition(vehicle,trackMatchesByVehicle[vehicle.vehicleId],now); return display&&!display.stale; }).map(vehicle=>vehicle.vehicleId)), [vehicles,trackMatchesByVehicle,now]);
   const roadEvents = useMemo(() => Object.values(roadEventsById), [roadEventsById]);
   const currentRoadEvents = useMemo(() => deduplicateRoadEvents(roadEvents.filter(isCurrentRoadEvent)), [roadEvents]);
   const recentRoadEvents = useMemo(() => currentRoadEvents.filter((event) => roadLayers[roadLayerFor(event)]).toSorted((left, right) => {
@@ -710,6 +712,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     setIsFollowingTrain(false);
     setNearbyOpen(false);
     selectedVehicleIdRef.current = vehicleId;
+    selectedTrainNumberRef.current = selected.trainNumber;
     setObservation(selected);
     setJourney(cached?.journey ?? null);
     setExpectedRoute(null);
@@ -720,25 +723,31 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     setSelectedRoadEventId(null);
     replaceSelectionUrl({ train: selected.trainNumber });
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ protocolVersion: 2, type: "select", vehicleId }));
-    if (focusMap && map.current) {
+    const focus = () => {
+      if (!map.current) return;
       const display = trainDisplayPosition(selected, trackMatchesRef.current.get(vehicleId), Date.now());
       if (display) map.current.easeTo({
         center: [display.position.longitude, display.position.latitude],
+        zoom: Math.max(map.current.getZoom(), 10),
         offset: window.innerWidth < 1024
-          ? [0, -Math.min(110, window.innerHeight * 0.14)]
+          ? [0, -Math.min(210, window.innerHeight * 0.24)]
           : [-190, 0],
         duration: 700,
       });
-    }
-  }, [vehiclesById, trainMemory, query, navigate, setNearbyOpen, setShowLayers, setShowJourneyPlanner, setShowDelayStats]);
+    };
+    pendingMapFocus.current = null;
+    if (focusMap) { if (mapReady) focus(); else pendingMapFocus.current = focus; }
+  }, [vehiclesById, trainMemory, query, navigate, setNearbyOpen, setShowLayers, setShowJourneyPlanner, setShowDelayStats, mapReady]);
 
   const clearVehicleSelection = useCallback(() => {
+    pendingMapFocus.current = null;
     panelDispatch({ type: "dismiss", kinds: ["train"] });
     if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify({ protocolVersion: 2, type: "deselect" }));
     setSelectedVehicleId(null);
     setPositionHistory([]);
     setIsFollowingTrain(false);
     selectedVehicleIdRef.current = null;
+    selectedTrainNumberRef.current = null;
     setObservation(null);
     setJourney(null);
     setExpectedRoute(null);
@@ -747,6 +756,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   }, []);
 
   const requestNearbyLocation = useCallback(() => {
+    if (locationStatus === "loading") { setNearbyOpen(true); return; }
+    setIsFollowingTrain(false);
     if (userLocation) {
       setNearbyOpen((open) => !open);
       return;
@@ -762,11 +773,11 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       const nextLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
       setUserLocation(nextLocation);
       setLocationStatus("idle");
-      map.current?.easeTo({ center: [nextLocation.longitude, nextLocation.latitude], zoom: Math.max(map.current.getZoom(), 11), duration: 650 });
+      if (activePanelRef.current?.kind === "nearby") map.current?.easeTo({ center: [nextLocation.longitude, nextLocation.latitude], zoom: Math.max(map.current.getZoom(), 11), duration: 650 });
     }, (error) => {
       setLocationStatus(error.code === error.PERMISSION_DENIED ? "denied" : "unavailable");
     }, { enableHighAccuracy: true, maximumAge: 30_000, timeout: 12_000 });
-  }, [userLocation, setNearbyOpen]);
+  }, [userLocation, locationStatus, setNearbyOpen]);
 
   const followPointRef = useRef<{ vehicleId: string; longitude: number; latitude: number } | null>(null);
   useEffect(() => {
@@ -787,7 +798,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     followPointRef.current = { vehicleId: selectedVehicleId, ...train.position };
     map.current.easeTo({
       center: [train.position.longitude, train.position.latitude],
-      offset: window.innerWidth < 1024 ? [0, -Math.min(110, window.innerHeight * 0.14)] : [-190, 0],
+      offset: window.innerWidth < 1024 ? [0, -Math.min(210, window.innerHeight * 0.24)] : [-190, 0],
       duration: 550,
       essential: true,
     });
@@ -804,12 +815,14 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     setShowJourneyPlanner(false);
     setShowDelayStats(false);
     setSelectedRoadEventId(null);
-    map.current?.easeTo({
+    const focus = () => map.current?.easeTo({
       center: [station.longitude, station.latitude],
-      offset: window.innerWidth < 1024 ? [0, -Math.min(140, window.innerHeight * 0.2)] : [-195, 0],
+      zoom: Math.max(map.current.getZoom(), 11),
+      offset: window.innerWidth < 1024 ? [0, -Math.min(210, window.innerHeight * 0.24)] : [-195, 0],
       duration: 700,
     });
-  }, [clearVehicleSelection, query, navigate, setNearbyOpen, setShowLayers, setShowJourneyPlanner, setShowDelayStats]);
+    if (mapReady) focus(); else pendingMapFocus.current = focus;
+  }, [clearVehicleSelection, query, navigate, setNearbyOpen, setShowLayers, setShowJourneyPlanner, setShowDelayStats, mapReady]);
 
   const resetMap = useCallback(() => {
     panelDispatch({ type: "close" });
@@ -820,7 +833,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     setSelectedRoadEventId(null);
     setSelectedStation(null);
     clearVehicleSelection();
-    map.current?.easeTo({ center: initialCenterRef.current ?? [5.3, 52.2], zoom: initialZoomRef.current ?? undefined, duration: 500 });
+    map.current?.fitBounds([[3.15, 50.7], [7.45, 53.7]], { padding: { top: 130, right: 24, bottom: 120, left: 24 }, duration: 500 });
   }, [clearVehicleSelection, setShowLayers, setShowJourneyPlanner, setShowDelayStats, setRadarSection]);
 
   useEffect(() => {
@@ -868,6 +881,9 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
 
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
+      const target = event.target;
+      const editing = target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+      if (event.key === "/" && !editing && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); searchInputRef.current?.focus(); return; }
       if (event.key !== "Escape") return;
       if (showMapStyles) { setShowMapStyles(false); return; }
       closePanelRef.current();
@@ -955,7 +971,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   }, [clearVehicleSelection, setShowLayers, setShowJourneyPlanner, setShowDelayStats, setRadarSection]);
   const updateFollowedRoute = useCallback((route: FollowedRoute | null) => {
     setFollowedRoute(route);
-  }, []);
+  }, [setFollowedRoute]);
 
   const openDelayStats = useCallback(() => {
     setShowDelayStats(true);
@@ -978,7 +994,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         fitBoundsOptions: {
           padding: window.innerWidth < 1024
             ? { top: 120, right: 22, bottom: 100, left: 22 }
-            : { top: 108, right: window.innerWidth >= 2200 ? 520 : 64, bottom: 92, left: window.innerWidth >= 2200 ? 190 : 150 },
+            : { top: 108, right: 28, bottom: 92, left: 28 },
         },
         attributionControl: false,
         minZoom: 5,
@@ -993,6 +1009,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         style: mapStyle,
       });
       map.current = instance;
+      instance.on("dragstart", event => { if (event.originalEvent) setIsFollowingTrain(false); });
       instance.on("error", event => {
         const sources = failedBaseMaps(event as Parameters<typeof failedBaseMaps>[0]);
         if (sources.length) setMapSourceFailures(current => sources.every(id => current[id]) ? current : { ...current, ...Object.fromEntries(sources.map(id => [id, true])) });
@@ -1006,9 +1023,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           instance.resize();
           instance.fitBounds([[3.15, 50.7], [7.45, 53.7]], { padding: window.innerWidth < 1024 ? 18 : 40, duration: 0 });
         }
-        initialZoomRef.current = instance.getZoom();
-        const initialCenter = instance.getCenter();
-        initialCenterRef.current = [initialCenter.lng, initialCenter.lat];
         instance.touchZoomRotate.disableRotation();
         const stationPopup = new Popup({ closeButton: false, closeOnClick: true, offset: 12, className: "stationTooltip" });
         const stationAtPoint = (point: { x: number; y: number }) => {
@@ -1106,7 +1120,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           source: "pdok-rail-geometry",
           minzoom: 4,
           paint: {
-            "line-color": "#fffdf8",
+            "line-color": "#ffffff",
             "line-width": ["interpolate", ["linear"], ["zoom"], 4, 1.6, 6, 2, 9, 3.1, 12, 4.5, 16, 6.8],
             "line-opacity": 0.94,
           },
@@ -1118,7 +1132,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           source: "pdok-rail-geometry",
           minzoom: 4,
           paint: {
-            "line-color": "#193e61",
+            "line-color": "#525963",
             "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.85, 6, 1.15, 9, 1.8, 12, 2.8, 16, 4.7],
             "line-opacity": 1,
           },
@@ -1141,7 +1155,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           type: "line",
           source: "pdok-rail-geometry",
           filter: ["==", ["get", "edgeId"], ""],
-          paint: { "line-color": "#a7dfc5", "line-width": 6, "line-opacity": 0.9 },
+          paint: { "line-color": "#b4caff", "line-width": 6, "line-opacity": 0.9 },
         }, "rail-fleet-points");
         instance.addSource("selected-track-match", {
           type: "geojson",
@@ -1156,14 +1170,14 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           type: "line",
           source: "expected-rail-route",
           filter: ["==", ["geometry-type"], "LineString"],
-          paint: { "line-color": "#1672d4", "line-width": ["interpolate", ["linear"], ["zoom"], 6, 3, 12, 6], "line-opacity": 0.78 },
+          paint: { "line-color": "#2563eb", "line-width": ["interpolate", ["linear"], ["zoom"], 6, 2, 12, 3], "line-opacity": 0.78 },
         }, "rail-fleet-points");
         instance.addLayer({
           id: "expected-rail-route-stops",
           type: "circle",
           source: "expected-rail-route",
           filter: ["==", ["geometry-type"], "Point"],
-          paint: { "circle-radius": 5, "circle-color": "#fff", "circle-stroke-color": "#1672d4", "circle-stroke-width": 2 },
+          paint: { "circle-radius": 5, "circle-color": "#fff", "circle-stroke-color": "#2563eb", "circle-stroke-width": 2 },
         });
         instance.addLayer({
           id: "selected-track-match-link",
@@ -1179,7 +1193,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           filter: ["==", ["geometry-type"], "Point"],
           paint: {
             "circle-radius": 7,
-            "circle-color": "#a7dfc5",
+            "circle-color": "#b4caff",
             "circle-stroke-color": "#163e35",
             "circle-stroke-width": 3,
           },
@@ -1312,7 +1326,11 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           for (const { observation, position } of !isAlertsPage && mapLayersRef.current.trains ? displayTrainsRef.current : []) {
             const projected = instance.project([position.longitude, position.latitude]);
             const distance = Math.hypot(projected.x - event.point.x, projected.y - event.point.y);
-            if (distance <= 18 && (!nearest || distance < nearest.distance)) nearest = { vehicleId: observation.vehicleId, distance };
+            const angle = ((observation.headingDegrees??0)-instance.getBearing())*Math.PI/180;
+            const dx=event.point.x-projected.x,dy=event.point.y-projected.y;
+            const localX=dx*Math.cos(angle)+dy*Math.sin(angle),localY=-dx*Math.sin(angle)+dy*Math.cos(angle);
+            const hit=instance.getZoom()>=SPRITE_ZOOM ? Math.abs(localX)<=22 && Math.abs(localY)<=42 : distance<=22;
+            if (hit && (!nearest || distance < nearest.distance)) nearest = { vehicleId: observation.vehicleId, distance };
           }
           if (nearest) { selectFromMapRef.current(nearest.vehicleId); return; }
           const stationHit = stationAtPoint(event.point);
@@ -1424,13 +1442,25 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
                 context,
                 projX,
                 projY,
-                derivedHeading * Math.PI / 180,
+                (derivedHeading - instance.getBearing()) * Math.PI / 180,
                 sprite,
                 isSelected,
                 matched,
                 stale,
                 responsiveMarkerScale,
               );
+              if (isSelected) {
+                const label = observation.trainNumber;
+                context.save();
+                context.font = "600 12px Arial";
+                const labelWidth = context.measureText(label).width + 14;
+                context.fillStyle = "#ffffff"; context.strokeStyle = "#d8dce3"; context.lineWidth = 1;
+                roundRectPath(context, projX + 14, projY - 23, labelWidth, 24, 4);
+                context.fill(); context.stroke();
+                context.fillStyle = "#202124"; context.textAlign = "left"; context.textBaseline = "middle";
+                context.fillText(label, projX + 21, projY - 11);
+                context.restore();
+              }
             }
           }
         }
@@ -1611,12 +1641,16 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         const messageType = typeof decoded === "object" && decoded !== null && "type" in decoded ? decoded.type : null;
         const fleetSnapshot = messageType === "rail.fleet.snapshot" ? railFleetSnapshotMessageSchema.safeParse(decoded) : null;
         if (fleetSnapshot?.success) {
+          setNow(Date.now());
+          setFleetReceived(true);
           latestSequence = fleetSnapshot.data.sequence;
           setVehiclesById(toRecord(fleetSnapshot.data.data));
           return;
         }
         const fleetBatch = messageType === "rail.fleet.batch" ? railFleetBatchMessageSchema.safeParse(decoded) : null;
         if (fleetBatch?.success) {
+          setNow(Date.now());
+          setFleetReceived(true);
           // At-least-once levering kan een batch herhalen of te laat afleveren.
           // Zo'n batch mag de vloot nooit bevriezen: een reeds verwerkt of ouder
           // volgnummer wordt genegeerd en de batch wordt daarna altijd toegepast,
@@ -1645,6 +1679,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         }
         const matchSnapshot = messageType === "rail.match.snapshot" ? railMatchSnapshotMessageSchema.safeParse(decoded) : null;
         if (matchSnapshot?.success) {
+          setNow(Date.now());
           const matches = new Map(matchSnapshot.data.data.map((match) => [match.vehicleId, match]));
           trackMatchesRef.current = matches;
           setTrackMatchesByVehicle(Object.fromEntries(matches));
@@ -1652,6 +1687,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         }
         const matchBatch = messageType === "rail.match.batch" ? railMatchBatchMessageSchema.safeParse(decoded) : null;
         if (matchBatch?.success) {
+          setNow(Date.now());
           const matches = new Map(trackMatchesRef.current);
           for (const vehicleId of matchBatch.data.removedVehicleIds) {
             matches.delete(vehicleId);
@@ -1665,15 +1701,20 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         }
         const selection = messageType === "rail.selection.snapshot" ? railSelectionSnapshotMessageSchema.safeParse(decoded) : null;
         if (selection?.success) {
+          setNow(Date.now());
           if (selection.data.vehicleId !== selectedVehicleIdRef.current) return;
+          if (selection.data.data && selection.data.data.trainNumber !== selectedTrainNumberRef.current) {
+            selectedTrainNumberRef.current = selection.data.data.trainNumber;
+            setJourney(null); setExpectedRoute(null);
+          }
           setSelectedVehicleId(selection.data.vehicleId);
           selectedVehicleIdRef.current = selection.data.vehicleId;
           setObservation(current => selection.data.data ?? (current?.vehicleId === selection.data.vehicleId ? current : null));
           return;
         }
-        const journeySnapshot = messageType === "rail.journey.snapshot" ? journeySnapshotMessageSchema.safeParse(decoded) : null;
+        const journeySnapshot = messageType === "rail.journey.snapshot" ? journeySnapshotMessageSchema.safeParse(decoded) : messageType === "rail.journey.delta" ? journeyDeltaMessageSchema.safeParse(decoded) : null;
         if (journeySnapshot?.success) {
-          if (!selectedVehicleIdRef.current) return;
+          if (!selectedVehicleIdRef.current || !journeyMatchesSelection(journeySnapshot.data, selectedTrainNumberRef.current)) return;
           setJourney(journeySnapshot.data.data);
           return;
         }
@@ -1739,9 +1780,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     fetch(realtimeHttpUrl(`/v1/trains/${encodeURIComponent(selectedVehicleId)}/route`), { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("Route unavailable");
-        const value = await response.json() as ExpectedRoute;
-        if (value.method !== "EXPECTED_SHORTEST_TRACK_PATH" || value.geometry?.type !== "MultiLineString" || !Array.isArray(value.stops)) throw new Error("Invalid route");
-        setExpectedRoute(value);
+        const value = expectedRouteSchema.parse(await response.json());
+        if (!controller.signal.aborted) setExpectedRoute(value);
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
@@ -1804,7 +1844,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     const coordinates = notice.geometry?.coordinates.flat() ?? notice.stations.flatMap(station => { const catalog = station.code ? stationDirectory.get(station.code.toUpperCase()) : null; const lng = station.longitude ?? catalog?.longitude, lat = station.latitude ?? catalog?.latitude; return lng != null && lat != null ? [[lng, lat] as [number, number]] : []; });
     if (!coordinates.length || !map.current) return;
     const bounds = coordinates.reduce<[[number, number], [number, number]]>((b, p) => [[Math.min(b[0][0], p[0]), Math.min(b[0][1], p[1])], [Math.max(b[1][0], p[0]), Math.max(b[1][1], p[1])]], [[Infinity, Infinity], [-Infinity, -Infinity]]);
-    map.current.fitBounds(bounds, { padding: window.innerWidth >= 1024 ? { left: 240, right: 450, top: 110, bottom: 100 } : { left: 28, right: 28, top: 140, bottom: Math.min(window.innerHeight * 0.5 + 90, window.innerHeight - 200) }, maxZoom: 12, duration: 500 });
+    map.current.fitBounds(bounds, { padding: window.innerWidth >= 1024 ? { left: 32, right: 450, top: 110, bottom: 100 } : { left: 28, right: 28, top: 140, bottom: Math.min(window.innerHeight * 0.5 + 90, window.innerHeight - 200) }, maxZoom: 12, duration: 500 });
   };
   const openRadarSection = (section: "stations" | "favorites" | "notices" | "more") => {
     navigate({ kind: section });
@@ -1903,8 +1943,9 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
                 else if (searchResults[activeSearchResultIndex - stationResults.length]) selectVehicle(searchResults[activeSearchResultIndex - stationResults.length].vehicleId);
               }
             }}
-            placeholder={t("search.placeholder")}
+            placeholder={language === "en" ? "Search train or station" : "Zoek trein of station"}
           />
+          {!query && <kbd className="searchShortcut" aria-hidden="true">/</kbd>}
           {query && <button className="clearSearchButton" type="button" aria-label={uiCopy("Wis zoekopdracht", language)} onClick={() => { setQuery(""); setActiveSearchIndex(0); searchInputRef.current?.focus(); }}>×</button>}
         </label>
         {query.trim() && <div className="trainResults" id="liveopweg-search-results" role="listbox" aria-label={uiCopy("Zoekresultaten", language)}>
@@ -1939,12 +1980,12 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         </div>}
       </section>}
 
-      <section className="workspace" id="map" aria-label={isAlertsPage ? "Kaart met actuele wegmeldingen" : "Landelijk realtime treindashboard"}>
+      <section className="workspace" id="main-content" tabIndex={-1} aria-label={uiCopy(isAlertsPage ? "Kaart met actuele wegmeldingen" : "Landelijk realtime treindashboard", language)}>
         <div className="mapWrap">
-          <div ref={mapElement} className="liveMap" aria-label={isAlertsPage ? "Kaart van Nederland met wegmeldingen" : "Kaart van Nederland met actuele treinposities"} aria-busy={!mapReady ? "true" : undefined} />
+          <div ref={mapElement} className="liveMap" aria-label={uiCopy(isAlertsPage ? "Kaart van Nederland met wegmeldingen" : "Kaart van Nederland met actuele treinposities", language)} aria-busy={!mapReady ? "true" : undefined} />
           {!isAlertsPage && <canvas ref={trainOverlayElement} className="trainOverlay" aria-hidden="true" />}
-          {mapBackgroundUnavailable ? <div className="mapStatusNotice uiNotice" role="status"><strong>{language === "en" ? "Map background unavailable" : "Kaartachtergrond niet beschikbaar"}</strong><p>{language === "en" ? "The background cannot be loaded. Search and train information remain available. Try another map style." : "De achtergrond kan niet worden geladen. Zoeken en treininformatie blijven beschikbaar. Probeer een andere kaartweergave."}</p><button onClick={() => setShowMapStyles(true)}>{language === "en" ? "Choose map style" : "Kies kaartweergave"}</button></div> : !isAlertsPage && (connection !== "live" || !vehicles.length || mappedTrainCount === 0) && <div className="mapStatusNotice" role="status">
-            <strong>{connection === "offline" || connection === "herstellen" ? (language === "en" ? "Connection interrupted" : "Verbinding onderbroken") : (language === "en" ? "Loading live trains" : "Live treinen ophalen")}</strong>
+          {mapBackgroundUnavailable ? <div className="mapStatusNotice uiNotice" role="status"><strong>{language === "en" ? "Map background unavailable" : "Kaartachtergrond niet beschikbaar"}</strong><p>{language === "en" ? "The background cannot be loaded. Search and train information remain available. Try another map style." : "De achtergrond kan niet worden geladen. Zoeken en treininformatie blijven beschikbaar. Probeer een andere kaartweergave."}</p><button onClick={() => { setShowLayers(true); setShowMapStyles(true); }}>{language === "en" ? "Choose map style" : "Kies kaartweergave"}</button></div> : !isAlertsPage && (connection !== "live" || !vehicles.length || mappedTrainCount === 0) && <div className="mapStatusNotice" role="status">
+            <strong>{connection === "offline" || connection === "herstellen" ? (language === "en" ? "Connection interrupted" : "Verbinding onderbroken") : (fleetReceived ? (language === "en" ? "No current train positions" : "Geen actuele treinposities") : (language === "en" ? "Loading live trains" : "Live treinen ophalen"))}</strong>
             <p>{connection === "offline" || connection === "herstellen" ? (language === "en" ? "We are reconnecting automatically. Any positions shown may be out of date." : "We verbinden automatisch opnieuw. Getoonde posities kunnen verouderd zijn.") : (language === "en" ? "The map is ready to explore. Train positions appear as soon as updates arrive." : "Je kunt de kaart alvast verkennen. Treinposities verschijnen zodra er updates binnenkomen.")}</p>
           </div>}
           {!isAlertsPage && <nav className="mobilePlannerActions" aria-label={language === "en" ? "Travel tools" : "Reishulpmiddelen"}>
@@ -1953,36 +1994,29 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           </nav>}
           {isAlertsPage && <div className="alertMapHeading"><span>{uiCopy("Meldingenkaart", language)}</span><strong>{uiCopy("Nederland onderweg", language)}</strong><small>{uiCopy("Alleen wegmeldingen · geen treinen", language)}</small></div>}
           <div className="mapActions" aria-label={uiCopy("Kaartbediening", language)}>
-            {!isAlertsPage && <button type="button" onClick={() => setShowLayers(true)} aria-expanded={showLayers}><UiIcon name="sliders" /><span>{uiCopy("Kaartlagen", language)}</span></button>}
-            {!isAlertsPage && <button className="nearbyAction" type="button" onClick={requestNearbyLocation} aria-expanded={nearbyOpen}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="2.5" /><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3" /></svg><span>{uiCopy("Bij mij in de buurt", language)}</span></button>}
+            {!isAlertsPage && <button type="button" onClick={() => setShowLayers(true)} aria-expanded={showLayers} aria-label={uiCopy("Kaartlagen", language)}><AppIcon name="layers" /><span>{language === "en" ? "Map" : "Kaart"}</span></button>}
+            {!isAlertsPage && <button className="nearbyAction" aria-label={uiCopy("Bij mij in de buurt", language)} type="button" onClick={requestNearbyLocation} aria-expanded={nearbyOpen}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="2.5" /><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3" /></svg><span>{uiCopy("Bij mij in de buurt", language)}</span></button>}
             {!isAlertsPage && <div className="positionLegend" aria-label={uiCopy("Positienauwkeurigheid", language)}><span><i className="matched" />{uiCopy("Op spoor", language)}</span><span><i className="gps" />{uiCopy("GPS-punt", language)}</span></div>}
             {isAlertsPage && <button type="button" onClick={() => map.current?.fitBounds([[3.15, 50.7], [7.45, 53.7]], { padding: 40, duration: 400 })}><UiIcon name="map" /><span>{uiCopy("Heel Nederland", language)}</span></button>}
-            <button type="button" onClick={toggleTheme} aria-label={theme === "dark" ? "Licht thema" : "Donker thema"}>
-              <svg viewBox="0 0 24 24" aria-hidden="true">{theme === "dark" ? <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.36 6.36l-.71-.71M6.34 6.34l-.71-.71m12.72 0l-.71.71M6.34 17.66l-.71.71M12 7a5 5 0 100 10 5 5 0 000-10z" /> : <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />}</svg>
-              <span>{theme === "dark" ? "Licht" : "Donker"}</span>
-            </button>
-            <button type="button" onClick={() => setLanguage(language === "nl" ? "en" : "nl")} aria-label={language === "nl" ? "Switch to English" : "Schakel over naar Nederlands"}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15 15 0 014 10 15 15 0 01-4 10 15 15 0 01-4-10 15 15 0 014-10z" /></svg>
-              <span>{language === "nl" ? "EN" : "NL"}</span>
-            </button>
           </div>
           {!isAlertsPage && followedRoute && <button className="followedRouteBadge" type="button" onClick={openJourneyPlanner} aria-label={uiCopy("Open gevolgde route", language)}>
-            <span><UiIcon name="train" /> Route volgen</span><strong>{followedRoute.originName} → {followedRoute.destinationName}</strong>
+            <span><UiIcon name="train" />{language === "en" ? "Saved route" : "Bewaarde route"}</span><strong>{followedRoute.originName} → {followedRoute.destinationName}</strong>
           </button>}
-          <div className="mapZoomControls" aria-label="Kaartzoom">
+          <div className="mapZoomControls" aria-label={language === "en" ? "Map zoom" : "Kaartzoom"}>
             <button type="button" onClick={() => map.current?.zoomIn({ duration: 250 })} aria-label={t("map.zoomIn")}>+</button>
             <button type="button" onClick={() => map.current?.zoomOut({ duration: 250 })} aria-label={t("map.zoomOut")}>−</button>
           </div>
-          <div className={`mapStylePicker ${showMapStyles ? "open" : ""}`}>
+{isAlertsPage && <>          <div className={`mapStylePicker ${showMapStyles ? "open" : ""}`}>
             <div className="mapStyleMenu" role="menu" aria-label={t("map.style")} aria-hidden={!showMapStyles}>
               {baseMapDefinitions.map((definition) => <button role="menuitemradio" aria-checked={baseMap === definition.key} type="button" key={definition.key} onClick={() => { setBaseMap(definition.key); setShowMapStyles(false); }}>
                 <span className={`mapStylePreview ${definition.key}`} /><span>{uiCopy(definition.label, language)}</span>{baseMap === definition.key && <b>✓</b>}
               </button>)}
             </div>
             <button className="mapStyleCurrent" type="button" aria-expanded={showMapStyles} aria-label={uiCopy("Kies kaartweergave", language)} onClick={() => setShowMapStyles((current) => !current)}>
-              <span className={`mapStylePreview ${baseMap}`} /><span>{uiCopy(baseMapDefinitions.find((definition) => definition.key === baseMap)?.label ?? "", language)}</span><UiIcon name="chevron" />
+              <UiIcon name="map" /><span>{uiCopy(baseMapDefinitions.find((definition) => definition.key === baseMap)?.label ?? "", language)}</span><UiIcon name="chevron" />
             </button>
           </div>
+</>}
           <div className="mapAttribution">{baseMap === "satellite" ? "Tiles © Esri" : "© OpenStreetMap-bijdragers"} · {isAlertsPage ? "wegmeldingen: NDW/leveranciers" : "spoor: ProRail/PDOK (CC0)"}</div>
 
         </div>
@@ -1990,6 +2024,16 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       {!isAlertsPage && showLayers && <section className="mapDrawer uiPanel" aria-label={uiCopy("Kaartlagen", language)}>
         <header className="uiPanelHeader"><div><span className="radarEyebrow">LIVEOPWEG</span><h2>{uiCopy("Kaartlagen", language)}</h2></div><button className="radarClose" type="button" onClick={closePrimaryPanel} aria-label={uiCopy("Sluit kaartlagen", language)}>×</button></header>
         <p>{language === "en" ? "Choose what appears on your train radar." : "Kies wat je op de treinradar wilt zien."}</p>
+          <div className={`mapStylePicker mapStyleInline ${showMapStyles ? "open" : ""}`}>
+            <div className="mapStyleMenu" role="menu" aria-label={t("map.style")} aria-hidden={!showMapStyles}>
+              {baseMapDefinitions.map((definition) => <button role="menuitemradio" aria-checked={baseMap === definition.key} type="button" key={definition.key} onClick={() => { setBaseMap(definition.key); setShowMapStyles(false); }}>
+                <span className={`mapStylePreview ${definition.key}`} /><span>{uiCopy(definition.label, language)}</span>{baseMap === definition.key && <b>✓</b>}
+              </button>)}
+            </div>
+            <button className="mapStyleCurrent" type="button" aria-expanded={showMapStyles} aria-label={uiCopy("Kies kaartweergave", language)} onClick={() => setShowMapStyles((current) => !current)}>
+              <UiIcon name="map" /><span>{uiCopy(baseMapDefinitions.find((definition) => definition.key === baseMap)?.label ?? "", language)}</span><UiIcon name="chevron" />
+            </button>
+          </div>
         <div className="uiLayerOptions">{mapLayerDefinitions.map(layer => <label key={layer.key}>
           <UiIcon name={layer.key === "trains" ? "train" : layer.key === "stations" ? "station" : layer.key === "crossings" ? "crossing" : "rail"} />
           <span>{uiCopy(layer.label, language)}</span><input type="checkbox" checked={mapLayers[layer.key]} onChange={event => setMapLayers(current => ({ ...current, [layer.key]: event.target.checked }))} />
@@ -2001,9 +2045,10 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             {locationStatus === "loading" && <p className="nearbyMessage">{uiCopy("Je locatie ophalen…", language)}</p>}
             {locationStatus === "denied" && <p className="nearbyMessage">{uiCopy("Locatietoegang is geblokkeerd. Sta locatie toe in je browser en probeer opnieuw.", language)}</p>}
             {locationStatus === "unavailable" && <p className="nearbyMessage">{uiCopy("Je locatie is nu niet beschikbaar. Controleer je browserinstellingen en probeer opnieuw.", language)}</p>}
+            {(locationStatus === "denied" || locationStatus === "unavailable") && <div className="uiActions"><button type="button" onClick={requestNearbyLocation}>{language === "en" ? "Try again" : "Opnieuw proberen"}</button></div>}
             {userLocation && <>
-              <section><h3><UiIcon name="station" /> Stations in de buurt</h3>{nearbyStations.map(({ station, distance }) => <button className="nearbyResult" type="button" key={station.code} onClick={() => selectStation(station)}><span><strong>{station.name}</strong><small>Station · {station.code}</small></span><b>{nearbyDistanceLabel(distance)}</b></button>)}{!nearbyStations.length && <p className="nearbyMessage">{uiCopy("Geen station binnen 50 km in de beschikbare kaartdata.", language)}</p>}</section>
-              <section><h3><UiIcon name="train" /> Live treinen</h3>{nearbyTrains.filter(({ distance }) => distance <= 25_000).map(({ train, distance }) => <button className="nearbyResult" type="button" key={train.observation.vehicleId} onClick={() => selectVehicle(train.observation.vehicleId)}><span><strong>{language === "en" ? "Train" : "Trein"} {train.observation.trainNumber}</strong><small>{identifyRollingStock(train.observation.materialNumber).label}{train.stale ? (language === "en" ? " · position out of date" : " · positie verouderd") : ""}</small></span><b>{nearbyDistanceLabel(distance)}</b></button>)}{!nearbyTrains.some(({ distance }) => distance <= 25_000) && <p className="nearbyMessage">{uiCopy("Geen live treinposities binnen 25 km.", language)}</p>}</section>
+              <section><h3><UiIcon name="station" />{language === "en" ? "Nearby stations" : "Stations in de buurt"}</h3>{nearbyStations.map(({ station, distance }) => <button className="nearbyResult" type="button" key={station.code} onClick={() => selectStation(station)}><span><strong>{station.name}</strong><small>Station · {station.code}</small></span><b>{nearbyDistanceLabel(distance)}</b></button>)}{!nearbyStations.length && <p className="nearbyMessage">{uiCopy("Geen station binnen 50 km in de beschikbare kaartdata.", language)}</p>}</section>
+              <section><h3><UiIcon name="train" />{language === "en" ? "Nearby trains" : "Treinen in de buurt"}</h3>{nearbyTrains.filter(({ distance }) => distance <= 25_000).map(({ train, distance }) => <button className="nearbyResult" type="button" key={train.observation.vehicleId} onClick={() => selectVehicle(train.observation.vehicleId)}><span><strong>{language === "en" ? "Train" : "Trein"} {train.observation.trainNumber}</strong><small>{identifyRollingStock(train.observation.materialNumber).label}{train.stale ? (language === "en" ? " · position out of date" : " · positie verouderd") : ""}</small></span><b>{nearbyDistanceLabel(distance)}</b></button>)}{!nearbyTrains.some(({ distance }) => distance <= 25_000) && <p className="nearbyMessage">{uiCopy("Geen live treinposities binnen 25 km.", language)}</p>}</section>
               <p className="nearbyPrivacy">{uiCopy("Je locatie blijft op dit apparaat en wordt niet opgeslagen.", language)}</p>
             </>}
           </aside>}
@@ -2014,15 +2059,15 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         {!isAlertsPage && radarSection === "notices" && <RailNotices selectedId={selectedDisruptionId} onSelected={setSelectedDisruptionId} data={disruptions} error={disruptionsError} retry={retryDisruptions} onSelect={focusDisruption} onClose={closePrimaryPanel} />}
         <AsyncPanel key={selectedStation?.code ?? selectedVehicleId ?? (showJourneyPlanner ? "planner" : "stats")}>
         {!isAlertsPage && panel?.kind === "station" && selectedStation && <StationPanel memory={stationMemory} key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} catalogFetchedAt={stationCatalogFetchedAt} onClose={closePrimaryPanel} onSelectVehicle={selectVehicle} />}
-        {!isAlertsPage && panel?.kind === "train" && observation && <TrainPanel key={observation.vehicleId} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} positionHistory={positionHistory} isFollowing={isFollowingTrain} canFollow={displayTrains.some((train) => !train.stale && train.observation.vehicleId === observation.vehicleId)} onToggleFollow={() => setIsFollowingTrain((following) => !following)} onClose={closePrimaryPanel} />}
-        {!isAlertsPage && showJourneyPlanner && <JourneyPlanner memory={plannerMemory} stations={stationCatalog} route={followedRoute} onRouteChange={updateFollowedRoute} onClose={closePrimaryPanel} liveTrainNumbers={new Set(displayTrains.filter(train => !train.stale).map(train => train.observation.trainNumber))} onSelectTrain={(trainNumber) => {
+        {!isAlertsPage && panel?.kind === "train" && observation && <TrainPanel key={observation.vehicleId} positionMatched={displayTrains.find(train=>train.observation.vehicleId===observation.vehicleId)?.matched ?? false} units={trainServices.find(service=>service.units.some(unit=>unit.vehicleId===observation.vehicleId))?.units} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} positionHistory={positionHistory} isFollowing={isFollowingTrain} canFollow={displayTrains.some((train) => !train.stale && train.observation.vehicleId === observation.vehicleId)} onToggleFollow={() => setIsFollowingTrain((following) => !following)} onClose={closePrimaryPanel} />}
+        {!isAlertsPage && showJourneyPlanner && <JourneyPlanner storageError={savedRouteError} onRetryStorage={retrySavedRoute} memory={plannerMemory} stations={stationCatalog} route={followedRoute} onRouteChange={updateFollowedRoute} onClose={closePrimaryPanel} liveTrainNumbers={new Set(displayTrains.filter(train => !train.stale).map(train => train.observation.trainNumber))} onSelectTrain={(trainNumber) => {
           const vehicle = vehicles.find((candidate) => candidate.trainNumber === trainNumber);
           if (vehicle) {
             selectVehicle(vehicle.vehicleId);
             setShowJourneyPlanner(false);
           }
         }} />}
-        {!isAlertsPage && showDelayStats && <DelayStats vehicles={vehicles} onClose={closePrimaryPanel} />}
+        {!isAlertsPage && showDelayStats && <DelayStats now={now} vehicles={displayTrains.map(train=>train.observation)} onClose={closePrimaryPanel} />}
         </AsyncPanel>
         </PanelHost>}
       </section>

@@ -5,6 +5,7 @@ import type { RailStation } from "../packages/domain-rail/stations";
 import { searchStations } from "../packages/domain-rail/stations";
 import { useFavoriteStations } from "./useFavoriteStations";
 import { useLanguage } from "./LanguageContext";
+import { AppIcon } from "./Icons";
 
 export function RadarDirectory({ stations, favoritesOnly, onSelect, onClose, initialQuery = "", onQueryChange }: {
   stations: RailStation[]; favoritesOnly: boolean; onSelect: (station: RailStation) => void; onClose: () => void;
@@ -20,7 +21,7 @@ export function RadarDirectory({ stations, favoritesOnly, onSelect, onClose, ini
   }, [stations, query, favoritesOnly, favorites]);
   const title = favoritesOnly ? (en ? "Favorites" : "Favorieten") : (en ? "Stations" : "Stations");
   return <aside className="radarDirectory radarCard" aria-label={title}>
-    <header><div><span className="radarEyebrow">LIVEOPWEG</span><h2>{title}</h2></div><button className="radarClose" type="button" onClick={onClose} aria-label={en ? "Close stations" : "Sluit stations"}>×</button></header>
+    <header><div><span className="radarEyebrow">{en ? "YOUR PLACES" : "JOUW PLEKKEN"}</span><h2>{title}</h2></div><button className="radarClose" type="button" onClick={onClose} aria-label={en ? "Close stations" : "Sluit stations"}><AppIcon name="close" /></button></header>
     <p>{favoritesOnly ? (en ? "Your saved stations, always close by." : "Je vaste stations, altijd dichtbij.") : (en ? "Find your station and view departures." : "Vind je station en bekijk de vertrektijden.")}</p>
     <input className="radarDirectorySearch" aria-label={en ? "Search stations" : "Zoek stations"} placeholder={en ? "Station name or code" : "Stationsnaam of code"} value={query} onChange={event => { setQuery(event.target.value); onQueryChange?.(event.target.value); }} />
     {storageError && <div className="uiNotice" role="status"><p>{en ? "Favorites are kept for this session. Your browser could not save them." : "Je favorieten blijven deze sessie bewaard. Je browser kon ze niet opslaan."}</p><button onClick={retry}>{en ? "Try saving again" : "Opnieuw opslaan"}</button></div>}

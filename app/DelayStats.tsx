@@ -1,38 +1,38 @@
 "use client";
-
 import { useMemo } from "react";
 import type { RailObservation } from "../packages/protocol/rail";
+import { observationIsStale } from "../packages/domain-rail/display-position";
 import { useLanguage } from "./LanguageContext";
+import { AppIcon } from "./Icons";
 
-export function fleetStats(vehicles: RailObservation[]) {
-  const measured = vehicles.filter((vehicle) => vehicle.speed !== null);
-  const moving = measured.filter((vehicle) => vehicle.speed!.valueKmh >= 5).length;
-  const fresh = vehicles.filter((vehicle) => vehicle.quality.state === "FRESH_SOURCE").length;
-  const speeds = measured.map((vehicle) => vehicle.speed!.valueKmh);
-  return {
-    total: vehicles.length,
-    measured: measured.length,
-    moving,
-    fresh,
-    maxSpeed: speeds.length ? Math.round(Math.max(...speeds)) : null,
-  };
+export function fleetStats(vehicles: RailObservation[], now = Date.now()) {
+  let measured = 0, moving = 0, fresh = 0, maxSpeed: number | null = null;
+  for (const vehicle of vehicles) {
+    if (vehicle.quality.state !== "FRESH_SOURCE" || observationIsStale(vehicle, now)) continue;
+    fresh++;
+    if (vehicle.speed === null) continue;
+    measured++;
+    if (vehicle.speed.valueKmh >= 5) moving++;
+    maxSpeed = Math.max(maxSpeed ?? 0, Math.round(vehicle.speed.valueKmh));
+  }
+  return { total: vehicles.length, measured, moving, fresh, maxSpeed };
 }
 
-export function DelayStats({ vehicles, onClose }: { vehicles: RailObservation[]; onClose: () => void }) {
+export function DelayStats({ vehicles, now, onClose }: { vehicles: RailObservation[]; now: number; onClose: () => void }) {
   const { language } = useLanguage();
-  const stats = useMemo(() => fleetStats(vehicles), [vehicles]);
-  const labels = language === "en"
-    ? { title: "Live fleet", total: "Trains visible", moving: "Moving", fresh: "Fresh positions", max: "Highest measured speed", coverage: "With speed reading", of: "of", note: "Calculated from current vehicle observations. National delay statistics are not available from this feed." }
-    : { title: "Live vloot", total: "Treinen zichtbaar", moving: "In beweging", fresh: "Actuele posities", max: "Hoogste gemeten snelheid", coverage: "Met snelheidsmeting", of: "van", note: "Berekend uit actuele treinposities. Landelijke vertragingscijfers zijn niet beschikbaar in deze gegevensfeed." };
-
+  const en = language === "en";
+  const stats = useMemo(() => fleetStats(vehicles, now), [vehicles, now]);
+  const labels = en
+    ? { title: "Fleet overview", total: "Trains in view", moving: "Moving", fresh: "Current positions", max: "Highest recent speed", note: "Based on received positions. Outdated readings are excluded from movement and speed figures. National delay statistics are not available." }
+    : { title: "Vlootoverzicht", total: "Treinen in beeld", moving: "In beweging", fresh: "Actuele posities", max: "Hoogste recente snelheid", note: "Gebaseerd op ontvangen posities. Oude metingen tellen niet mee voor beweging en snelheid. Landelijke vertragingscijfers zijn niet beschikbaar." };
   return <section className="delayStatsPanel uiPanel" aria-label={labels.title}>
-    <header className="uiPanelHeader"><h3>{labels.title}</h3><button className="radarClose" type="button" aria-label={language === "en" ? "Close statistics" : "Sluit statistieken"} onClick={onClose}>×</button></header>
+    <header className="uiPanelHeader"><div><span className="radarEyebrow">{en ? "ON THE RADAR" : "OP DE RADAR"}</span><h2>{labels.title}</h2></div><button className="radarClose" type="button" aria-label={en ? "Close statistics" : "Sluit statistieken"} onClick={onClose}><AppIcon name="close" /></button></header>
     <div className="dsGrid">
-      <div className="dsCard dsOnTime"><span>{labels.total}</span><strong>{stats.total}</strong></div>
-      <div className="dsCard dsDelayed"><span>{labels.moving}</span><strong>{stats.moving}</strong></div>
-      <div className="dsCard dsAvg"><span>{labels.fresh}</span><strong>{stats.fresh}</strong></div>
-      <div className="dsCard dsMax"><span>{labels.max}</span><strong>{stats.maxSpeed === null ? "—" : `${stats.maxSpeed} ${language === "en" ? "km/h" : "km/u"}`}</strong></div>
+      <div className="dsCard"><span>{labels.total}</span><strong>{stats.total}</strong></div>
+      <div className="dsCard"><span>{labels.fresh}</span><strong>{stats.fresh}</strong></div>
+      <div className="dsCard"><span>{labels.moving}</span><strong>{stats.moving}</strong></div>
+      <div className="dsCard"><span>{labels.max}</span><strong>{stats.maxSpeed === null ? "—" : `${stats.maxSpeed} ${en ? "km/h" : "km/u"}`}</strong></div>
     </div>
-    <p className="dsDataNote">{labels.coverage}: {stats.measured} {labels.of} {stats.total}. {labels.note}</p>
+    <p className="dsDataNote">{stats.measured} {en ? "current speed readings." : "actuele snelheidsmetingen."} {labels.note}</p>
   </section>;
 }

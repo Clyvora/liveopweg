@@ -9,14 +9,15 @@ export type RollingStockIdentity = {
 type NumberRange = readonly [minimum: number, maximum: number];
 
 const definitions: ReadonlyArray<{
-  family: Exclude<RollingStockFamily, "unknown">;
+  family: RollingStockFamily;
   label: string;
   ranges: readonly NumberRange[];
 }> = [
   {
     family: "virm",
     label: "VIRM dubbeldekker",
-    ranges: [[8601, 8681], [8701, 8723], [8727, 8746], [9401, 9481], [9502, 9526], [9547, 9597]],
+    // Renumbered formations 8726, 9528 and 9544 are listed in the NVBS fleet inventory.
+    ranges: [[8601, 8681], [8701, 8723], [8726, 8746], [9401, 9481], [9502, 9526], [9528, 9528], [9544, 9544], [9547, 9597]],
   },
   {
     family: "icng",
@@ -38,11 +39,14 @@ const definitions: ReadonlyArray<{
     label: "SLT Sprinter",
     ranges: [[2401, 2469], [2601, 2662]],
   },
+  // The type is known, but there is no dedicated illustration in the existing asset set.
+  { family:"unknown", label:"FLIRT", ranges:[[2010,2015],[2201,2233],[2501,2525]] },
+  { family:"unknown", label:"DDZ dubbeldekker", ranges:[[7501,7550],[7601,7650]] },
 ];
 
 function numericMaterialNumber(materialNumber: string | null | undefined): number | null {
   const normalized = materialNumber?.trim() ?? "";
-  if (!/^\d{4}$/.test(normalized)) return null;
+  if (!/^0*\d{4}$/.test(normalized)) return null;
   const parsed = Number(normalized);
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
@@ -68,3 +72,8 @@ export function identifyRollingStock(materialNumber: string | null | undefined):
   };
 }
 
+export function rollingStockLabel(identity:RollingStockIdentity, language="nl") {
+  if (language!=="en") return identity.label;
+  if (identity.confidence==="UNKNOWN") return "Train type unknown";
+  return identity.label.replace("dubbeldekker","double-decker");
+}
