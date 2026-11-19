@@ -4,7 +4,7 @@ import type { DisruptionsResponse, RailDisruption } from "../packages/protocol/n
 import { useLanguage } from "./LanguageContext";
 import { AppIcon } from "./Icons";
 
-export function RailNotices({ data, error, retry, onSelect, onClose, selectedId, onSelected }: { data: DisruptionsResponse | null; error: boolean; retry: () => void; onSelect: (value: RailDisruption) => void; onClose: () => void; selectedId: string | null; onSelected: (id: string | null) => void }) {
+export function RailNotices({ data, error, retry, onSelect, onClose, selectedId, onSelected, onPlan }: { data: DisruptionsResponse | null; error: boolean; retry: () => void; onSelect: (value: RailDisruption) => void; onClose: () => void; selectedId: string | null; onSelected: (id: string | null) => void; onPlan: () => void }) {
   const { language } = useLanguage(); const en = language === "en";
   const [filter, setFilter] = useState("ALL");
   const selected = data?.disruptions.find(value => value.id === selectedId);
@@ -19,7 +19,12 @@ export function RailNotices({ data, error, retry, onSelect, onClose, selectedId,
     {data && !notices.length && !error && !data.stale && <p>{en ? "No active disruptions match this filter." : "Geen actieve meldingen binnen dit filter."}</p>}
     <ul className="uiResultList">{notices.map(notice => <li key={notice.id}>
       <button className="uiResultButton" aria-expanded={selectedId === notice.id} onClick={() => { const opening = selectedId !== notice.id; onSelected(opening ? notice.id : null); if (opening) onSelect(notice); }}><strong>{notice.title}</strong><span>{notice.type === "MAINTENANCE" ? (en ? "Engineering works" : "Werkzaamheden") : (en ? "Rail disruption" : "Spoorverstoring")}</span></button>
-      {selectedId === notice.id && <div className="uiResultDetail"><p>{notice.description || (en ? "No further details supplied." : "Geen verdere toelichting ontvangen.")}</p><p>{notice.stations.map(s => s.name).join(" · ")}</p>{!notice.geometry && !notice.stations.some(s => s.latitude !== null && s.longitude !== null) && <small>{en ? "No map location supplied by the source." : "De bron levert geen kaartlocatie voor deze melding."}</small>}</div>}
+      {selectedId === notice.id && <div className="uiResultDetail railNoticeDetails">
+        <p>{notice.description || (en ? "No further details supplied." : "Geen verdere toelichting ontvangen.")}</p>
+        {notice.stations.length > 0 && <div><strong>{en ? "Affected stations" : "Getroffen stations"}</strong><p>{notice.stations.map(station => station.name).join(" · ")}</p></div>}
+        {!notice.geometry && !notice.stations.some(s => s.latitude !== null && s.longitude !== null) && <small>{en ? "No map location supplied by the source." : "De bron levert geen kaartlocatie voor deze melding."}</small>}
+        <button className="railNoticePlan" type="button" onClick={onPlan}><AppIcon name="planner" />{en ? "Find another route" : "Zoek een andere route"}</button>
+      </div>}
     </li>)}</ul>
     {data?.fetchedAt && <small>{en ? "Updated" : "Bijgewerkt"} {new Date(data.fetchedAt).toLocaleTimeString(language === "en" ? "en-GB" : "nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" })} · NS</small>}
   </aside>;

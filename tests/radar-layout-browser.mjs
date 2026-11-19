@@ -6,7 +6,7 @@ async (page) => {
   for(const kind of ['stations','planner','stats','notices','layers','train']){
     await page.setViewportSize({width:1440,height:1000});
     await page.goto(`http://localhost:3000/${['layers','train'].includes(kind)?'':`?panel=${kind}`}`);
-    await page.getByRole('button',{name:'1 treinen in beeld',exact:true}).waitFor();
+    await page.getByRole('button',{name:'1 trein in beeld',exact:true}).waitFor();
     if(kind==='layers')await page.getByRole('button',{name:'Kaartlagen',exact:true}).click();
     if(kind==='train'){
       await page.getByRole('combobox',{name:'Zoek trein, station of materieel'}).fill('1234');

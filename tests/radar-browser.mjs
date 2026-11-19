@@ -21,7 +21,7 @@ async (page) => {
   await page.route('**/v1/journeys/advice?*', route => route.fulfill({ status: adviceMode === 'error' ? 503 : 200, json: adviceMode === 'error' ? { error: 'unavailable' } : { source:'NS', fetchedAt:now(), journeys: adviceMode === 'empty' ? [] : [{ id:'test-advice', durationMinutes:30, transfers:0, cancelled:false, messages:['TESTGEGEVENS · controleer spoorwijziging'], legs:[{ id:'test-leg', mode:'TRAIN', service:'Intercity', trainNumber:'1234', origin:point(stations[0],5), destination:point(stations[1],35), cancelled:false, messages:[] }] }] } }));
   const entry = (id, trainNumber, vehicleId) => ({ id, trainNumber, serviceDate:now().slice(0,10), direction:'Amsterdam Centraal', operator:'NS', serviceType:'Intercity', plannedAt:later(8), expectedAt:later(10), timeBasis:'UPDATED', delaySeconds:120, track:'5', plannedTrack:'7', trackChanged:true, cancelled:false, vehicleId, rollingStock:'VIRM' });
   await page.route('**/v1/stations/*/board', route => route.fulfill({ json: { stationCode: route.request().url().match(/stations\/(.*?)\/board/)[1], generatedAt:now(), lastReceivedAt:now(), sourceHealthy:true, coverage:'RECEIVED_JOURNEYS', windowMinutes:60, departures:[entry('test-board','1234','test-train'),entry('test-positionless','9999',null)], arrivals:[entry('test-arrival','1234','test-train')] } }));
-  await page.routeWebSocket('**/v1/realtime', ws => {
+  await page.routeWebSocket(/\/v1\/realtime(?:\?|$)/, ws => {
     const observation = () => ({ observationId:'test-observation', vehicleId:'test-train', trainNumber:'1234', materialNumber:'8601', materialSequence:null, position:{longitude:5.11,latitude:52.09,elevationMeters:null,reference:'GPS_SOURCE',mapMatching:'NOT_APPLIED'},speed:{valueKmh:88,origin:'MEASURED_GPS'},headingDegrees:10,gpsQuality:{hdop:null,satellites:null,fix:null},time:{sourceMeasuredAt:now(),sourceGeneratedAt:now(),sourcePublishedAt:now(),receivedAt:now(),normalizedAt:now()},provenance:{sourceId:'ndov.ns.train-positions.interface-5',sourceTopic:'/RIG/NStreinpositiesInterface5',schemaVersion:'TreinLocatie.xsd@2016-10-10',payloadSha256:'a'.repeat(64),origin:'SOURCE'},quality:{state:'FRESH_SOURCE',flags:[],freshnessThresholdSeconds:30} });
     let sequence=0;
     const send = () => ws.send(JSON.stringify({protocolVersion:2,type:'rail.fleet.snapshot',sequence:sequence++,sentAt:now(),data:trainPresent?[observation()]:[]}));
@@ -32,7 +32,7 @@ async (page) => {
   await page.evaluate(()=>{localStorage.setItem('liveopweg-language','nl');localStorage.setItem('theme','light');});
   await page.setViewportSize({width:1440,height:1000});
   await page.goto('http://localhost:3000/');
-  await page.getByRole('button',{name:'1 treinen in beeld',exact:true}).waitFor();
+  await page.getByRole('button',{name:'1 trein in beeld',exact:true}).waitFor();
   await page.evaluate(() => { localStorage.removeItem('liveopweg-favorite-stations'); localStorage.removeItem('liveopweg-followed-route'); });
   const search=page.getByRole('combobox',{name:'Zoek trein, station of materieel'});
   await search.fill('1234');
@@ -106,6 +106,29 @@ async (page) => {
     }
   }
   checks.push('five widths × light/dark; mobile expand/collapse; panel bounds');
+  await page.setViewportSize({width:1440,height:1000});
+  await nav.getByRole('button',{name:'Reisplanner',exact:true}).click();
+  await page.getByRole('button',{name:'Route bewaren',exact:true}).click();
+  await page.goto('http://localhost:3000/');
+  const commute = page.getByRole('region',{name:'Bewaarde route',exact:true});
+  const departure = commute.getByRole('button',{name:/Intercity.*Spoor 7 → 5/});
+  await departure.waitFor();
+  await page.screenshot({path:'output/playwright/saved-route-desktop-TESTGEGEVENS.png'});
+  await departure.click();
+  await page.getByRole('button',{name:'Volg trein op de kaart'}).waitFor();
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({width:390,height:844});
+  const notice = commute.getByRole('button',{name:/Melding bij een station op je route/});
+  await notice.waitFor();
+  await page.screenshot({path:'output/playwright/saved-route-mobile-TESTGEGEVENS.png'});
+  await notice.click();
+  await page.getByText('Getroffen stations',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Zoek een andere route',exact:true}).click();
+  check(await page.getByRole('combobox',{name:'Van',exact:true}).inputValue()==='Utrecht Centraal','Disruption carries saved origin');
+  check(await page.getByRole('combobox',{name:'Naar',exact:true}).inputValue()==='Amsterdam Centraal','Disruption carries saved destination');
+  await page.getByRole('button',{name:'Zoek reizen',exact:true}).click();
+  await page.getByRole('button',{name:'Bekijk trein op radar',exact:true}).waitFor();
+  checks.push('saved departures and changed platform → live train; mobile alert → prefilled planner');
   await page.setViewportSize({width:1440,height:1000});
   await page.goto('http://localhost:3000/instellingen');
   await page.getByRole('heading',{name:'Instellingen',exact:true}).waitFor();

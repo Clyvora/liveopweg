@@ -3,11 +3,12 @@ import { useEffect, useState } from "react";
 import type { DisruptionsResponse } from "../packages/protocol/ns-travel";
 import { requestDisruptions } from "./travel-api";
 
-export function useDisruptions() {
+export function useDisruptions(enabled = true) {
   const [data, setData] = useState<DisruptionsResponse | null>(null);
   const [error, setError] = useState(false);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
+    if (!enabled) return;
     let disposed = false;
     let active: AbortController | null = null;
     const refresh = async () => {
@@ -22,6 +23,6 @@ export function useDisruptions() {
     document.addEventListener("visibilitychange", onVisible);
     const timer = window.setInterval(() => void refresh(), 60_000);
     return () => { disposed = true; active?.abort(); clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
-  }, [revision]);
+  }, [enabled, revision]);
   return { data, error, retry: () => setRevision(value => value + 1) };
 }

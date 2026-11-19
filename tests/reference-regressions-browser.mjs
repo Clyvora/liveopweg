@@ -5,10 +5,10 @@ async (page) => {
   const checks=[];
   const now=()=>new Date().toISOString();
   const later=min=>new Date(Date.now()+min*60000).toISOString();
-  let sendJourney, sendFleet, fleetEmpty=false;
+  let sendJourney, sendFleet, fleetEmpty=false, routeRequests=0;
   await page.route('**/v1/rail/disruptions',route=>route.fulfill({json:{source:'NS',fetchedAt:now(),stale:false,disruptions:[]}}));
-  await page.route('**/v1/trains/*/route',route=>route.fulfill({json:{method:'EXPECTED_SHORTEST_TRACK_PATH',exactSwitchPathKnown:false,geometry:{type:'MultiLineString',coordinates:[[[5.11,52.089],[5.085,52.118],[5.018,52.17],[4.999,52.21],[4.99,52.31],[4.9,52.378]]]},stops:[{code:'UT',name:'Utrecht Centraal',arrivalAt:later(6),departureAt:later(7),delaySeconds:120},{code:'ASD',name:'Amsterdam Centraal',arrivalAt:later(32),departureAt:null,delaySeconds:120}],routedStops:2}}));
-  await page.routeWebSocket('**/v1/realtime', ws=>{
+  await page.route('**/v1/trains/*/route',route=>{routeRequests++;return route.fulfill({json:{method:'EXPECTED_SHORTEST_TRACK_PATH',exactSwitchPathKnown:false,geometry:{type:'MultiLineString',coordinates:[[[5.11,52.089],[5.085,52.118],[5.018,52.17],[4.999,52.21],[4.99,52.31],[4.9,52.378]]]},stops:[{code:'UT',name:'Utrecht Centraal',arrivalAt:later(6),departureAt:later(7),delaySeconds:120},{code:'ASD',name:'Amsterdam Centraal',arrivalAt:later(32),departureAt:null,delaySeconds:120}],routedStops:2}});});
+  await page.routeWebSocket(/\/v1\/realtime(?:\?|$)/, ws=>{
     const observation=number=>({observationId:`fixture-${number}`,vehicleId:`fixture-${number}`,trainNumber:number,materialNumber:'8601',materialSequence:null,position:{longitude:5.002,latitude:52.17,elevationMeters:null,reference:'GPS_SOURCE',mapMatching:'NOT_APPLIED'},speed:{valueKmh:124,origin:'MEASURED_GPS'},headingDegrees:25,gpsQuality:{hdop:null,satellites:null,fix:null},time:{sourceMeasuredAt:now(),sourceGeneratedAt:now(),sourcePublishedAt:now(),receivedAt:now(),normalizedAt:now()},provenance:{sourceId:'ndov.ns.train-positions.interface-5',sourceTopic:'/RIG/NStreinpositiesInterface5',schemaVersion:'TreinLocatie.xsd@2016-10-10',payloadSha256:'a'.repeat(64),origin:'SOURCE'},quality:{state:'FRESH_SOURCE',flags:[],freshnessThresholdSeconds:30}});
     const journey=(number,type='rail.journey.snapshot')=>({protocolVersion:1,type,sequence:1,sentAt:now(),link:{method:'TRAIN_NUMBER_AND_LOCAL_SERVICE_DATE',origin:'DERIVED',trainNumber:number,serviceDate:now().slice(0,10)},data:{journeyId:`fixture-${number}`,trainNumber:number,serviceDate:now().slice(0,10),operator:'TESTGEGEVENS · NS',trainCategory:{code:'IC',name:'Intercity'},product:{id:'fixture',version:null,applicationVersion:null,generatedAt:now(),informationAt:now(),validUntil:later(60)},destination:{actual:number==='1727'?'Amsterdam Centraal':'Hilversum',planned:null},stops:[['RTD','Rotterdam Centraal',-32,'14'],['GD','Gouda',-14,'5'],['WD','Woerden',-2,'3'],['UT','Utrecht Centraal',6,'5'],['ASD','Amsterdam Centraal',32,'11']].map(([code,name,min,track],order)=>({order,station:{code,uicCode:null,shortName:name,mediumName:name,longName:name},calls:{planned:true,actual:true},arrival:{plannedAt:later(min-2),actualAt:later(min),exactDelaySeconds:120,plannedTrack:track,actualTrack:track},departure:{plannedAt:later(min-1),actualAt:later(min+1),exactDelaySeconds:120,plannedTrack:track,actualTrack:track},destination:{planned:null,actual:null},changes:[]})),provenance:{sourceId:'ndov.infoplus.rit.interface-5',sourceTopic:'/RIG/InfoPlusRITInterface5',schemaVersion:'RIT-v5@2024-06-27',payloadSha256:'b'.repeat(64),receivedAt:now(),origin:'SOURCE'}}});
     let sequence=0;
@@ -22,7 +22,7 @@ async (page) => {
   await page.goto('http://localhost:3000/');
   await page.getByRole('button',{name:'2 treinen in beeld',exact:true}).waitFor();
   await page.getByRole('button',{name:'Open gevolgde route'}).waitFor();
-  check(await page.locator('.followedRouteBadge').innerText().then(s=>s.includes('Utrecht Centraal')),'Saved route restored and canonicalized on initial load');
+  check(await page.locator('.savedCommute').innerText().then(s=>s.includes('Utrecht Centraal')),'Saved route restored and canonicalized on initial load');
   await page.keyboard.press('/');
   check(await page.getByRole('combobox',{name:'Zoek trein, station of materieel'}).evaluate(el=>el===document.activeElement),'Slash shortcut focuses search');
   await page.getByRole('navigation',{name:'Hoofdnavigatie'}).getByRole('button',{name:'Reisplanner'}).click();
@@ -31,7 +31,7 @@ async (page) => {
   check(await page.getByRole('button',{name:'Stations omwisselen'}).evaluate(el=>el===document.activeElement),'Tab does not disappear into unmounted suggestions');
   await page.evaluate(()=>{window.__restoreRouteRemove=Storage.prototype.removeItem;Storage.prototype.removeItem=function(k){if(k==='liveopweg-followed-route')throw new DOMException('blocked','SecurityError');return window.__restoreRouteRemove.call(this,k);};});
   await page.getByRole('button',{name:'Verwijderen',exact:true}).click();
-  check(await page.locator('.followedRouteBadge').count()===0,'Blocked storage removal applies in session');
+  check(await page.locator('.savedCommute').count()===0,'Blocked storage removal applies in session');
   await page.getByRole('button',{name:'Opnieuw opslaan',exact:true}).waitFor();
   await page.evaluate(()=>{Storage.prototype.removeItem=window.__restoreRouteRemove;});
   await page.getByRole('button',{name:'Opnieuw opslaan',exact:true}).click();
@@ -58,6 +58,12 @@ async (page) => {
   await page.getByRole('heading',{name:'Amsterdam Centraal',exact:true}).waitFor();
   await page.waitForFunction(()=>document.querySelector('.liveMap')?.getAttribute('aria-busy')!=='true');
   await page.waitForTimeout(1000);
+  const beforeRepeat=routeRequests;
+  check(beforeRepeat>0,'A selected journey requested route geometry');
+  sendJourney('1727');
+  await page.waitForTimeout(350);
+  check(routeRequests===beforeRepeat,'Repeated journey data did not request the same geometry again');
+  checks.push('route request deduplication');
   await page.screenshot({path:'output/playwright/reference-desktop-TESTGEGEVENS.png'});
   await page.setViewportSize({width:390,height:844});
   await page.getByRole('button',{name:'Paneel vergroten of verkleinen'}).click();

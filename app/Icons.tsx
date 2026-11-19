@@ -9,6 +9,7 @@ const paths: Record<string, ReactNode> = {
   radar: <><circle cx="12" cy="12" r="8" /><path d="m12 12 5-5M12 4v2M4 12h2M12 18v2M18 12h2" /></>,
   stations: <><path d="M3 20h18M5 17V8l7-5 7 5v9M3 8h18M9 12h6M9 16h6" /></>,
   notices: <><path d="M6 10a6 6 0 0 1 12 0c0 6 2 6 2 6H4s2 0 2-6Z" /><path d="M10 20h4" /></>,
+  alert: <><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v4m0 3h.01" /></>,
   favorites: <path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1.1 6.1-5.6-3-5.6 3 1.1-6.1L3 9.5l6.2-.9L12 3Z" />,
   more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
   settings: <><circle cx="12" cy="12" r="3" /><path d="m9 3-1 3-3 1-2 4 2 2v4l4 3 3-1 3 1 4-3v-4l2-2-2-4-3-1-1-3H9Z" /></>,
