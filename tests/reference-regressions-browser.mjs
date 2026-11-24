@@ -12,7 +12,7 @@ async (page) => {
     const observation=number=>({observationId:`fixture-${number}`,vehicleId:`fixture-${number}`,trainNumber:number,materialNumber:'8601',materialSequence:null,position:{longitude:5.002,latitude:52.17,elevationMeters:null,reference:'GPS_SOURCE',mapMatching:'NOT_APPLIED'},speed:{valueKmh:124,origin:'MEASURED_GPS'},headingDegrees:25,gpsQuality:{hdop:null,satellites:null,fix:null},time:{sourceMeasuredAt:now(),sourceGeneratedAt:now(),sourcePublishedAt:now(),receivedAt:now(),normalizedAt:now()},provenance:{sourceId:'ndov.ns.train-positions.interface-5',sourceTopic:'/RIG/NStreinpositiesInterface5',schemaVersion:'TreinLocatie.xsd@2016-10-10',payloadSha256:'a'.repeat(64),origin:'SOURCE'},quality:{state:'FRESH_SOURCE',flags:[],freshnessThresholdSeconds:30}});
     const journey=(number,type='rail.journey.snapshot')=>({protocolVersion:1,type,sequence:1,sentAt:now(),link:{method:'TRAIN_NUMBER_AND_LOCAL_SERVICE_DATE',origin:'DERIVED',trainNumber:number,serviceDate:now().slice(0,10)},data:{journeyId:`fixture-${number}`,trainNumber:number,serviceDate:now().slice(0,10),operator:'TESTGEGEVENS · NS',trainCategory:{code:'IC',name:'Intercity'},product:{id:'fixture',version:null,applicationVersion:null,generatedAt:now(),informationAt:now(),validUntil:later(60)},destination:{actual:number==='1727'?'Amsterdam Centraal':'Hilversum',planned:null},stops:[['RTD','Rotterdam Centraal',-32,'14'],['GD','Gouda',-14,'5'],['WD','Woerden',-2,'3'],['UT','Utrecht Centraal',6,'5'],['ASD','Amsterdam Centraal',32,'11']].map(([code,name,min,track],order)=>({order,station:{code,uicCode:null,shortName:name,mediumName:name,longName:name},calls:{planned:true,actual:true},arrival:{plannedAt:later(min-2),actualAt:later(min),exactDelaySeconds:120,plannedTrack:track,actualTrack:track},departure:{plannedAt:later(min-1),actualAt:later(min+1),exactDelaySeconds:120,plannedTrack:track,actualTrack:track},destination:{planned:null,actual:null},changes:[]})),provenance:{sourceId:'ndov.infoplus.rit.interface-5',sourceTopic:'/RIG/InfoPlusRITInterface5',schemaVersion:'RIT-v5@2024-06-27',payloadSha256:'b'.repeat(64),receivedAt:now(),origin:'SOURCE'}}});
     let sequence=0;
-    sendFleet=()=>ws.send(JSON.stringify({protocolVersion:2,type:'rail.fleet.snapshot',sequence:sequence++,sentAt:now(),data:fleetEmpty?[]:[observation('1727'),{...observation('1735'),position:{...observation('1735').position,latitude:52.21,longitude:5.04}}]}));
+    sendFleet=()=>ws.send(JSON.stringify({protocolVersion:2,type:'rail.fleet.snapshot',sequence:sequence++,sentAt:now(),data:fleetEmpty?[]:[observation('1727'),{...observation('1735'),materialNumber:'3120',position:{...observation('1735').position,latitude:52.21,longitude:5.04}}]}));
     sendJourney=(number,type)=>ws.send(JSON.stringify(journey(number,type)));
     sendFleet();const timer=setInterval(sendFleet,5000);ws.onClose(()=>clearInterval(timer));
     ws.onMessage(raw=>{const msg=JSON.parse(String(raw));if(msg.type==='select'){const number=msg.vehicleId.replace('fixture-','');ws.send(JSON.stringify({protocolVersion:2,type:'rail.selection.snapshot',sequence:0,sentAt:now(),vehicleId:msg.vehicleId,data:observation(number)}));sendJourney(number);}});
@@ -65,6 +65,24 @@ async (page) => {
   check(routeRequests===beforeRepeat,'Repeated journey data did not request the same geometry again');
   checks.push('route request deduplication');
   await page.screenshot({path:'output/playwright/reference-desktop-TESTGEGEVENS.png'});
+  // The fixture puts train 1735 just northeast of the selected train.
+  await page.mouse.move(724,391);
+  const preview = page.locator('.trainMapPreview');
+  await preview.getByText('Trein 1735',{exact:true}).waitFor();
+  await preview.getByText('ICNG · 3120',{exact:true}).waitFor();
+  await page.waitForFunction(()=>document.querySelector('.trainMapPreview img')?.naturalWidth>0);
+  await page.screenshot({path:'output/playwright/train-map-hover-TESTGEGEVENS.png'});
+  await page.mouse.move(500,680);
+  await preview.waitFor({state:'hidden'});
+  // Choose the label outside the 24 px marker and its click tolerance.
+  await page.mouse.click(775,391);
+  await page.waitForURL(url => url.searchParams.get('train') === '1735');
+  await page.keyboard.press('Escape');
+  await page.locator('.trainPanel').waitFor({state:'hidden'});
+  check(!new URL(page.url()).searchParams.has('train'),'One close clears a replacement train panel');
+  await page.goto('http://localhost:3000/?train=1727');
+  await page.getByRole('heading',{name:'Amsterdam Centraal',exact:true}).waitFor();
+  checks.push('hover shows matching train artwork; click on train label selects its train');
   await page.setViewportSize({width:390,height:844});
   await page.getByRole('button',{name:'Paneel vergroten of verkleinen'}).click();
   await page.screenshot({path:'output/playwright/reference-mobile-TESTGEGEVENS.png'});

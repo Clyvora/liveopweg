@@ -15,10 +15,10 @@ function stop(order: number, name: string, time: string, cancelled = false): Rai
 const stops = [stop(0,"Amsterdam Centraal","2026-09-09T12:22:00Z"),stop(1,"Amsterdam Amstel","2026-09-09T12:28:00Z"),stop(2,"Hilversum","2026-09-09T12:38:00Z"),stop(3,"Baarn","2026-09-09T12:45:00Z",true),stop(4,"Utrecht Centraal","2026-09-09T13:01:00Z")];
 const observation = { vehicleId: "test", trainNumber: "1735", materialNumber: "8601", speed: { valueKmh:132 }, time:{sourceMeasuredAt:new Date(now).toISOString()},quality:{state:"FRESH_SOURCE",freshnessThresholdSeconds:30} } as RailObservation;
 const journey = { stops, operator:"NS", trainCategory:{name:"Intercity",code:"IC"}, destination:{actual:"Utrecht Centraal",planned:"Utrecht Centraal"} } as RailJourney;
-function render(j: RailJourney | null = journey, o = observation, isFollowing = false) {
+function render(j: RailJourney | null = journey, o = observation, isFollowing = false, units?: RailObservation[]) {
   return renderToStaticMarkup(
     createElement(LanguageProvider, null, 
-      createElement(TrainPanel, { observation:o, journey:j, now, isFollowing, canFollow:true, onToggleFollow() {}, onClose() {} })
+      createElement(TrainPanel, { observation:o, journey:j, now, isFollowing, units, canFollow:true, onToggleFollow() {}, onClose() {} })
     )
   );
 }
@@ -39,7 +39,7 @@ describe("train passenger panel", () => {
     expect(trainClock(null)).toBe("—"); expect(trainDelay(null)).toBe("—");
     expect(trainDelay(0)).toBe("Op tijd"); expect(trainDelay(30)).toBe("+<1 min");
     const html=render(null,{...observation, materialNumber:null, speed:null});
-    expect(html).toContain("Nog niet bekend"); expect(html).toContain("tpImageFallback");
+    expect(html).toContain("Nog niet bekend"); expect(html).toContain("Algemene treinafbeelding");
     expect(html).not.toContain("132 km/u"); expect(html).not.toContain("Op tijd");
   });
   it("renders every stop, cancellations, changed tracks and next-stop status", () => {
@@ -49,10 +49,35 @@ describe("train passenger panel", () => {
     const long=render({...journey,stops:Array.from({length:40},(_,i)=>stop(i,`Station ${i}`,"2026-09-09T13:00:00Z"))});
     expect(long).toContain("Station 39");
   });
-  it("maps all five material families to locally available images", () => {
-    for(const [number,family] of [["8601","virm"],["3101","icng"],["4001","icm"],["2301","sng"],["2401","slt"],["0","unknown"]]) {
-      expect(render(journey,{...observation,materialNumber:number})).toContain(family === "unknown" ? "tpImageFallback" : `side-${family}.png`);
-      expect(readFileSync(`public/trains/side-${family}.png`).length).toBeGreaterThan(1000);
+  it("uses a locally available image for each recognized family and unknown stock", () => {
+    for(const [number,file] of [["8601","virm.png"],["3101","icng.png"],["4001","icm.png"],["2301","sng.png"],["2401","slt.png"],["2015","flirt.webp"],["7501","ddz.webp"],["0","unknown.png"]]) {
+      expect(render(journey,{...observation,materialNumber:number})).toContain(`side-${file}`);
+      expect(readFileSync(`public/trains/side-${file}`).length).toBeGreaterThan(1000);
+    }
+  });
+  it.each([
+    ["2401", "69 m · 4 rijtuigen"],
+    ["2601", "101 m · 6 rijtuigen"],
+  ])("shows the variants of an SLT formation (%s)", (materialNumber, label) => {
+    expect(render(journey, { ...observation, materialNumber })).toContain(`≈ ${label}`);
+  });
+  it("draws and sums both reported trainsets in a coupled formation", () => {
+    const second = { ...observation, vehicleId: "coupled", materialNumber: "9544" };
+    const html = render(journey, observation, false, [observation, second]);
+    expect(html).toContain("≈ 270 m · 10 rijtuigen");
+    expect(html.match(/class="tpFormationUnit"/g)).toHaveLength(2);
+    expect(html).toContain('aria-label="Instapgids voor treinstel 8601" aria-expanded="false"');
+    expect(html).toContain('aria-label="Instapgids voor treinstel 9544" aria-expanded="false"');
+  });
+  it("does not show a total if a reported set has unknown dimensions or stale data", () => {
+    const unknown = { ...observation, vehicleId: "coupled", materialNumber: null };
+    const stale = { ...unknown, materialNumber: "9544", time: { ...observation.time, sourceMeasuredAt: new Date(now - 60_000).toISOString() } };
+    for (const part of [unknown, stale]) {
+      const html = render(journey, observation, false, [observation, part]);
+      expect(html).toContain("Treinlengte onbekend");
+      expect(html).not.toContain("tpFormationDiagram");
+      expect(html).toContain("Instapgids voor treinstel 8601");
+      expect(html).not.toContain("Instapgids voor treinstel 9544");
     }
   });
   it("keeps a served station eligible until its departure", () => {

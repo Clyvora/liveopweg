@@ -5,7 +5,7 @@ import "./ui.css";
 import "./train-panel.css";
 import { ThemeProvider } from "./ThemeContext";
 import { LanguageProvider } from "./LanguageContext";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,6 +31,8 @@ function getSiteUrl(): URL {
 }
 
 const siteUrl = getSiteUrl();
+
+export const viewport: Viewport = { viewportFit: "cover" };
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

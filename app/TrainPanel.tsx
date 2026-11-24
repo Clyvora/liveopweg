@@ -5,26 +5,21 @@ import type { RailJourney } from "../packages/protocol/journey";
 import type { RailObservation } from "../packages/protocol/rail";
 import { identifyRollingStock, rollingStockLabel } from "../packages/domain-rail/rolling-stock";
 import { useLanguage } from "./LanguageContext";
-import { parseTimestamp } from "./realtime-url";
 import { AppIcon } from "./Icons";
+import { TrainFormation } from "./TrainFormation";
 import { TrainImage } from "./TrainImage";
 import { measurementTime, observationIsStale } from "../packages/domain-rail/position-quality";
 import { usePanelNow } from "./usePanelNow";
 
 type Stop = RailJourney["stops"][number];
-const clock = new Intl.DateTimeFormat("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" });
-export function trainClock(value: string | null | undefined) {
-  const parsed = parseTimestamp(value);
-  return parsed !== null ? clock.format(new Date(parsed)) : "—";
-}
 export function trainDelay(seconds: number | null | undefined, language = "nl") {
   if (seconds == null) return "—";
   if (seconds === 0) return language === "en" ? "On time" : "Op tijd";
   if (Math.abs(seconds) < 60) return seconds > 0 ? "+<1 min" : "−<1 min";
   return `${seconds > 0 ? "+" : "−"}${Math.round(Math.abs(seconds) / 60)} min`;
 }
-export { nextTrainStop } from "./next-train-stop";
-import { nextTrainStop, stopEvent, minutesUntilStop } from "./next-train-stop";
+export { nextTrainStop, trainClock } from "./next-train-stop";
+import { nextTrainStop, stopEvent, minutesUntilStop, trainClock } from "./next-train-stop";
 
 // Calculate ETA in minutes
 function getETA(stop: Stop, now: number): number | null {
@@ -35,7 +30,8 @@ function Delay({ seconds }: { seconds: number | null | undefined }) {
   const { language } = useLanguage();
   return <span className={seconds != null && seconds > 0 ? "tpLate" : "tpDelay"}>{trainDelay(seconds, language)}</span>;
 }
-export function TrainPanel({ observation, journey, now:initialNow, onClose, isFollowing, canFollow:canFollowFromMap, onToggleFollow, units, positionMatched }: { observation: RailObservation; journey: RailJourney | null; now: number; positionMatched?: boolean; units?: RailObservation[]; positionHistory?: Array<{ at: number; latitude: number; longitude: number }>; onClose: () => void; isFollowing: boolean; canFollow: boolean; onToggleFollow: () => void }) {
+
+export function TrainPanel({ observation, journey, now:initialNow, onClose, isFollowing, canFollow:canFollowFromMap, onToggleFollow, units, positionMatched, showExpectedRoute, showRecentTrail }: { observation: RailObservation; journey: RailJourney | null; now: number; positionMatched?: boolean; units?: RailObservation[]; showExpectedRoute?: boolean; showRecentTrail?: boolean; onClose: () => void; isFollowing: boolean; canFollow: boolean; onToggleFollow: () => void }) {
   const now = usePanelNow(initialNow);
   const [expanded, setExpanded] = useState(true);
   const [shareMessage, setShareMessage] = useState("");
@@ -83,10 +79,11 @@ export function TrainPanel({ observation, journey, now:initialNow, onClose, isFo
       {!canFollow && <p className="uiNotice" role="status">{language === "en" ? "No current live position is available. Previously received train details remain accessible." : "Er is geen actuele livepositie beschikbaar. Eerder ontvangen treininformatie blijft beschikbaar."}</p>}
       {journeyStale && <p className="uiNotice" role="status">{language === "en" ? "These stop times may be out of date." : "Deze haltetijden kunnen verouderd zijn."}</p>}
       <div className="tpStock">
-      <div className="tpIllustration" key={observation.vehicleId}>
-        <TrainImage key={stock.family} family={stock.family} label={stock.confidence === "UNKNOWN" ? t("train.unknown_type") : `${stock.family==="unknown" ? (en?"Generic illustration":"Algemene treinafbeelding") : (en ? "Side view" : "Zijaanzicht")} ${stockLabel}`} />
-      </div>
-      <div className="tpStockCaption">{stockLabel}{observation.materialNumber ? ` · ${observation.materialNumber}` : ""}{units && units.length>1 ? ` · ${units.length} ${en?"coupled units":"gekoppelde stellen"}` : ""}{journey?.operator ? ` · ${journey.operator}` : ""}</div>
+        <div className="tpIllustration" key={observation.vehicleId}>
+          <TrainImage model={stock.confidence === "UNKNOWN" ? null : stockLabel} operator={journey?.operator} />
+        </div>
+        <div className="tpStockCaption">{stockLabel}{observation.materialNumber ? ` · ${observation.materialNumber}` : ""}{units && units.length>1 ? ` · ${units.length} ${en?"coupled units":"gekoppelde stellen"}` : ""}{journey?.operator ? ` · ${journey.operator}` : ""}</div>
+        <TrainFormation units={units?.length ? units : [observation]} now={now} />
       </div>
       <section className="tpFacts" aria-label={t("train.route")}>
         <div aria-label={t("train.speed")}><strong>{observation.speed && !positionStale ? `${Math.round(observation.speed.valueKmh)} ${en ? "km/h" : "km/u"}` : "—"}</strong></div>
@@ -103,6 +100,10 @@ export function TrainPanel({ observation, journey, now:initialNow, onClose, isFo
           {next && (() => { const e = getETA(next, now); return e === null ? null : e <= 0 ? <span className="tpETA">· {event?.departing ? (en ? "at station" : "op het station") : t("train.arrived")}</span> : <span className="tpETA">· {en ? "in" : "over"} {e} min</span>; })()}
         </footer>
       </section>
+      {(showExpectedRoute || showRecentTrail) && <ul className="tpRouteLegend" aria-label={en ? "Route on the map" : "Route op de kaart"}>
+        {showExpectedRoute && <li className="tpExpectedKey">{en ? "Expected route" : "Verwachte route"}</li>}
+        {showRecentTrail && <li className="tpRecentKey">{en ? "Recent live positions" : "Recente liveposities"}</li>}
+      </ul>}
       <section className="tpJourney" ref={routeSection} tabIndex={-1}><button className="tpJourneyToggle" type="button" aria-expanded={expanded} aria-controls="train-stop-list" onClick={() => setExpanded(value => !value)}>Route<span aria-hidden="true">{expanded ? "⌄" : "›"}</span></button>
         {expanded && <ol id="train-stop-list">{stops.map(stop => {
           const cancelled = stop.calls.actual === false && stop.calls.planned === true;
@@ -118,7 +119,10 @@ export function TrainPanel({ observation, journey, now:initialNow, onClose, isFo
 
     </div>
       <footer className="tpFooter"><button className={`tpFollowButton ${isFollowing ? "active" : ""}`} type="button" aria-pressed={isFollowing} aria-label={!canFollow ? (en ? "Live position unavailable" : "Live treinpositie niet beschikbaar") : isFollowing ? (en ? "Stop following train" : "Stop met trein volgen") : (en ? "Follow train on map" : "Volg trein op de kaart")} disabled={!canFollow} onClick={onToggleFollow}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2.5" /><path d="M12 2v4m0 12v4m10-10h-4M6 12H2" /></svg>{!canFollow ? (en ? "No live position" : "Geen live positie") : isFollowing ? (en ? "Following" : "Volgen actief") : (en ? "Follow train" : "Trein volgen")}</button>
-        <div className="tpSecondaryActions"><button type="button" onClick={share}><AppIcon name="share" />{en ? "Share" : "Delen"}</button><button type="button" onClick={() => { setExpanded(true); routeSection.current?.scrollIntoView({ block:"start", behavior:"smooth" }); routeSection.current?.focus({ preventScroll:true }); }}><AppIcon name="calendar" />{en ? "Timetable" : "Dienstregeling"}</button></div>
+        <div className="tpSecondaryActions">
+          <button type="button" aria-label={en ? "Share" : "Delen"} onClick={share}><AppIcon name="share" /><span>{en ? "Share" : "Delen"}</span></button>
+          <button type="button" aria-label={en ? "Timetable" : "Dienstregeling"} onClick={() => { setExpanded(true); routeSection.current?.scrollIntoView({ block:"start", behavior:"smooth" }); routeSection.current?.focus({ preventScroll:true }); }}><AppIcon name="calendar" /><span>{en ? "Timetable" : "Dienstregeling"}</span></button>
+        </div>
         {shareMessage && <p role="status">{shareMessage}</p>}{shareUrl && <input className="tpShareUrl" aria-label={en ? "Train link" : "Treinlink"} value={shareUrl} readOnly onFocus={event => event.target.select()} />}
       </footer>
   </aside>;

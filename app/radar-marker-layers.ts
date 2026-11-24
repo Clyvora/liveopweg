@@ -1,38 +1,76 @@
 import type { Map as RadarMap } from "maplibre-gl";
+import { trainLiveries } from "./train-livery";
 
 const stationZooms = [5, 7, 8, 10];
 export const stationLayers = stationZooms.map(zoom => `radar-stations-${zoom}`);
-export const trainLayers = ["rail-fleet-selected", "rail-fleet-heading", "rail-fleet-points"];
+export const trainIdentityLayers = ["rail-fleet-labels", "rail-fleet-selected-label"];
+export const trainHitLayers = ["rail-fleet-points", ...trainIdentityLayers];
+export const trainLayers = ["rail-fleet-selected", "rail-fleet-matched-ring", "rail-fleet-heading", ...trainHitLayers];
 
-function addBadge(map: RadarMap, name: string, fill: string, glyph: string, rim = "#ffffff") {
+export const trainBadgeShapes = {
+  generic: {
+    body: "M9 5.5h6a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z",
+    glass: "M8.5 7.5h7v4h-7Z M9 13h1.5v1.5H9Z M13.5 13H15v1.5h-1.5Z",
+    rails: "M8 19l2-3m6 3-2-3",
+  },
+  doubleDeck: {
+    body: "M8.5 4.5h7l2.5 3v8l-2.5 2h-7L6 15.5v-8Z",
+    glass: "M9 6.5h6l1.5 2.5h-9Z M8 11h3v3H8Z M13 11h3v3h-3Z",
+    rails: "M8 19.5l2-2.5m6 2.5L14 17",
+  },
+  icng: {
+    body: "M6.5 6.5h7.75l5.25 7.75v2.5l-3 1H5v-8Z",
+    glass: "M8 8h5.5l3 4.5H8Z M6.75 14.5h2v1.5h-2Z M15.25 14.5h2v1.5h-2Z",
+    rails: "M8 19.5l1.5-2m7 2-1.5-2",
+  },
+  slt: {
+    body: "M12 5c4.25 0 7 2.5 7 6.75v2.75c0 2-2.75 3.5-7 3.5s-7-1.5-7-3.5v-2.75C5 7.5 7.75 5 12 5Z",
+    glass: "M7.25 11c.5-2.5 2.25-4 4.75-4s4.25 1.5 4.75 4H7.25Z M7.75 13.5h2.25V15H7.75Z M14 13.5h2.25V15H14Z",
+    rails: "M8 19.5l1.5-2m7 2-1.5-2",
+  },
+};
+
+function addLabelBackground(map: RadarMap, name: string, fill: string, border: string) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 48;
+  canvas.height = 36;
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  context.beginPath();
+  context.roundRect(1, 1, 46, 34, 10);
+  context.fillStyle = fill;
+  context.fill();
+  context.strokeStyle = border;
+  context.lineWidth = 2;
+  context.stroke();
+  map.addImage(name, context.getImageData(0, 0, 48, 36), {
+    pixelRatio: 2, stretchX: [[13, 35]], stretchY: [[12, 24]], content: [9, 5, 39, 31],
+  });
+}
+
+function addBadge(map: RadarMap, name: string, shape: keyof typeof trainBadgeShapes, bodyColor: string, detail: string, rim: string) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 48;
   const context = canvas.getContext("2d");
   if (!context) return;
   context.scale(2, 2);
 
-  // One compact front-facing train glyph, reused across the whole fleet.
   context.beginPath();
   context.roundRect(2, 2, 20, 20, 7);
-  context.fillStyle = fill;
+  context.fillStyle = detail;
   context.fill();
   context.strokeStyle = rim;
   context.lineWidth = 1.5;
   context.stroke();
-  context.beginPath();
-  context.roundRect(7.75, 6, 8.5, 10.5, 2);
-  context.moveTo(8.5, 19);
-  context.lineTo(10.25, 16.5);
-  context.moveTo(15.5, 19);
-  context.lineTo(13.75, 16.5);
-  context.strokeStyle = glyph;
+  const { body, glass, rails } = trainBadgeShapes[shape];
+  context.fillStyle = bodyColor;
+  context.fill(new Path2D(body));
+  context.fillStyle = detail;
+  context.fill(new Path2D(glass));
+  context.strokeStyle = bodyColor;
   context.lineWidth = 1.25;
   context.lineCap = "round";
-  context.stroke();
-  context.fillStyle = glyph;
-  context.fillRect(8.5, 10.5, 7, 1);
-  context.fillRect(9.5, 13.25, 1.25, 1.25);
-  context.fillRect(13.25, 13.25, 1.25, 1.25);
+  context.stroke(new Path2D(rails));
   map.addImage(name, context.getImageData(0, 0, 48, 48), { pixelRatio: 2 });
 }
 
@@ -52,13 +90,18 @@ function addOverviewDot(map: RadarMap, name: string, fill: string, rim: string) 
 }
 
 export function addRadarMarkerLayers(map: RadarMap) {
-  addBadge(map, "train-matched", "#214bb8", "#ffffff");
-  addBadge(map, "train-gps", "#f2f6ff", "#204484", "#6286c3");
-  addBadge(map, "train-stale", "#e8ebef", "#526173", "#95a3b4");
-  addBadge(map, "train-selected", "#103a9f", "#ffffff", "#ffffff");
-  addOverviewDot(map, "train-matched", "#214bb8", "#ffffff");
-  addOverviewDot(map, "train-gps", "#f2f6ff", "#426fae");
+  for (const shape of Object.keys(trainBadgeShapes) as Array<keyof typeof trainBadgeShapes>) {
+    addBadge(map, `train-stale-${shape}`, shape, "#e8ebef", "#526173", "#95a3b4");
+    for (const [livery, { body, detail }] of Object.entries(trainLiveries)) {
+      addBadge(map, `train-${livery}-${shape}`, shape, body, detail, "#ffffff");
+    }
+  }
+  for (const [livery, { body, detail }] of Object.entries(trainLiveries)) {
+    addOverviewDot(map, `train-${livery}`, body, detail);
+  }
   addOverviewDot(map, "train-stale", "#e8ebef", "#95a3b4");
+  addLabelBackground(map, "train-label", "#ffffff", "#a9b8cc");
+  addLabelBackground(map, "train-label-selected", "#153b9a", "#ffffff");
 
   const heading = document.createElement("canvas");
   heading.width = heading.height = 84;
@@ -98,6 +141,14 @@ export function addRadarMarkerLayers(map: RadarMap) {
     paint: { "circle-radius": 18, "circle-color": "#4f87ee", "circle-opacity": 0.3, "circle-stroke-width": 2, "circle-stroke-color": "#3b74da" },
   });
   map.addLayer({
+    id: "rail-fleet-matched-ring", type: "circle", source: "rail-fleet",
+    filter: ["==", ["get", "badge"], "train-matched"],
+    paint: {
+      "circle-radius": ["step", ["zoom"], 4.5, 8, 11],
+      "circle-opacity": 0, "circle-stroke-color": "#3779db", "circle-stroke-width": 1.5,
+    },
+  });
+  map.addLayer({
     id: "rail-fleet-heading", type: "symbol", source: "rail-fleet", minzoom: 9,
     filter: ["all", ["==", ["get", "hasHeading"], true], ["!=", ["get", "badge"], "train-stale"]],
     layout: {
@@ -109,10 +160,35 @@ export function addRadarMarkerLayers(map: RadarMap) {
   map.addLayer({
     id: "rail-fleet-points", type: "symbol", source: "rail-fleet",
     layout: {
-      "icon-image": ["step", ["zoom"], ["case", ["get", "selected"], ["get", "badge"], ["concat", ["get", "badge"], "-dot"]], 8, ["get", "badge"]],
+      "icon-image": ["step", ["zoom"], ["case", ["get", "selected"], ["get", "detailIcon"], ["get", "dotIcon"]], 8, ["get", "detailIcon"]],
       "icon-size": ["interpolate", ["linear"], ["zoom"], 5, 0.64, 8, 0.82, 11, 1],
       "icon-allow-overlap": true, "icon-ignore-placement": true,
       "symbol-sort-key": ["get", "priority"],
     },
   });
+  for (const [index, id] of trainIdentityLayers.entries()) {
+    const selected = index === 1;
+    map.addLayer({
+      id, type: "symbol", source: "rail-fleet", minzoom: selected ? 0 : 9,
+      filter: ["==", ["get", "selected"], selected],
+      layout: {
+        "text-field": selected ? ["get", "identityLabel"] : ["step", ["zoom"], ["get", "trainNumber"], 10, ["get", "identityLabel"]],
+        "text-font": ["Arial Bold"],
+        "text-size": 11,
+        "text-max-width": 40,
+        "text-anchor": "left",
+        "text-offset": [1.6, 0],
+        "text-padding": 7,
+        "text-allow-overlap": selected,
+        "icon-image": selected ? "train-label-selected" : "train-label",
+        "icon-text-fit": "both",
+        "icon-text-fit-padding": [2, 5, 2, 5],
+        "icon-allow-overlap": selected,
+        "symbol-sort-key": ["-", ["get", "priority"]],
+      },
+      paint: {
+        "text-color": selected ? "#ffffff" : ["case", ["==", ["get", "badge"], "train-stale"], "#5a6678", "#1f3457"],
+      },
+    });
+  }
 }

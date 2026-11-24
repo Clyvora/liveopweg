@@ -3,9 +3,10 @@ import { groupTrainServices } from "../packages/domain-rail/train-service";
 
 import { lazy, useReducer, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import type { GeoJSONSource, Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
+import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 import type { Feature } from "geojson";
 import { trainDisplayPosition } from "../packages/domain-rail/display-position";
+import { measurementTime } from "../packages/domain-rail/position-quality";
 import { identifyRollingStock } from "../packages/domain-rail/rolling-stock";
 import {
   journeySnapshotMessageSchema,
@@ -30,10 +31,13 @@ import { parseTimestamp, realtimeHttpUrl, realtimeWebSocketUrl } from "./realtim
 import { normalizeSearchText, railStations, searchStations, stationMinZoom, type RailStation } from "../packages/domain-rail/stations";
 import { stationCatalogSchema } from "../packages/protocol/station-catalog";
 import { nextTrainStop } from "./next-train-stop";
+import { distanceBetweenMeters, trainRouteFeatures, trainTrailFeatures, updateTrainTrail } from "./train-route-progress";
 import { panelReducer, type Panel } from "./panel-navigation";
 import { uiCopy } from "./ui-copy";
-import { addRadarMarkerLayers, stationLayers, trainLayers } from "./radar-marker-layers";
+import { addRadarMarkerLayers, stationLayers, trainHitLayers, trainLayers } from "./radar-marker-layers";
+import { trainMapPreview, trainMarkerIdentity } from "./train-map-preview";
 import { failedBaseMaps } from "./map-source-state";
+import { baseMapLayers, baseMapStyle, type BaseMapKey } from "./radar-basemaps";
 import { AppNavigation } from "./AppNavigation";
 import { AppIcon } from "./Icons";
 import { expectedRouteSchema, type ExpectedRoute } from "../packages/protocol/expected-route";
@@ -59,44 +63,11 @@ const RadarDirectory = lazy(() => import("./RadarDirectory").then(module => ({ d
 type ConnectionState = "verbinden" | "live" | "herstellen" | "offline";
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
 type MapLayerKey = "trains" | "stations" | "railways" | "crossings";
-type BaseMapKey = "standard" | "light" | "satellite";
 type UiIconName = "map" | "train" | "station" | "rail" | "crossing" | "car" | "bell" | "sliders" | "clock" | "settings" | "queue" | "warning" | "works" | "closure" | "shield" | "chevron";
-const fallbackMapStyle: StyleSpecification = {
-  version: 8,
-  sources: {
-    "base-standard": {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      attribution: "© OpenStreetMap-bijdragers",
-    },
-    "base-light": {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      attribution: "© OpenStreetMap-bijdragers",
-    },
-    "base-satellite": {
-      type: "raster",
-      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256,
-      minzoom: 0,
-      maxzoom: 19,
-      attribution: "Tiles © Esri",
-    },
-  },
-  layers: [
-    { id: "atlas-paper", type: "background", paint: { "background-color": "#eef1f5" } },
-    { id: "base-standard", type: "raster", source: "base-standard", paint: { "raster-saturation": -0.45, "raster-contrast": -0.08, "raster-opacity": 0.92 } },
-    { id: "base-light", type: "raster", source: "base-light", layout: { visibility: "none" }, paint: { "raster-saturation": -0.9, "raster-contrast": 0.18, "raster-brightness-min": 0.04, "raster-brightness-max": 0.45 } },
-    { id: "base-satellite", type: "raster", source: "base-satellite", layout: { visibility: "none" }, paint: { "raster-saturation": -0.12, "raster-brightness-max": 0.92 } },
-  ],
-};
-
 const baseMapDefinitions: { key: BaseMapKey; label: string }[] = [
   { key: "standard", label: "Standaard" },
   { key: "light", label: "Nacht" },
-  { key: "satellite", label: "Satelliet" },
+  { key: "satellite", label: "Luchtfoto" },
 ];
 
 function UiIcon({ name }: { name: UiIconName }) {
@@ -121,12 +92,6 @@ function UiIcon({ name }: { name: UiIconName }) {
   return <svg className="uiIcon" viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
 }
 
-function loadPublicMapStyle(): StyleSpecification {
-  // Een kleine rasterstijl start betrouwbaar in alle browsers en houdt de
-  // interactieve trein-, spoor- en weglaag onafhankelijk van een vectorkaart.
-  return fallbackMapStyle;
-}
-
 const roadLayerDefinitions: { key: RoadLayerKey; label: string; color: string }[] = [
   { key: "congestion", label: "Files", color: "#c94f3d" },
   { key: "incidents", label: "Ongevallen & incidenten", color: "#792f43" },
@@ -141,15 +106,6 @@ const mapLayerDefinitions: { key: MapLayerKey; label: string; color: string }[] 
   { key: "railways", label: "Spoorlijnen", color: "#66516f" },
   { key: "crossings", label: "Overwegen", color: "#f0a52b" },
 ];
-
-function distanceBetweenMeters(first: { latitude: number; longitude: number }, second: { latitude: number; longitude: number }) {
-  const radians = (degrees: number) => degrees * Math.PI / 180;
-  const latitudeDelta = radians(second.latitude - first.latitude);
-  const longitudeDelta = radians(second.longitude - first.longitude);
-  const arc = Math.sin(latitudeDelta / 2) ** 2
-    + Math.cos(radians(first.latitude)) * Math.cos(radians(second.latitude)) * Math.sin(longitudeDelta / 2) ** 2;
-  return 6_371_000 * 2 * Math.atan2(Math.sqrt(arc), Math.sqrt(1 - arc));
-}
 
 function nearbyDistanceLabel(meters: number) {
   return meters < 1_000 ? `${Math.round(meters)} m` : `${(meters / 1_000).toLocaleString("nl-NL", { maximumFractionDigits: 1 })} km`;
@@ -254,13 +210,47 @@ function toRecord(observations: RailObservation[]): Record<string, RailObservati
   return Object.fromEntries(observations.map((observation) => [observation.vehicleId, observation]));
 }
 
+function radarDockWidth(width: number) {
+  if (width < 768) {
+    const landscapeDock = window.matchMedia("(min-width:600px) and (max-height:500px)").matches;
+    return landscapeDock ? Math.max(286, width * .42) : 0;
+  }
+  return width < 1024 ? Math.max(328, Math.min(width * .42, 384)) : 396;
+}
+
+function radarPanelOffset(instance: MapLibreMap): [number, number] {
+  const dock = radarDockWidth(window.innerWidth);
+  if (dock) return [-dock / 2, 0];
+  return [0, -Math.min(220, instance.getContainer().clientHeight * .24)];
+}
+
 export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "alerts" }) {
   const isAlertsPage = mode === "alerts";
   const { theme } = useTheme();
   const { language, t } = useLanguage();
+  const languageRef = useRef(language);
+  useEffect(() => { languageRef.current = language; }, [language]);
+  const shell = useRef<HTMLElement>(null);
   const mapElement = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const map = useRef<MapLibreMap | null>(null);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const element = shell.current;
+    if (!viewport || !element) return;
+    const update = () => {
+      if (viewport.scale === 1 && viewport.height < window.innerHeight - 1) {
+        element.style.setProperty("--radar-visible-height", `${viewport.height}px`);
+        element.dataset.keyboardOpen = "";
+      } else {
+        element.style.removeProperty("--radar-visible-height");
+        delete element.dataset.keyboardOpen;
+      }
+    };
+    update();
+    viewport.addEventListener("resize", update);
+    return () => viewport.removeEventListener("resize", update);
+  }, []);
   const requestedGeometry = useRef(new Set<string>());
   const socketRef = useRef<WebSocket | null>(null);
   const selectFromMapRef = useRef<(vehicleId: string) => void>(() => undefined);
@@ -299,7 +289,9 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const [observation, setObservation] = useState<RailObservation | null>(null);
   const [trainMemory] = useState(() => new Map<string, { observation: RailObservation; journey: RailJourney | null }>());
   const [journey, setJourney] = useState<RailJourney | null>(null);
-  const [expectedRoute, setExpectedRoute] = useState<ExpectedRoute | null>(null);
+  const [expectedRoute, setExpectedRoute] = useState<{ key: string; route: ExpectedRoute } | null>(null);
+  const trainTrail = useRef<{ key: string | null; points: ReturnType<typeof updateTrainTrail> }>({ key: null, points: [] });
+  const [visibleTrailKey, setVisibleTrailKey] = useState<string | null>(null);
   const [trackMatchesByVehicle, setTrackMatchesByVehicle] = useState<Record<string, RailTrackMatch>>({});
   useEffect(() => {
     if (!observation) return;
@@ -449,7 +441,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     selectedTrainNumberRef.current = selected.trainNumber;
     setObservation(selected);
     setJourney(cached?.journey ?? null);
-    setExpectedRoute(null);
     setQuery("");
     setShowLayers(false);
     setShowJourneyPlanner(false);
@@ -463,9 +454,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       if (display) map.current.easeTo({
         center: [display.position.longitude, display.position.latitude],
         zoom: Math.max(map.current.getZoom(), 10),
-        offset: window.innerWidth < 1024
-          ? [0, -Math.min(210, window.innerHeight * 0.24)]
-          : [-190, 0],
+        offset: radarPanelOffset(map.current),
         duration: 700,
       });
     };
@@ -483,7 +472,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     selectedTrainNumberRef.current = null;
     setObservation(null);
     setJourney(null);
-    setExpectedRoute(null);
     setQuery("");
     replaceSelectionUrl();
   }, []);
@@ -531,7 +519,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     followPointRef.current = { vehicleId: selectedVehicleId, ...train.position };
     map.current.easeTo({
       center: [train.position.longitude, train.position.latitude],
-      offset: window.innerWidth < 1024 ? [0, -Math.min(210, window.innerHeight * 0.24)] : [-190, 0],
+      offset: radarPanelOffset(map.current),
       duration: 550,
       essential: true,
     });
@@ -551,7 +539,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     const focus = () => map.current?.easeTo({
       center: [station.longitude, station.latitude],
       zoom: Math.max(map.current.getZoom(), 11),
-      offset: window.innerWidth < 1024 ? [0, -Math.min(210, window.innerHeight * 0.24)] : [-195, 0],
+      offset: radarPanelOffset(map.current),
       duration: 700,
     });
     if (mapReady) focus(); else pendingMapFocus.current = focus;
@@ -728,15 +716,16 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   }, [clearVehicleSelection, setShowLayers, setShowJourneyPlanner, setShowDelayStats, setRadarSection]);
   useEffect(() => {
     let disposed = false;
-    void Promise.all([import("maplibre-gl"), loadPublicMapStyle()]).then(([{ Map, Popup, setWorkerUrl }, mapStyle]) => {
+    void import("maplibre-gl").then(({ Map, Popup, setWorkerUrl }) => {
       if (disposed || !mapElement.current || map.current) return;
       setWorkerUrl(mapWorkerUrl);
+      const mapHeight = mapElement.current.clientHeight;
       const instance = new Map({
         container: mapElement.current,
         bounds: [[3.15, 50.7], [7.45, 53.7]] as [[number, number], [number, number]],
         fitBoundsOptions: {
           padding: window.innerWidth < 1024
-            ? { top: 120, right: 22, bottom: 100, left: 22 }
+            ? { top: Math.min(120, mapHeight * .2), right: 22, bottom: Math.min(100, mapHeight * .2), left: 22 }
             : { top: 108, right: 28, bottom: 92, left: 28 },
         },
         attributionControl: false,
@@ -749,7 +738,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         touchPitch: false,
         keyboard: true,
         dragRotate: false,
-        style: mapStyle,
+        style: baseMapStyle,
       });
       map.current = instance;
       instance.on("dragstart", event => { if (event.originalEvent) setIsFollowingTrain(false); });
@@ -770,20 +759,47 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         }
         instance.touchZoomRotate.disableRotation();
         const stationPopup = new Popup({ closeButton: false, closeOnClick: true, offset: 12, className: "stationTooltip" });
+        const trainPopup = new Popup({
+          closeButton: false, closeOnClick: false, focusAfterOpen: false, offset: 22, className: "trainMapTooltip",
+        });
+        let previewKey: string | null = null;
+        const clearTrainHover = () => { previewKey = null; trainPopup.remove(); };
+        const clearMarkerHover = () => { clearTrainHover(); stationPopup.remove(); instance.getCanvas().style.cursor = ""; };
         requestedGeometry.current.clear();
         addRadarMarkerLayers(instance);
-        instance.on("mousemove", stationLayers, event => {
-          if (instance.isMoving() || !mapLayersRef.current.stations) return;
-          const feature = event.features?.[0];
-          if (feature?.geometry.type !== "Point") return;
+        const hoverLayers = [...trainHitLayers, ...stationLayers];
+        instance.on("mousemove", hoverLayers, event => {
+          if (isAlertsPage || instance.isMoving()) return;
+          const train = mapLayersRef.current.trains ? event.features?.find(feature => feature.source === "rail-fleet") : undefined;
+          if (train?.geometry.type === "Point") {
+            stationPopup.remove();
+            instance.getCanvas().style.cursor = "pointer";
+            const { vehicleId, trainNumber, materialNumber } = train.properties;
+            const key = `${vehicleId}:${trainNumber}:${materialNumber}:${languageRef.current}`;
+            const position = train.geometry.coordinates as [number, number];
+            if (previewKey !== key) {
+              previewKey = key;
+              trainPopup.setDOMContent(trainMapPreview(trainNumber, materialNumber ?? null, languageRef.current));
+              trainPopup.setLngLat(position).addTo(instance);
+            } else {
+              const location = trainPopup.getLngLat();
+              if (location.lng !== position[0] || location.lat !== position[1]) trainPopup.setLngLat(position);
+            }
+            return;
+          }
+          clearTrainHover();
+          const feature = mapLayersRef.current.stations ? event.features?.find(item => item.source === "radar-stations") : undefined;
+          if (feature?.geometry.type !== "Point") { clearMarkerHover(); return; }
           const coordinates = feature.geometry.coordinates as [number, number];
           if (stationPopup.isOpen() && stationPopup.getLngLat().toArray().every((value, index) => value === coordinates[index])) return;
           instance.getCanvas().style.cursor = "pointer";
           stationPopup.setLngLat(coordinates).setText(String(feature.properties.name)).addTo(instance);
         });
-        const clearStationHover = () => { instance.getCanvas().style.cursor = ""; stationPopup.remove(); };
-        instance.on("mouseleave", stationLayers, clearStationHover);
-        instance.on("movestart", clearStationHover);
+        instance.on("mouseleave", hoverLayers, clearMarkerHover);
+        instance.on("movestart", clearMarkerHover);
+        instance.on("styledata", () => {
+          if (previewKey && instance.getLayoutProperty("rail-fleet-points", "visibility") === "none") clearMarkerHover();
+        });
         const crossingIcon = document.createElement("canvas");
         crossingIcon.width = 48;
         crossingIcon.height = 48;
@@ -812,6 +828,21 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         instance.addSource("user-location", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
         instance.addLayer({ id: "user-location-halo", type: "circle", source: "user-location", paint: { "circle-radius": 13, "circle-color": "#1682ed", "circle-opacity": 0.18 } });
         instance.addLayer({ id: "user-location-dot", type: "circle", source: "user-location", paint: { "circle-radius": 6, "circle-color": "#1682ed", "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
+        if (!isAlertsPage) {
+          instance.addSource("rail-overview", {
+            type: "geojson", data: new URL("/rail/overview.geojson", window.location.origin).href,
+            maxzoom: 9,
+          });
+          instance.addLayer({
+            id: "rail-overview", type: "line", source: "rail-overview",
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: {
+              "line-color": "#455b78",
+              "line-width": ["interpolate", ["linear"], ["zoom"], 5, 1.15, 8, 1.9, 11, 2.3],
+              "line-opacity": 0.83,
+            },
+          }, "rail-fleet-points");
+        }
         instance.addSource("pdok-rail-geometry", {
           type: "geojson",
           data: { type: "FeatureCollection", features: [] },
@@ -836,7 +867,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           source: "pdok-rail-geometry",
           minzoom: 4,
           paint: {
-            "line-color": "#525963",
+            "line-color": "#455b78",
             "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.85, 6, 1.15, 9, 1.8, 12, 2.8, 16, 4.7],
             "line-opacity": 1,
           },
@@ -873,15 +904,35 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           id: "expected-rail-route-line",
           type: "line",
           source: "expected-rail-route",
-          filter: ["==", ["geometry-type"], "LineString"],
-          paint: { "line-color": "#2563eb", "line-width": ["interpolate", ["linear"], ["zoom"], 6, 2, 12, 3], "line-opacity": 0.78 },
+          filter: ["==", ["get", "kind"], "route"],
+          paint: { "line-color": "#2563eb", "line-width": ["interpolate", ["linear"], ["zoom"], 6, 2.5, 12, 4], "line-dasharray": [2, 1] },
+        }, "rail-fleet-points");
+        instance.addSource("selected-train-trail", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        instance.addLayer({
+          id: "selected-train-trail-line", type: "line", source: "selected-train-trail",
+          layout: { "line-cap": "round" },
+          paint: { "line-color": "#728095", "line-width": 4 },
         }, "rail-fleet-points");
         instance.addLayer({
           id: "expected-rail-route-stops",
           type: "circle",
           source: "expected-rail-route",
           filter: ["==", ["geometry-type"], "Point"],
-          paint: { "circle-radius": 5, "circle-color": "#fff", "circle-stroke-color": "#2563eb", "circle-stroke-width": 2 },
+          paint: {
+            "circle-radius": ["match", ["get", "kind"], "next", 7, "passed", 4, 5],
+            "circle-color": ["match", ["get", "kind"], "next", "#2563eb", "passed", "#728095", "#fff"],
+            "circle-stroke-color": ["match", ["get", "kind"], "stop", "#2563eb", "#fff"],
+            "circle-stroke-width": 2,
+          },
+        }, "rail-fleet-points");
+        instance.addLayer({
+          id: "expected-rail-route-next-label", type: "symbol", source: "expected-rail-route",
+          filter: ["==", ["get", "kind"], "next"],
+          layout: {
+            "text-field": ["get", "label"], "text-font": ["Arial Bold"], "text-size": 12,
+            "text-anchor": "bottom", "text-offset": [0, -1], "text-allow-overlap": true,
+          },
+          paint: { "text-color": "#10213f", "text-halo-color": "#fff", "text-halo-width": 2 },
         });
         instance.addLayer({
           id: "selected-track-match-link",
@@ -1019,8 +1070,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             [[x - radius, y - radius], [x + radius, y + radius]], { layers },
           );
           if (mapLayersRef.current.trains) {
-            const train = hits(["rail-fleet-points"], 5)[0];
-            if (train) { selectFromMapRef.current(String(train.properties.vehicleId)); return; }
+            const train = hits(trainHitLayers, 0)[0] ?? hits(["rail-fleet-points"], 5)[0];
+            if (train) { clearMarkerHover(); selectFromMapRef.current(String(train.properties.vehicleId)); return; }
           }
           if (instance.getLayer("ns-disruption-points")) {
             const notice = hits(["ns-disruption-points", "ns-disruption-lines"], 2)[0];
@@ -1035,8 +1086,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             if (station) { stationPopup.remove(); selectStationFromMapRef.current(String(station.properties.code)); }
           }
         });
-        instance.on("mouseenter", "rail-fleet-points", () => { instance.getCanvas().style.cursor = "pointer"; });
-        instance.on("mouseleave", "rail-fleet-points", () => { instance.getCanvas().style.cursor = ""; });
+        instance.on("remove", clearMarkerHover);
         setMapReady(true);
       });
     });
@@ -1055,17 +1105,22 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         type: "FeatureCollection",
         features: displayTrains.map(({ observation, position, stale, matched }) => {
           const selected = observation.vehicleId === selectedVehicleId;
+          const { shape, livery, ...identity } = trainMarkerIdentity(observation.trainNumber, observation.materialNumber);
+          const badge = stale ? "train-stale" : selected ? "train-selected" : matched ? "train-matched" : "train-gps";
           return {
             type: "Feature",
             id: observation.vehicleId,
             geometry: { type: "Point", coordinates: [position.longitude, position.latitude] },
             properties: {
               vehicleId: observation.vehicleId,
+              ...identity,
               selected,
               priority: selected ? 2 : stale ? 0 : 1,
               hasHeading: observation.headingDegrees != null,
               heading: observation.headingDegrees ?? 0,
-              badge: stale ? "train-stale" : selected ? "train-selected" : matched ? "train-matched" : "train-gps",
+              badge,
+              detailIcon: stale ? `train-stale-${shape}` : `train-${livery}-${shape}`,
+              dotIcon: stale ? "train-stale-dot" : `train-${livery}-dot`,
             },
           };
         }),
@@ -1142,6 +1197,14 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     };
     setVisibility(trainLayers, mapLayers.trains);
     setVisibility(stationLayers, mapLayers.stations);
+    setVisibility(["rail-overview"], mapLayers.railways);
+    const applyDetailVisibility = () => {
+      if (!instance.getLayer("rail-overview")) return;
+      const hasDetailedTracks = instance.getZoom() >= 8
+        && requestedGeometry.current.has("pdok-rail-geometry")
+        && instance.isSourceLoaded("pdok-rail-geometry");
+      setVisibility(["rail-overview"], mapLayers.railways && !hasDetailedTracks);
+    };
     const applyZoomDensity = () => {
       const layers = [
         { id: "pdok-rail-geometry", path: "/v1/geometry/rail", visible: mapLayers.railways && instance.getZoom() >= 8, layers: ["pdok-rail-geometry-casing", "pdok-rail-geometry-lines"] },
@@ -1156,10 +1219,15 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           source.setData(realtimeHttpUrl(layer.path));
         }
       }
+      applyDetailVisibility();
     };
     applyZoomDensity();
+    const afterGeometryLoad = (event: { sourceId?: string }) => {
+      if (event.sourceId === "pdok-rail-geometry") applyDetailVisibility();
+    };
+    instance.on("sourcedata", afterGeometryLoad);
     instance.on("zoomend", applyZoomDensity);
-    return () => { instance.off("zoomend", applyZoomDensity); };
+    return () => { instance.off("zoomend", applyZoomDensity); instance.off("sourcedata", afterGeometryLoad); };
   }, [mapLayers, mapReady]);
 
   useEffect(() => {
@@ -1173,10 +1241,15 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   useEffect(() => {
     const instance = map.current;
     if (!mapReady || !instance) return;
-    for (const definition of baseMapDefinitions) {
-      const layerId = `base-${definition.key}`;
-      if (instance.getLayer(layerId)) instance.setLayoutProperty(layerId, "visibility", definition.key === baseMap ? "visible" : "none");
+    for (const [mode, layerIds] of Object.entries(baseMapLayers)) {
+      for (const layerId of layerIds) instance.setLayoutProperty(layerId, "visibility", mode === baseMap ? "visible" : "none");
     }
+    const nightMap = baseMap !== "standard";
+    instance.setPaintProperty("atlas-paper", "background-color", nightMap ? "#151e2a" : "#eef2f5");
+    for (const layer of ["rail-overview", "pdok-rail-geometry-lines"]) {
+      if (instance.getLayer(layer)) instance.setPaintProperty(layer, "line-color", nightMap ? "#bacbe6" : "#455b78");
+    }
+    instance.setPaintProperty("pdok-rail-geometry-casing", "line-color", nightMap ? "#26354b" : "#ffffff");
   }, [baseMap, mapReady]);
 
   useEffect(() => {
@@ -1318,7 +1391,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           if (selection.data.vehicleId !== selectedVehicleIdRef.current) return;
           if (selection.data.data && selection.data.data.trainNumber !== selectedTrainNumberRef.current) {
             selectedTrainNumberRef.current = selection.data.data.trainNumber;
-            setJourney(null); setExpectedRoute(null);
+            setJourney(null);
           }
           setSelectedVehicleId(selection.data.vehicleId);
           selectedVehicleIdRef.current = selection.data.vehicleId;
@@ -1374,43 +1447,75 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     };
   }, [isAlertsPage]);
 
+  const routeJourney = selectedVehicleId && journey && journey.trainNumber === observation?.trainNumber
+    && Date.parse(journey.product.validUntil) >= now ? journey : null;
+  const routeStops = useMemo(() => routeJourney?.stops.toSorted((a, b) => a.order - b.order) ?? [], [routeJourney]);
+  const nextOrder = nextTrainStop(routeStops, now)?.order;
+  const routeKey = routeJourney && nextOrder !== undefined
+    ? JSON.stringify([selectedVehicleId, routeJourney.journeyId, routeJourney.provenance.payloadSha256, nextOrder])
+    : null;
+  const currentRoute = expectedRoute?.key === routeKey ? expectedRoute.route : null;
+  const trailObservation = selectedVehicleId ? vehiclesById[selectedVehicleId] : null;
+  const trailMatch = selectedVehicleId ? trackMatchesByVehicle[selectedVehicleId] : null;
+  const trailKey = selectedVehicleId && observation
+    ? JSON.stringify([selectedVehicleId, observation.trainNumber]) : null;
   useEffect(() => {
-    const instance = map.current;
-    const source = instance?.getSource("expected-rail-route") as GeoJSONSource | undefined;
-    if (!source) return;
-    const features: Feature[] = [];
-    if (expectedRoute?.geometry.coordinates.length) features.push({ type: "Feature", properties: { kind: "route" }, geometry: expectedRoute.geometry });
-    for (const stop of expectedRoute?.stops ?? []) {
-      const station = stationDirectory.get(stop.code);
-      if (station) features.push({ type: "Feature", properties: { kind: "stop", code: stop.code }, geometry: { type: "Point", coordinates: [station.longitude, station.latitude] } });
-    }
-    source.setData({ type: "FeatureCollection", features } as Parameters<GeoJSONSource["setData"]>[0]);
-  }, [expectedRoute, mapReady, stationDirectory]);
-
-  const routeJourneyId = journey?.journeyId;
-  const routeRevision = journey?.provenance.payloadSha256;
-  useEffect(() => {
-    if (!selectedVehicleId || !routeJourneyId) return;
-    const controller = new AbortController();
-    fetch(realtimeHttpUrl(`/v1/trains/${encodeURIComponent(selectedVehicleId)}/route`), { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]) })
-      .then(async (response) => {
+    if (!routeKey || !selectedVehicleId) return;
+    let active: AbortController | null = null;
+    const load = async () => {
+      if (active || document.visibilityState === "hidden") return;
+      const controller = new AbortController();
+      active = controller;
+      try {
+        const response = await fetch(realtimeHttpUrl(`/v1/trains/${encodeURIComponent(selectedVehicleId)}/route`), {
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
+        });
         if (!response.ok) throw new Error("Route unavailable");
-        const value = expectedRouteSchema.parse(await response.json());
-        if (!controller.signal.aborted) setExpectedRoute(value);
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          console.warn("[MobilityDashboard:ExpectedRoute]", {
-            timestamp: new Date().toISOString(),
-            error: errorMessage,
-            context: "fetch expected route",
-          });
-          setExpectedRoute(null);
-        }
-      });
-    return () => controller.abort();
-  }, [routeJourneyId, routeRevision, selectedVehicleId]);
+        const route = expectedRouteSchema.parse(await response.json());
+        if (!controller.signal.aborted) setExpectedRoute({ key: routeKey, route });
+      } catch {
+        // The timetable still supplies station markers if the track route is unavailable.
+      } finally {
+        if (active === controller) active = null;
+      }
+    };
+    void load();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") { active?.abort(); active = null; }
+      else void load();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      active?.abort();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [selectedVehicleId, routeKey]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    const source = map.current?.getSource("expected-rail-route") as GeoJSONSource | undefined;
+    source?.setData(trainRouteFeatures(currentRoute, routeStops, nextOrder, stationDirectory, language));
+  }, [currentRoute, language, mapReady, nextOrder, routeStops, stationDirectory]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    const source = map.current?.getSource("selected-train-trail") as GeoJSONSource | undefined;
+    if (!source) return;
+    const previous = trainTrail.current;
+    const base = previous.key === trailKey ? previous.points : [];
+    const position = trainDisplayPosition(trailObservation, trailMatch, now);
+    const at = trailObservation ? measurementTime(trailObservation) : null;
+    const point = trailKey && trailObservation && trailObservation.trainNumber === observation?.trainNumber
+      && position && !position.stale && at !== null && document.visibilityState !== "hidden"
+      ? { latitude: trailObservation.position.latitude, longitude: trailObservation.position.longitude, at }
+      : null;
+    const points = updateTrainTrail(base, point, now);
+    if (previous.key === trailKey && points === previous.points) return;
+    trainTrail.current = { key: trailKey, points };
+    const data = trainTrailFeatures(points);
+    source.setData(data);
+    setVisibleTrailKey(data.features.length ? trailKey : null);
+  }, [mapReady, now, observation?.trainNumber, trailKey, trailMatch, trailObservation]);
 
   useEffect(() => {
     const instance = map.current;
@@ -1452,7 +1557,12 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     const coordinates = notice.geometry?.coordinates.flat() ?? notice.stations.flatMap(station => { const catalog = station.code ? stationDirectory.get(station.code.toUpperCase()) : null; const lng = station.longitude ?? catalog?.longitude, lat = station.latitude ?? catalog?.latitude; return lng != null && lat != null ? [[lng, lat] as [number, number]] : []; });
     if (!coordinates.length || !map.current) return;
     const bounds = coordinates.reduce<[[number, number], [number, number]]>((b, p) => [[Math.min(b[0][0], p[0]), Math.min(b[0][1], p[1])], [Math.max(b[1][0], p[0]), Math.max(b[1][1], p[1])]], [[Infinity, Infinity], [-Infinity, -Infinity]]);
-    map.current.fitBounds(bounds, { padding: window.innerWidth >= 1024 ? { left: 32, right: 450, top: 110, bottom: 100 } : { left: 28, right: 28, top: 140, bottom: Math.min(window.innerHeight * 0.5 + 90, window.innerHeight - 200) }, maxZoom: 12, duration: 500 });
+    const dock = radarDockWidth(window.innerWidth);
+    const height = map.current.getContainer().clientHeight;
+    const padding = dock
+      ? { left: 28, right: dock + 32, top: Math.min(110, height * .22), bottom: Math.min(100, height * .22) }
+      : { left: 24, right: 24, top: Math.min(120, height * .2), bottom: Math.min(height * .48 + 80, height * .68) };
+    map.current.fitBounds(bounds, { padding, maxZoom: 12, duration: 500 });
   };
   const openRadarSection = (section: "stations" | "favorites" | "notices" | "more") => {
     navigate({ kind: section });
@@ -1472,7 +1582,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   };
 
   return (
-    <main className={`shell radarShell ${panel && panel.kind !== "search" ? "radarPanelOpen" : ""} ${isAlertsPage ? "alertsPage" : "trainPage"}`}>
+    <main ref={shell} className={`shell radarShell ${panel && panel.kind !== "search" ? "radarPanelOpen" : ""} ${isAlertsPage ? "alertsPage" : "trainPage"}`}>
       <AppNavigation active={isAlertsPage ? "roads" : panel?.kind ?? "radar"} onHome={isAlertsPage ? undefined : resetMap} onOpen={isAlertsPage ? undefined : kind => {
         if (kind === "planner") openJourneyPlanner();
         else if (kind === "stats") openDelayStats();
@@ -1609,13 +1719,13 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           {isAlertsPage && <div className="alertMapHeading"><span>{uiCopy("Meldingenkaart", language)}</span><strong>{uiCopy("Nederland onderweg", language)}</strong><small>{uiCopy("Alleen wegmeldingen · geen treinen", language)}</small></div>}
           <div className="mapActions" aria-label={uiCopy("Kaartbediening", language)}>
             {!isAlertsPage && <button type="button" onClick={() => setShowLayers(true)} aria-expanded={showLayers} aria-label={uiCopy("Kaartlagen", language)}><AppIcon name="layers" /><span>{language === "en" ? "Map" : "Kaart"}</span></button>}
-            {!isAlertsPage && <button className="nearbyAction" aria-label={uiCopy("Bij mij in de buurt", language)} type="button" onClick={requestNearbyLocation} aria-expanded={nearbyOpen}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="2.5" /><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3" /></svg><span>{uiCopy("Bij mij in de buurt", language)}</span></button>}
+            {!isAlertsPage && <button className="nearbyAction" aria-label={uiCopy("Bij mij in de buurt", language)} type="button" onClick={requestNearbyLocation} aria-expanded={nearbyOpen}><AppIcon name="locate" /><span>{uiCopy("Bij mij in de buurt", language)}</span></button>}
             {isAlertsPage && <button type="button" onClick={() => map.current?.fitBounds([[3.15, 50.7], [7.45, 53.7]], { padding: 40, duration: 400 })}><UiIcon name="map" /><span>{uiCopy("Heel Nederland", language)}</span></button>}
           </div>
           {!isAlertsPage && followedRoute && <SavedRouteCard key={`${followedRoute.originCode}:${followedRoute.destinationCode}`} route={followedRoute} disruptions={disruptions} noticesUnavailable={disruptionsError} liveTrainNumbers={liveTrainNumbers} now={now} onOpenPlanner={openRoutePlanner} onTrain={selectLiveTrain} onNotice={openSavedRouteNotice} />}
           <div className="mapZoomControls" aria-label={language === "en" ? "Map zoom" : "Kaartzoom"}>
-            <button type="button" onClick={() => map.current?.zoomIn({ duration: 250 })} aria-label={t("map.zoomIn")}>+</button>
-            <button type="button" onClick={() => map.current?.zoomOut({ duration: 250 })} aria-label={t("map.zoomOut")}>−</button>
+            <button type="button" onClick={() => map.current?.zoomIn({ duration: 250 })} aria-label={t("map.zoomIn")}><AppIcon name="plus" /></button>
+            <button type="button" onClick={() => map.current?.zoomOut({ duration: 250 })} aria-label={t("map.zoomOut")}><AppIcon name="minus" /></button>
           </div>
 {isAlertsPage && <>          <div className={`mapStylePicker ${showMapStyles ? "open" : ""}`}>
             <div className="mapStyleMenu" role="menu" aria-label={t("map.style")} aria-hidden={!showMapStyles}>
@@ -1628,7 +1738,12 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             </button>
           </div>
 </>}
-          <div className="mapAttribution">{baseMap === "satellite" ? "Tiles © Esri" : "© OpenStreetMap-bijdragers"} · {isAlertsPage ? "wegmeldingen: NDW/leveranciers" : "spoor: ProRail/PDOK (CC0)"}</div>
+          <div className="mapAttribution">{baseMap === "satellite" ? <>
+            <a href="https://www.pdok.nl/introductie/-/article/pdok-luchtfoto-rgb-open-">Beeldmateriaal Nederland / PDOK</a> · Kadaster
+          </> : <>
+            <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap</a>
+            {baseMap === "light" && <> · <a href="https://openfreemap.org/">OpenFreeMap</a> · OpenMapTiles</>}
+          </>} · {isAlertsPage ? "wegmeldingen: NDW/leveranciers" : "spoor: ProRail/PDOK (CC0)"}</div>
 
         </div>
         {panel && panel.kind !== "search" && <PanelHost memory={panelScroll} panelKey={`${panel.kind}:${panel.id ?? ""}`} onClose={closePrimaryPanel} onBack={navigation.history.length ? backPrimaryPanel : undefined}>
@@ -1675,7 +1790,19 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         {!isAlertsPage && radarSection === "notices" && <RailNotices selectedId={selectedDisruptionId} onSelected={setSelectedDisruptionId} data={disruptions} error={disruptionsError} retry={retryDisruptions} onSelect={focusDisruption} onClose={closePrimaryPanel} onPlan={openRoutePlanner} />}
         <AsyncPanel key={selectedStation?.code ?? selectedVehicleId ?? (showJourneyPlanner ? "planner" : "stats")}>
         {!isAlertsPage && panel?.kind === "station" && selectedStation && <StationPanel memory={stationMemory} key={selectedStation.code} station={selectedStation} now={now} availableVehicleIds={availableVehicleIds} catalogFetchedAt={stationCatalogFetchedAt} onClose={closePrimaryPanel} onSelectVehicle={selectVehicle} />}
-        {!isAlertsPage && panel?.kind === "train" && observation && <TrainPanel key={observation.vehicleId} positionMatched={displayTrains.find(train=>train.observation.vehicleId===observation.vehicleId)?.matched ?? false} units={trainServices.find(service=>service.units.some(unit=>unit.vehicleId===observation.vehicleId))?.units} observation={vehiclesById[observation.vehicleId] ?? observation} journey={journey} now={now} isFollowing={isFollowingTrain} canFollow={displayTrains.some((train) => !train.stale && train.observation.vehicleId === observation.vehicleId)} onToggleFollow={() => setIsFollowingTrain((following) => !following)} onClose={closePrimaryPanel} />}
+        {!isAlertsPage && panel?.kind === "train" && observation && <TrainPanel
+          key={observation.vehicleId}
+          positionMatched={displayTrains.find(train => train.observation.vehicleId === observation.vehicleId)?.matched ?? false}
+          units={trainServices.find(service => service.units.some(unit => unit.vehicleId === observation.vehicleId))?.units}
+          observation={vehiclesById[observation.vehicleId] ?? observation}
+          journey={journey} now={now}
+          showExpectedRoute={Boolean(currentRoute?.geometry.coordinates.length)}
+          showRecentTrail={trailKey !== null && visibleTrailKey === trailKey}
+          isFollowing={isFollowingTrain}
+          canFollow={displayTrains.some(train => !train.stale && train.observation.vehicleId === observation.vehicleId)}
+          onToggleFollow={() => setIsFollowingTrain(following => !following)}
+          onClose={closePrimaryPanel}
+        />}
         {!isAlertsPage && showJourneyPlanner && <JourneyPlanner storageError={savedRouteError} onRetryStorage={retrySavedRoute} memory={plannerMemory} stations={stationCatalog} route={followedRoute} onRouteChange={updateFollowedRoute} onClose={closePrimaryPanel} liveTrainNumbers={liveTrainNumbers} onSelectTrain={selectLiveTrain} />}
         {!isAlertsPage && showDelayStats && <DelayStats now={now} vehicles={displayTrains.map(train=>train.observation)} onClose={closePrimaryPanel} />}
         </AsyncPanel>

@@ -18,6 +18,18 @@ const paths: Record<string, ReactNode> = {
   swap: <><path d="M8 3v16m-4-4 4 4 4-4M16 21V5m-4 4 4-4 4 4" /></>,
   back: <path d="m10 5-7 7 7 7M3 12h18" />,
   share: <><circle cx="18" cy="5" r="3" /><circle cx="5" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8 10 7-4m-7 8 7 4" /></>,
+  bicycle: <><circle cx="5" cy="17" r="3.5" /><circle cx="19" cy="17" r="3.5" /><path d="m5 17 4-7 4 7H5m8 0 3-8-1-3h3m-9 4L8 7H6" /></>,
+  wheelchair: <><circle cx="11" cy="4" r="1.5" /><path d="m10 8 1 6h5l3 5h2M11 11h4m-7 1a5 5 0 1 0 6 7" /></>,
+  quiet: <><path d="M5 20v-3c0-2 1-3 3-4a7 7 0 1 1 10-6v2l2 3-2 1v2c0 1-1 2-2 2h-2v3M12 12v7m0-7a1 1 0 0 1 2 0v5" /><path d="M15 7h.01" /></>,
+  chevron: <path d="m7 10 5 5 5-5" />,
+  locate: <><circle cx="12" cy="12" r="7.5" /><circle cx="12" cy="12" r="2" /><path d="M12 2v2.5m0 15V22M2 12h2.5m15 0H22" /></>,
+  plus: <path d="M5 12h14m-7-7v14" />,
+  minus: <path d="M5 12h14" />,
+  toilet: <path d="M5 4h6v9H5zm0 9h14v2a4 4 0 0 1-4 4h-1v2H8v-3a5 5 0 0 1-3-5Z" />,
+  shop: <><path d="M4 9 6 4h12l2 5M5 12v8h14v-8M4 9v1a3 3 0 0 0 4.5 2.6L12 11l3.5 1.6A3 3 0 0 0 20 10V9M10 20v-5h4v5" /></>,
+  lockers: <><rect x="5" y="3.5" width="14" height="17" rx="2" /><path d="M12 4v16M8.7 11v2m6.6-2v2" /></>,
+  parking: <><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M10 16V8h3a2.25 2.25 0 0 1 0 4.5h-3" /></>,
+  external: <path d="M13 5h6v6m0-6-8 8m-2-8H5v14h14v-4" />,
 };
 
 export function AppIcon({ name }: { name: string }) {

@@ -1,6 +1,12 @@
 import type { RailJourney } from "../packages/protocol/journey";
 import { parseTimestamp } from "./realtime-url";
 
+const clock = new Intl.DateTimeFormat("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" });
+export function trainClock(value: string | null | undefined) {
+  const parsed = parseTimestamp(value);
+  return parsed !== null ? clock.format(new Date(parsed)) : "—";
+}
+
 export function nextTrainStop(stops: RailJourney["stops"], now: number) {
   return stops.find(stop => {
     if (stop.calls.actual === false && stop.calls.planned === true) return false;

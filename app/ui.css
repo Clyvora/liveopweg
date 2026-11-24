@@ -3,7 +3,7 @@
 .panelHost:focus { outline:none; }
 .panelHostTools { position:sticky; top:0; z-index:4; display:flex; align-items:center; min-height:44px; flex:none; border-bottom:1px solid var(--ui-border); background:var(--ui-surface); }
 .panelHostTools>button { display:flex; align-items:center; gap:8px; min-height:44px; padding:0 18px; border:0; background:transparent; color:var(--ui-muted); font-size:12px; }
-.panelResize { display:none!important; }
+.panelHostTools>.panelResize,.panelHostTools>.panelDismiss { display:none; }
 .panelHostTools:not(:has(.panelBack)) { display:none; }
 .panelHost>.uiPanel,.panelHost>.radarCard { flex:1 0 auto; min-width:0; padding:20px 16px; }
 .uiPanelHeader,.radarCard>header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin:0 0 16px; }
@@ -37,6 +37,30 @@
 .stationResult>span:nth-child(2) { display:grid; gap:5px; }
 .stationResult>span:nth-child(3) { font-size:12px; white-space:nowrap; }
 .stationResult>small { grid-column:2/-1; }
+.stationOperatorFilter { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0 4px; font-size:12px; }
+.stationOperatorFilter select { min-height:44px; max-width:70%; padding:6px 10px; background:var(--ui-surface); color:var(--ui-text); border:1px solid var(--ui-border); border-radius:6px; font:inherit; }
+.stationPlatformFilter>span { display:flex; align-items:center; gap:6px; font-weight:650; }
+.stationPlatformFilter .uiIcon { width:16px; height:16px; }
+.stationPhoto { margin:12px 0 0; }
+.stationPhoto img { display:block; width:100%; height:110px; object-fit:cover; border-radius:7px; background:var(--ui-muted-surface); }
+.stationPhoto figcaption { margin-top:3px; color:var(--ui-muted); text-align:right; font-size:10px; }
+.stationPhoto figcaption a { color:inherit; text-underline-offset:2px; }
+.stationSections { margin:9px 0; }
+.stationSections + div>.uiTabs { margin-top:0; }
+.stationGuideList { list-style:none; padding:0; margin:4px 0 0; }
+.stationGuideList li+li { border-top:1px solid var(--ui-border); }
+.stationGuideList a { display:grid; grid-template-columns:34px minmax(0,1fr) 16px; align-items:center; gap:10px; min-height:58px; padding:9px 3px; color:var(--ui-text); text-decoration:none; }
+.stationGuideList a:hover strong,.stationGuideList a:focus-visible strong { text-decoration:underline; }
+.stationGuideIcon { display:grid; place-items:center; width:34px; height:34px; border-radius:6px; background:var(--ui-muted-surface); color:var(--ui-accent); }
+.stationGuideText strong,.stationGuideText small { display:block; }
+.stationGuideText strong { font-size:13px; }
+.stationGuideText small { margin-top:3px; color:var(--ui-muted); font-size:12px; line-height:1.4; }
+.stationGuideList a>.uiIcon { width:16px; height:16px; color:var(--ui-muted); }
+.stationServiceIdentity { display:flex; align-items:center; gap:5px; min-width:0; }
+.stationOperatorIcon { flex:none; width:19px; height:19px; }
+.stationTrainArt { display:grid; gap:4px; margin:0 0 12px; padding:10px 12px 7px; border:1px solid var(--ui-border); border-radius:8px; background:var(--ui-muted-surface); }
+.stationTrainArt img { display:block; width:100%; height:58px; object-fit:contain; }
+.stationTrainArt figcaption { color:var(--ui-muted); font-size:11px; text-align:right; }
 .radarDirectorySearch,.stationPicker input,.uiField input { width:100%; min-height:44px; padding:10px 12px; border:1px solid var(--ui-border); border-radius:6px; background:var(--ui-surface); color:var(--ui-text); font-size:15px; }
 .radarDirectorySearch::placeholder { color:var(--ui-muted); opacity:1; }
 .radarDirectory ul { margin:18px 0 0; padding:0; list-style:none; }
@@ -167,20 +191,34 @@
 .alertsPage .mapZoomControls { right:calc(var(--radar-feed) + 40px); }
 @media (max-width:1023px) {
   .stationPicker input,.uiField input,.radarDirectorySearch { font-size:16px; }
-  .panelHost { top:auto; bottom:calc(74px + env(safe-area-inset-bottom)); left:8px; right:8px; width:auto; min-height:220px; max-height:46dvh; border-radius:10px; z-index:75; }
-  .panelHostExpanded { height:calc(100dvh - 150px - env(safe-area-inset-bottom)); max-height:calc(100dvh - 150px - env(safe-area-inset-bottom)); }
-  .panelHostTools,.panelHostTools:not(:has(.panelBack)) { display:flex; min-height:44px; }
-  .panelResize { display:flex!important; flex-direction:column; align-items:center; justify-content:center; gap:2px!important; margin:0 auto; touch-action:none; }
-  .panelResize i { display:block; width:32px; height:4px; border-radius:4px; background:var(--ui-border); }
-  .panelResize span { font-size:10px; }
   .panelHost>.uiPanel,.panelHost>.radarCard { padding:16px; }
   .uiPanel h2,.uiPanel h3,.radarCard h2 { font-size:20px; }
   .settingsPage.radarShell { padding:0 0 calc(80px + env(safe-area-inset-bottom)); }
   .settingsMain { padding:30px 24px; }
-  .railAlertsPanel { top:auto; left:8px; right:8px; bottom:82px; width:auto; max-height:50dvh; }
-  .alertsPage .mapStylePicker { bottom:calc(50dvh + 100px); right:12px; }
-  .alertsPage .mapZoomControls { bottom:calc(50dvh + 162px); right:12px; }
-  .alertMapHeading { top:12px; left:12px; right:75px; width:auto; max-width:350px; }
+  .radarShell[data-keyboard-open] .panelHost:focus-within { bottom:max(var(--radar-panel-bottom),calc(100dvh - var(--radar-visible-height) + 8px)); }
+  .alertMapHeading { top:var(--radar-search-top); left:max(12px,env(safe-area-inset-left)); right:65px; padding:10px 12px; width:max-content; max-width:calc(100% - 76px); }
+}
+@media (max-width:599px), (max-width:767px) and (min-height:501px) {
+  .panelHost { top:auto; bottom:var(--radar-panel-bottom); left:max(8px,env(safe-area-inset-left)); right:max(8px,env(safe-area-inset-right)); width:auto; max-height:min(var(--radar-sheet-compact),var(--radar-sheet-room)); border-radius:10px; z-index:75; }
+  .panelHostExpanded { height:var(--radar-sheet-room); max-height:var(--radar-sheet-room); }
+  .radarShell[data-keyboard-open] .panelHost:focus-within { top:var(--radar-search-top); height:auto; max-height:none; }
+  .panelHostTools,.panelHostTools:not(:has(.panelBack)) { display:grid; grid-template-columns:1fr auto 1fr; }
+  .panelHostTools>.panelBack { grid-column:1; grid-row:1; justify-self:start; padding:0 12px; }
+  .panelHostTools>.panelResize { display:flex; grid-column:2; grid-row:1; flex-direction:column; justify-content:center; gap:3px; touch-action:none; }
+  .panelResize i { display:block; width:32px; height:4px; border-radius:4px; background:var(--ui-muted); }
+  .panelResize span { font-size:10px; }
+  .panelHostTools>.panelDismiss { display:flex; grid-column:3; grid-row:1; justify-self:end; justify-content:center; width:44px; padding:0; }
+  .panelHost>:is(.uiPanel,.radarCard)>header>.radarClose { display:none; }
+  .railAlertsPanel { top:auto; left:max(8px,env(safe-area-inset-left)); right:max(8px,env(safe-area-inset-right)); bottom:var(--radar-panel-bottom); width:auto; max-height:min(45dvh,calc(100dvh - var(--radar-panel-bottom) - 142px)); }
+  .alertsPage .mapStylePicker { top:var(--radar-search-top); bottom:auto; left:auto; right:max(12px,env(safe-area-inset-right)); }
+  .alertsPage .mapStyleMenu { top:calc(100% + 8px); bottom:auto; }
+  .alertsPage .mapZoomControls { top:calc(var(--radar-search-top) + 52px); bottom:auto; right:max(12px,env(safe-area-inset-right)); }
+  .alertsPage .mapActions { top:calc(var(--radar-search-top) + 82px); bottom:auto; }
+  .alertMapHeading { max-width:calc(100% - 176px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
+}
+@media (min-width:768px) and (max-width:1023px), (min-width:600px) and (max-width:767px) and (max-height:500px) {
+  .panelHost,.railAlertsPanel { top:var(--radar-search-top); bottom:var(--radar-panel-bottom); right:max(12px,env(safe-area-inset-right)); }
+  .alertMapHeading { max-width:calc(100% - var(--radar-feed) - 36px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
 }
 @media (max-width:700px) { .settingsGrid { grid-template-columns:1fr; } }
 @media (max-width:420px) { .settingsMain { padding:28px 16px; } .settingsCard { padding:16px; } .settingsRow { flex-wrap:wrap; } }

@@ -7,5 +7,7 @@ export function panelReducer(state: PanelNavigation, action: PanelAction): Panel
   if (action.type === "dismiss") return state.current && action.kinds.includes(state.current.kind) ? { ...state, current: null } : state;
   if (action.type === "toggle" && state.current?.kind === action.panel.kind) return { current: null, history: [] };
   if (state.current?.kind === action.panel.kind && state.current.id === action.panel.id) return state;
+  // Going directly from one train to another replaces the detail view.
+  if (state.current?.kind === "train" && action.panel.kind === "train") return { ...state, current: action.panel };
   return { current: action.panel, history: state.current ? [...state.history, state.current].slice(-12) : state.history };
 }

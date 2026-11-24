@@ -66,7 +66,7 @@ test("server-renders een aparte meldingenkaart zonder treinlaag", async () => {
   assert.match(html, /Kies kaartweergave/);
   assert.match(html, /Standaard/);
   assert.match(html, /Nacht/);
-  assert.match(html, /Satelliet/);
+  assert.match(html, /Luchtfoto/);
   assert.doesNotMatch(html, /class="trainOverlay"/);
   assert.doesNotMatch(html, /class="fleetTools"/);
 });
