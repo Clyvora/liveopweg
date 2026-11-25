@@ -37,7 +37,7 @@ import { uiCopy } from "./ui-copy";
 import { addRadarMarkerLayers, stationLayers, trainHitLayers, trainLayers } from "./radar-marker-layers";
 import { trainMapPreview, trainMarkerIdentity } from "./train-map-preview";
 import { failedBaseMaps } from "./map-source-state";
-import { baseMapLayers, baseMapStyle, nightFallbackLayer, type BaseMapKey } from "./radar-basemaps";
+import { baseMapLayers, baseMapStyle, nightFallbackLayer, nightMapBackground, type BaseMapKey } from "./radar-basemaps";
 import { AppNavigation } from "./AppNavigation";
 import { AppIcon } from "./Icons";
 import { expectedRouteSchema, type ExpectedRoute } from "../packages/protocol/expected-route";
@@ -353,12 +353,32 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     window.addEventListener("storage", syncNotificationSetting);
     return () => window.removeEventListener("storage", syncNotificationSetting);
   }, []);
-  const [selectedMapStyle, setBaseMap] = useState<BaseMapKey | null>(null);
+  const [selectedMapStyle, setSelectedMapStyle] = useState<BaseMapKey | null>(null);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("liveopweg-map-style") === "light") {
+        const frame = window.requestAnimationFrame(() => setSelectedMapStyle("light"));
+        return () => window.cancelAnimationFrame(frame);
+      }
+    } catch {
+      // The map can still follow the theme when storage is unavailable.
+    }
+  }, []);
   const baseMap = selectedMapStyle ?? (theme === "dark" ? "light" : "standard");
   const [mapSourceFailures, setMapSourceFailures] = useState<Record<string, boolean>>({});
   const useNightFallback = baseMap === "light" && Boolean(mapSourceFailures["base-light"]);
   const mapBackgroundUnavailable = Boolean(mapSourceFailures[useNightFallback ? "base-standard" : `base-${baseMap}`]);
   const [showMapStyles, setShowMapStyles] = useState(false);
+  const selectBaseMap = (mode: BaseMapKey) => {
+    setSelectedMapStyle(mode);
+    setShowMapStyles(false);
+    try {
+      if (mode === "light") localStorage.setItem("liveopweg-map-style", mode);
+      else localStorage.removeItem("liveopweg-map-style");
+    } catch {
+      // Keep the selected map style for this visit.
+    }
+  };
   const [mapLayers, setMapLayers] = useState<Record<MapLayerKey, boolean>>({
     trains: !isAlertsPage, stations: !isAlertsPage, railways: !isAlertsPage, crossings: !isAlertsPage,
   });
@@ -1247,7 +1267,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     }
     instance.setLayoutProperty(nightFallbackLayer, "visibility", useNightFallback ? "visible" : "none");
     const nightMap = baseMap !== "standard";
-    instance.setPaintProperty("atlas-paper", "background-color", nightMap ? "#151e2a" : "#eef2f5");
+    instance.setPaintProperty("atlas-paper", "background-color", nightMap ? nightMapBackground : "#eef2f5");
+    instance.setPaintProperty("atlas-paper", "background-opacity", 1);
     for (const layer of ["rail-overview", "pdok-rail-geometry-lines"]) {
       if (instance.getLayer(layer)) instance.setPaintProperty(layer, "line-color", nightMap ? "#bacbe6" : "#455b78");
     }
@@ -1584,7 +1605,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   };
 
   return (
-    <main ref={shell} className={`shell radarShell ${panel && panel.kind !== "search" ? "radarPanelOpen" : ""} ${isAlertsPage ? "alertsPage" : "trainPage"}`}>
+    <main ref={shell} data-night-map={baseMap === "light" ? "" : undefined} className={`shell radarShell ${panel && panel.kind !== "search" ? "radarPanelOpen" : ""} ${isAlertsPage ? "alertsPage" : "trainPage"}`}>
       <AppNavigation active={isAlertsPage ? "roads" : panel?.kind ?? "radar"} onHome={isAlertsPage ? undefined : resetMap} onOpen={isAlertsPage ? undefined : kind => {
         if (kind === "planner") openJourneyPlanner();
         else if (kind === "stats") openDelayStats();
@@ -1731,7 +1752,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           </div>
 {isAlertsPage && <>          <div className={`mapStylePicker ${showMapStyles ? "open" : ""}`}>
             <div className="mapStyleMenu" role="menu" aria-label={t("map.style")} aria-hidden={!showMapStyles}>
-              {baseMapDefinitions.map((definition) => <button role="menuitemradio" aria-checked={baseMap === definition.key} type="button" key={definition.key} onClick={() => { setBaseMap(definition.key); setShowMapStyles(false); }}>
+              {baseMapDefinitions.map((definition) => <button role="menuitemradio" aria-checked={baseMap === definition.key} type="button" key={definition.key} onClick={() => selectBaseMap(definition.key)}>
                 <span className={`mapStylePreview ${definition.key}`} /><span>{uiCopy(definition.label, language)}</span>{baseMap === definition.key && <b>✓</b>}
               </button>)}
             </div>
@@ -1754,7 +1775,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         <p>{language === "en" ? "Choose what appears on your train radar." : "Kies wat je op de treinradar wilt zien."}</p>
           <div className={`mapStylePicker mapStyleInline ${showMapStyles ? "open" : ""}`}>
             <div className="mapStyleMenu" role="menu" aria-label={t("map.style")} aria-hidden={!showMapStyles}>
-              {baseMapDefinitions.map((definition) => <button role="menuitemradio" aria-checked={baseMap === definition.key} type="button" key={definition.key} onClick={() => { setBaseMap(definition.key); setShowMapStyles(false); }}>
+              {baseMapDefinitions.map((definition) => <button role="menuitemradio" aria-checked={baseMap === definition.key} type="button" key={definition.key} onClick={() => selectBaseMap(definition.key)}>
                 <span className={`mapStylePreview ${definition.key}`} /><span>{uiCopy(definition.label, language)}</span>{baseMap === definition.key && <b>✓</b>}
               </button>)}
             </div>
