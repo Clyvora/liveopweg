@@ -24,7 +24,13 @@ async (page) => {
   const point = (s, minute) => ({ code:s.code, name:s.name, plannedAt:later(minute), actualAt:later(minute), track:'5', plannedTrack:'7' });
   await page.route('**/v1/journeys/advice?*', route => route.fulfill({ status: adviceMode === 'error' ? 503 : 200, json: adviceMode === 'error' ? { error: 'unavailable' } : { source:'NS', fetchedAt:now(), journeys: adviceMode === 'empty' ? [] : [{ id:'test-advice', durationMinutes:30, transfers:0, cancelled:false, messages:['TESTGEGEVENS · controleer spoorwijziging'], legs:[{ id:'test-leg', mode:'TRAIN', service:'Intercity', trainNumber:'1234', origin:point(stations[0],5), destination:point(stations[1],35), cancelled:false, messages:[] }] }] } }));
   const entry = (id, trainNumber, vehicleId) => ({ id, trainNumber, serviceDate:now().slice(0,10), direction:'Amsterdam Centraal', operator:'NS', serviceType:'Intercity', plannedAt:later(8), expectedAt:later(10), timeBasis:'UPDATED', delaySeconds:120, track:'5', plannedTrack:'7', trackChanged:true, cancelled:false, vehicleId, rollingStock:'VIRM' });
-  await page.route('**/v1/stations/*/board', route => route.fulfill({ json: { stationCode: route.request().url().match(/stations\/(.*?)\/board/)[1], generatedAt:now(), lastReceivedAt:now(), sourceHealthy:true, coverage:'RECEIVED_JOURNEYS', windowMinutes:60, departures:[entry('test-board','1234','test-train'),{...entry('test-positionless','9999',null),operator:'Arriva',serviceType:'Stoptrein',rollingStock:null,track:'8a',plannedTrack:'8a',trackChanged:false}], arrivals:[entry('test-arrival','1234','test-train')] } }));
+  const stationDepartures = [
+    entry('test-board','1234','test-train'),
+    {...entry('test-positionless','9999',null),operator:'Arriva',serviceType:'Stoptrein',rollingStock:null,track:'8a',plannedTrack:'8a',trackChanged:false},
+    {...entry('test-blauwnet-a','3823',null),operator:'Blauwnet A',direction:'Emmen',serviceType:'Sneltrein',rollingStock:null,track:'3',plannedTrack:'3',trackChanged:false},
+    {...entry('test-blauwnet-k','7925',null),operator:'Blauwnet K',direction:'Enschede',serviceType:'Sprinter',rollingStock:null,track:'4',plannedTrack:'4',trackChanged:false},
+  ];
+  await page.route('**/v1/stations/*/board', route => route.fulfill({ json: { stationCode: route.request().url().match(/stations\/(.*?)\/board/)[1], generatedAt:now(), lastReceivedAt:now(), sourceHealthy:true, coverage:'RECEIVED_JOURNEYS', windowMinutes:60, departures:stationDepartures, arrivals:[entry('test-arrival','1234','test-train')] } }));
   let longitude=5.11, journeyRevision='a', routeAvailable=true, updateJourney;
   const journeyEvent=(minutes)=>({ plannedAt:new Date(Date.now()+minutes*60_000).toISOString(), actualAt:null, exactDelaySeconds:null, plannedTrack:'5', actualTrack:null });
   const journeyStops=stations.map((station,order)=>({
@@ -138,6 +144,15 @@ async (page) => {
   await page.getByRole('img',{name:'Voorbeeldillustratie trein van Arriva',exact:true}).waitFor();
   await page.waitForFunction(()=>document.querySelector('.stationTrainArt img')?.naturalWidth>0);
   check(await page.getByRole('button',{name:'Bekijk op radar',exact:true}).isDisabled(),'Positionless row remains readable');
+  await operatorFilter.selectOption('Blauwnet');
+  const blauwnetArriva=page.getByRole('button').filter({hasText:'Blauwnet (Arriva) · Sneltrein 3823'});
+  await blauwnetArriva.waitFor();
+  await page.getByRole('button').filter({hasText:'Blauwnet (Keolis) · Sprinter 7925'}).waitFor();
+  check(await page.locator('.stationResult').count()===2,'The Blauwnet filter groups both operators and excludes other services');
+  await blauwnetArriva.click();
+  check(await page.locator('.stationTrainArt img').getAttribute('src')==='/trains/side-blauwnet.webp','Blauwnet shows its own train illustration');
+  check(await page.getByRole('button',{name:'Bekijk op radar',exact:true}).isDisabled(),'Blauwnet departure without GPS does not open the radar');
+  checks.push('Blauwnet groups Arriva and Keolis and shows its own artwork');
   await operatorFilter.selectOption('');
   await page.getByRole('button').filter({hasText:'Intercity 1234'}).click();
   await page.getByRole('button',{name:'Bekijk op radar',exact:true}).click();

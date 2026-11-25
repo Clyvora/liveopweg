@@ -2,6 +2,7 @@ import type { LayerSpecification, StyleSpecification } from "maplibre-gl";
 
 export type BaseMapKey = "standard" | "light" | "satellite";
 
+export const nightFallbackLayer = "night-fallback";
 const labels = "https://service.pdok.nl/kadaster/brt-achtergrondkaart/wmts/v2_0/labels/EPSG:3857/{z}/{x}/{y}.png";
 const aerial = "https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/EPSG:3857/{z}/{x}/{y}.jpeg";
 const aerialBounds: [number, number, number, number] = [3.2, 50.73, 7.23, 53.71];
@@ -43,6 +44,10 @@ export const baseMapStyle: StyleSpecification = {
   layers: [
     { id: "atlas-paper", type: "background", paint: { "background-color": "#eef2f5" } },
     { id: "base-standard", type: "raster", source: "base-standard", paint: { "raster-saturation": -0.35, "raster-opacity": 0.88 } },
+    {
+      id: nightFallbackLayer, type: "raster", source: "base-standard", layout: { visibility: "none" },
+      paint: { "raster-saturation": -1, "raster-brightness-min": 0.1, "raster-brightness-max": 0.32 },
+    },
     ...nightLayers.map(layer => ({ ...layer, layout: { ...layer.layout, visibility: "none" as const } }) as LayerSpecification),
     { id: "base-satellite", type: "raster", source: "base-satellite", layout: { visibility: "none" }, paint: { "raster-saturation": -0.05 } },
     { id: "base-aerial-labels", type: "raster", source: "base-aerial-labels", layout: { visibility: "none" } },

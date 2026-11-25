@@ -15,5 +15,22 @@ async (page) => {
   await page.getByRole('option').filter({hasText:'Trein 1234'}).waitFor();
   await page.unroute('https://tile.openstreetmap.org/**');
   await page.unroute('https://service.pdok.nl/**');
-  return {checks:['Tile source failure has an explanation','Map style remains usable','Source recovery clears warning','Train search remains available']};
+  await page.evaluate(()=>localStorage.setItem('theme','dark'));
+  await page.route('https://tiles.openfreemap.org/**',route=>route.abort('failed'));
+  await page.route('https://tile.openstreetmap.org/**',route=>route.fulfill({contentType:'image/png',headers:{'access-control-allow-origin':'*'},body:Buffer.from(tile,'base64')}));
+  await page.setViewportSize({width:1200,height:850});
+  await page.goto('http://localhost:3000/');
+  await page.locator('.mapAttribution').getByText('OpenFreeMap',{exact:true}).waitFor();
+  await page.locator('.liveMap canvas').waitFor();
+  const fallbackTile=page.waitForResponse(response=>/^https:\/\/tile\.openstreetmap\.org\/(?:8|9|1\d)\//.test(response.url()) && response.ok());
+  await page.getByRole('button',{name:'Inzoomen op kaart',exact:true}).click();
+  await page.getByRole('button',{name:'Inzoomen op kaart',exact:true}).click();
+  await fallbackTile;
+  await page.getByRole('button',{name:'Kaartlagen',exact:true}).click();
+  await page.locator('.mapStyleInline .mapStyleCurrent').getByText('Nacht',{exact:true}).waitFor();
+  await page.getByText('Kaartachtergrond niet beschikbaar',{exact:true}).waitFor({state:'hidden'});
+  await page.unroute('https://tiles.openfreemap.org/**');
+  await page.unroute('https://tile.openstreetmap.org/**');
+  await page.evaluate(()=>localStorage.setItem('theme','light'));
+  return {checks:['Tile source failure has an explanation','Map style remains usable','Source recovery clears warning','Train search remains available','Night mode loads fallback tiles when its provider fails']};
 }

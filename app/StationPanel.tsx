@@ -9,6 +9,7 @@ import { AppIcon } from "./Icons";
 import { TrainImage } from "./TrainImage";
 import { trainArtwork } from "./train-artwork";
 import { RegionalTrainIcon } from "./RegionalTrainIcon";
+import { regionalTrainBrand } from "./train-livery";
 import { StationGuideContent, StationPhoto } from "./StationGuideContent";
 import { stationGuides } from "./station-guide";
 import { departurePlatforms, movedFromPlatform, showsOnPlatform } from "./station-platform";
@@ -22,6 +23,14 @@ export function boardEntryStatus(entry: StationBoardEntry, en = false): string {
 }
 type StationSection = "board" | "facilities" | "onward";
 const stationSections = ["board", "facilities", "onward"] as const;
+const blauwnetOperators = new Map([
+  ["blauwnet a", "Blauwnet (Arriva)"],
+  ["blauwnet k", "Blauwnet (Keolis)"],
+]);
+
+function operatorGroup(name: string | null) {
+  return regionalTrainBrand(name) === "blauwnet" ? "Blauwnet" : name?.trim() ?? "";
+}
 export type StationPanelMemory = Map<string, {
   board: StationBoard | null;
   tab: "departures" | "arrivals";
@@ -69,13 +78,14 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
   const stale = error || !board?.sourceHealthy || now - Date.parse(board?.generatedAt ?? "") > 45_000;
   const entries = (board?.[tab] ?? []).filter(entry => Date.parse(entry.expectedAt) >= now);
   const operators = [...new Set([...(board?.departures ?? []), ...(board?.arrivals ?? [])]
-    .flatMap(entry => entry.operator?.trim() ? [entry.operator.trim()] : []))].sort((left, right) => left.localeCompare(right));
-  const selectedOperator = operators.includes(operator) ? operator : "";
+    .map(entry => operatorGroup(entry.operator)).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  const savedOperator = operatorGroup(operator);
+  const selectedOperator = operators.includes(savedOperator) ? savedOperator : "";
   const activePlatform = tab === "departures" ? platform : "";
   const platforms = tab === "departures" ? departurePlatforms(entries) : [];
   if (activePlatform && !platforms.includes(activePlatform)) platforms.push(activePlatform);
   const visibleEntries = entries.filter(entry =>
-    (!selectedOperator || entry.operator?.trim() === selectedOperator) && showsOnPlatform(entry, activePlatform));
+    (!selectedOperator || operatorGroup(entry.operator) === selectedOperator) && showsOnPlatform(entry, activePlatform));
   const sectionLabel = en
     ? { board: "Trains", facilities: "Facilities", onward: "Onward travel" }
     : { board: "Treinen", facilities: "Voorzieningen", onward: "Verder reizen" };
@@ -136,11 +146,12 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
         : (en ? "No journeys received for the next hour. This does not mean no trains are running." : "Geen ritten ontvangen voor het komende uur. Dit betekent niet dat er geen treinen rijden.")}</p>}
       <ul className="uiResultList">{visibleEntries.map(entry => {
         const canFollow = !stale && !entry.cancelled && entry.vehicleId !== null && availableVehicleIds.has(entry.vehicleId);
+        const operatorName = blauwnetOperators.get(entry.operator?.trim().toLowerCase() ?? "") ?? entry.operator;
         const moved = !entry.cancelled && movedFromPlatform(entry, activePlatform);
         return <li key={entry.id}>
           <button className="uiResultButton stationResult" aria-expanded={selected === entry.id} onClick={() => setSelected(selected === entry.id ? null : entry.id)}>
             <time dateTime={entry.expectedAt}>{clock(entry.expectedAt)}</time>
-            <span><strong>{entry.direction}</strong><small className="stationServiceIdentity"><RegionalTrainIcon operator={entry.operator} /><span>{[entry.operator, `${entry.serviceType} ${entry.trainNumber}`].filter(Boolean).join(" · ")}</span></small></span>
+            <span><strong>{entry.direction}</strong><small className="stationServiceIdentity"><RegionalTrainIcon operator={entry.operator} /><span>{[operatorName, `${entry.serviceType} ${entry.trainNumber}`].filter(Boolean).join(" · ")}</span></small></span>
             <span>{en ? "Platform" : "Spoor"} {entry.track ?? "—"}</span>
             <small className={moved || entry.cancelled || (entry.delaySeconds ?? 0) >= 60 ? "tpLate" : ""}>
               {moved ? (en ? `Moved to platform ${entry.track}` : `Verplaatst naar spoor ${entry.track}`) : boardEntryStatus(entry, en)}
@@ -148,8 +159,8 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
           </button>
           {selected === entry.id && <div className="uiResultDetail">
             <figure className="stationTrainArt">
-              <TrainImage model={entry.rollingStock} operator={entry.operator} />
-              <figcaption>{trainArtwork(entry.rollingStock, entry.operator).kind === "model" ? entry.rollingStock : (en ? "Illustration · exact train model unavailable" : "Illustratie · exact treintype onbekend")}</figcaption>
+              <TrainImage model={entry.rollingStock} operator={operatorName} />
+              <figcaption>{trainArtwork(entry.rollingStock, operatorName).kind === "model" ? entry.rollingStock : (en ? "Illustration · exact train model unavailable" : "Illustratie · exact treintype onbekend")}</figcaption>
             </figure>
             {entry.trackChanged && <p>{en ? "Platform changed" : "Spoor gewijzigd"}: {entry.plannedTrack ?? "—"} → {entry.track ?? "—"}</p>}
             <button disabled={!canFollow} onClick={() => { if (entry.vehicleId && canFollow) onSelectVehicle(entry.vehicleId); }}>{en ? "View on radar" : "Bekijk op radar"}</button>

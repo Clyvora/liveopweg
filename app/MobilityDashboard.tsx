@@ -37,7 +37,7 @@ import { uiCopy } from "./ui-copy";
 import { addRadarMarkerLayers, stationLayers, trainHitLayers, trainLayers } from "./radar-marker-layers";
 import { trainMapPreview, trainMarkerIdentity } from "./train-map-preview";
 import { failedBaseMaps } from "./map-source-state";
-import { baseMapLayers, baseMapStyle, type BaseMapKey } from "./radar-basemaps";
+import { baseMapLayers, baseMapStyle, nightFallbackLayer, type BaseMapKey } from "./radar-basemaps";
 import { AppNavigation } from "./AppNavigation";
 import { AppIcon } from "./Icons";
 import { expectedRouteSchema, type ExpectedRoute } from "../packages/protocol/expected-route";
@@ -356,7 +356,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   const [selectedMapStyle, setBaseMap] = useState<BaseMapKey | null>(null);
   const baseMap = selectedMapStyle ?? (theme === "dark" ? "light" : "standard");
   const [mapSourceFailures, setMapSourceFailures] = useState<Record<string, boolean>>({});
-  const mapBackgroundUnavailable = Boolean(mapSourceFailures[`base-${baseMap}`]);
+  const useNightFallback = baseMap === "light" && Boolean(mapSourceFailures["base-light"]);
+  const mapBackgroundUnavailable = Boolean(mapSourceFailures[useNightFallback ? "base-standard" : `base-${baseMap}`]);
   const [showMapStyles, setShowMapStyles] = useState(false);
   const [mapLayers, setMapLayers] = useState<Record<MapLayerKey, boolean>>({
     trains: !isAlertsPage, stations: !isAlertsPage, railways: !isAlertsPage, crossings: !isAlertsPage,
@@ -1244,13 +1245,14 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     for (const [mode, layerIds] of Object.entries(baseMapLayers)) {
       for (const layerId of layerIds) instance.setLayoutProperty(layerId, "visibility", mode === baseMap ? "visible" : "none");
     }
+    instance.setLayoutProperty(nightFallbackLayer, "visibility", useNightFallback ? "visible" : "none");
     const nightMap = baseMap !== "standard";
     instance.setPaintProperty("atlas-paper", "background-color", nightMap ? "#151e2a" : "#eef2f5");
     for (const layer of ["rail-overview", "pdok-rail-geometry-lines"]) {
       if (instance.getLayer(layer)) instance.setPaintProperty(layer, "line-color", nightMap ? "#bacbe6" : "#455b78");
     }
     instance.setPaintProperty("pdok-rail-geometry-casing", "line-color", nightMap ? "#26354b" : "#ffffff");
-  }, [baseMap, mapReady]);
+  }, [baseMap, mapReady, useNightFallback]);
 
   useEffect(() => {
     const instance = map.current;
