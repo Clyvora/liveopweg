@@ -42,6 +42,8 @@ import { AppNavigation } from "./AppNavigation";
 import { AppIcon } from "./Icons";
 import { expectedRouteSchema, type ExpectedRoute } from "../packages/protocol/expected-route";
 import { PanelHost } from "./PanelHost";
+import { BlauwnetLayer } from "./BlauwnetLayer";
+import { crossingPopupContent } from "./rail-crossing";
 import { useDisruptions } from "./useDisruptions";
 import { RailNotices } from "./RailNotices";
 import { SavedRouteCard } from "./SavedRouteCard";
@@ -380,8 +382,10 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     }
   };
   const [mapLayers, setMapLayers] = useState<Record<MapLayerKey, boolean>>({
-    trains: !isAlertsPage, stations: !isAlertsPage, railways: !isAlertsPage, crossings: !isAlertsPage,
+    trains: !isAlertsPage, stations: !isAlertsPage, railways: !isAlertsPage, crossings: false,
   });
+  const [showBlauwnet, setShowBlauwnet] = useState(false);
+  const [blauwnetUnavailable, setBlauwnetUnavailable] = useState(false);
   const mapLayersRef = useRef(mapLayers);
   useEffect(() => { mapLayersRef.current = mapLayers; }, [mapLayers]);
   const [roadLayers, setRoadLayers] = useState<Record<RoadLayerKey, boolean>>({
@@ -780,6 +784,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         }
         instance.touchZoomRotate.disableRotation();
         const stationPopup = new Popup({ closeButton: false, closeOnClick: true, offset: 12, className: "stationTooltip" });
+        const crossingPopup = new Popup({ closeButton: false, closeOnClick: false, offset: 14 });
         const trainPopup = new Popup({
           closeButton: false, closeOnClick: false, focusAfterOpen: false, offset: 22, className: "trainMapTooltip",
         });
@@ -826,25 +831,20 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         crossingIcon.height = 48;
         const crossingContext = crossingIcon.getContext("2d");
         if (crossingContext) {
-          crossingContext.beginPath(); crossingContext.arc(24, 24, 19, 0, Math.PI * 2);
+          crossingContext.beginPath(); crossingContext.roundRect(5, 5, 38, 38, 10);
           crossingContext.fillStyle = "#fff7e5"; crossingContext.fill();
-          crossingContext.strokeStyle = "#e6a124"; crossingContext.lineWidth = 2.5; crossingContext.stroke();
+          crossingContext.strokeStyle = "#956329"; crossingContext.lineWidth = 2.5; crossingContext.stroke();
           crossingContext.beginPath(); crossingContext.lineCap = "round"; crossingContext.lineJoin = "round";
           crossingContext.moveTo(16, 16); crossingContext.lineTo(32, 32);
           crossingContext.moveTo(32, 16); crossingContext.lineTo(16, 32);
-          crossingContext.moveTo(13, 13); crossingContext.lineTo(35, 13);
-          crossingContext.moveTo(13, 35); crossingContext.lineTo(35, 35);
-          crossingContext.strokeStyle = "#80530b"; crossingContext.lineWidth = 3; crossingContext.stroke();
+          crossingContext.strokeStyle = "#71471e"; crossingContext.lineWidth = 4; crossingContext.stroke();
         }
         if (crossingContext) instance.addImage("liveopweg-level-crossing", crossingContext.getImageData(0, 0, 48, 48), { pixelRatio: 2 });
         instance.addSource("rail-level-crossings", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
         instance.addLayer({
-          id: "rail-level-crossing-badges", type: "circle", source: "rail-level-crossings", minzoom: 10,
-          paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 5, 12, 8, 16, 10], "circle-color": "#fff7e5", "circle-stroke-color": "#e6a124", "circle-stroke-width": 1.7 },
-        });
-        instance.addLayer({
-          id: "rail-level-crossing-symbols", type: "symbol", source: "rail-level-crossings", minzoom: 10,
-          layout: { "icon-image": "liveopweg-level-crossing", "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.52, 12, 0.78, 16, 1], "icon-allow-overlap": true },
+          id: "rail-level-crossing-symbols", type: "symbol", source: "rail-level-crossings", minzoom: 13,
+          filter: ["==", ["get", "karakter"], "Openbare overweg"],
+          layout: { "icon-image": "liveopweg-level-crossing", "icon-size": 0.9 },
         });
         instance.addSource("user-location", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
         instance.addLayer({ id: "user-location-halo", type: "circle", source: "user-location", paint: { "circle-radius": 13, "circle-color": "#1682ed", "circle-opacity": 0.18 } });
@@ -1070,28 +1070,21 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         // bewust terug bovenaan, zodat de primaire live-objecten zichtbaar en
         // aanklikbaar blijven op ieder zoomniveau.
         for (const layerId of [...stationLayers, ...trainLayers]) instance.moveLayer(layerId);
-        instance.on("click", "rail-level-crossing-badges", (event) => {
-          const feature = event.features?.[0];
-          const coordinates = feature?.geometry.type === "Point" ? feature.geometry.coordinates : null;
-          if (coordinates) new Popup({ closeButton: true, closeOnClick: true, offset: 12, className: "stationTooltip" })
-            .setLngLat(coordinates as [number, number]).setText("Overweg · ProRail").addTo(instance);
+        instance.on("mouseenter", "rail-level-crossing-symbols", () => { instance.getCanvas().style.cursor = "pointer"; });
+        instance.on("mouseleave", "rail-level-crossing-symbols", () => { instance.getCanvas().style.cursor = ""; });
+        instance.on("movestart", () => crossingPopup.remove());
+        instance.on("styledata", () => {
+          if (!mapLayersRef.current.crossings) crossingPopup.remove();
         });
-        instance.on("click", "rail-level-crossing-symbols", (event) => {
-          const feature = event.features?.[0];
-          const coordinates = feature?.geometry.type === "Point" ? feature.geometry.coordinates : null;
-          if (coordinates) new Popup({ closeButton: true, closeOnClick: true, offset: 12, className: "stationTooltip" })
-            .setLngLat(coordinates as [number, number]).setText("Overweg · ProRail").addTo(instance);
-        });
-        instance.on("mouseenter", "rail-level-crossing-badges", () => { instance.getCanvas().style.cursor = "pointer"; });
-        instance.on("mouseleave", "rail-level-crossing-badges", () => { instance.getCanvas().style.cursor = ""; });
         instance.on("click", (event) => {
           if (isAlertsPage) return;
+          crossingPopup.remove();
           const { x, y } = event.point;
           const hits = (layers: string[], radius: number) => instance.queryRenderedFeatures(
             [[x - radius, y - radius], [x + radius, y + radius]], { layers },
           );
           if (mapLayersRef.current.trains) {
-            const train = hits(trainHitLayers, 0)[0] ?? hits(["rail-fleet-points"], 5)[0];
+            const train = hits(trainHitLayers, 0)[0] ?? hits(trainHitLayers, 8)[0];
             if (train) { clearMarkerHover(); selectFromMapRef.current(String(train.properties.vehicleId)); return; }
           }
           if (instance.getLayer("ns-disruption-points")) {
@@ -1104,7 +1097,14 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           }
           if (mapLayersRef.current.stations) {
             const station = hits(stationLayers, 8)[0];
-            if (station) { stationPopup.remove(); selectStationFromMapRef.current(String(station.properties.code)); }
+            if (station) { stationPopup.remove(); selectStationFromMapRef.current(String(station.properties.code)); return; }
+          }
+          if (mapLayersRef.current.crossings) {
+            const crossing = hits(["rail-level-crossing-symbols"], 7)[0];
+            if (crossing?.geometry.type === "Point") crossingPopup
+              .setLngLat(crossing.geometry.coordinates as [number, number])
+              .setDOMContent(crossingPopupContent(crossing.properties, languageRef.current))
+              .addTo(instance);
           }
         });
         instance.on("remove", clearMarkerHover);
@@ -1229,7 +1229,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     const applyZoomDensity = () => {
       const layers = [
         { id: "pdok-rail-geometry", path: "/v1/geometry/rail", visible: mapLayers.railways && instance.getZoom() >= 8, layers: ["pdok-rail-geometry-casing", "pdok-rail-geometry-lines"] },
-        { id: "rail-level-crossings", path: "/v1/geometry/rail/level-crossings", visible: mapLayers.crossings && instance.getZoom() >= 10, layers: ["rail-level-crossing-badges", "rail-level-crossing-symbols"] },
+        { id: "rail-level-crossings", path: "/v1/geometry/rail/level-crossings", visible: mapLayers.crossings && instance.getZoom() >= 13, layers: ["rail-level-crossing-symbols"] },
       ];
       for (const layer of layers) {
         setVisibility(layer.layers, layer.visible);
@@ -1731,6 +1731,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       <section className="workspace" id="main-content" tabIndex={-1} aria-label={uiCopy(isAlertsPage ? "Kaart met actuele wegmeldingen" : "Landelijk realtime treindashboard", language)}>
         <div className="mapWrap">
           <div ref={mapElement} className="liveMap" aria-label={uiCopy(isAlertsPage ? "Kaart van Nederland met wegmeldingen" : "Kaart van Nederland met actuele treinposities", language)} aria-busy={!mapReady ? "true" : undefined} />
+          {!isAlertsPage && mapReady && showBlauwnet && <BlauwnetLayer map={map} language={language} onUnavailable={setBlauwnetUnavailable} />}
           {mapBackgroundUnavailable ? <div className="mapStatusNotice uiNotice" role="status"><strong>{language === "en" ? "Map background unavailable" : "Kaartachtergrond niet beschikbaar"}</strong><p>{language === "en" ? "The background cannot be loaded. Search and train information remain available. Try another map style." : "De achtergrond kan niet worden geladen. Zoeken en treininformatie blijven beschikbaar. Probeer een andere kaartweergave."}</p><button onClick={() => { setShowLayers(true); setShowMapStyles(true); }}>{language === "en" ? "Choose map style" : "Kies kaartweergave"}</button></div> : !isAlertsPage && (connection !== "live" || !vehicles.length || mappedTrainCount === 0) && <div className="mapStatusNotice" role="status">
             <strong>{connection === "offline" || connection === "herstellen" ? (language === "en" ? "Connection interrupted" : "Verbinding onderbroken") : (fleetReceived ? (language === "en" ? "No current train positions" : "Geen actuele treinposities") : (language === "en" ? "Loading live trains" : "Live treinen ophalen"))}</strong>
             <p>{connection === "offline" || connection === "herstellen" ? (language === "en" ? "We are reconnecting automatically. Any positions shown may be out of date." : "We verbinden automatisch opnieuw. Getoonde posities kunnen verouderd zijn.") : (language === "en" ? "The map is ready to explore. Train positions appear as soon as updates arrive." : "Je kunt de kaart alvast verkennen. Treinposities verschijnen zodra er updates binnenkomen.")}</p>
@@ -1786,7 +1787,15 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         <div className="uiLayerOptions">{mapLayerDefinitions.map(layer => <label key={layer.key}>
           <UiIcon name={layer.key === "trains" ? "train" : layer.key === "stations" ? "station" : layer.key === "crossings" ? "crossing" : "rail"} />
           <span>{uiCopy(layer.label, language)}</span><input type="checkbox" checked={mapLayers[layer.key]} onChange={event => setMapLayers(current => ({ ...current, [layer.key]: event.target.checked }))} />
-        </label>)}</div>
+        </label>)}<label>
+          <UiIcon name="train" />
+          <span>Blauwnet</span>
+          <input type="checkbox" checked={showBlauwnet} onChange={event => setShowBlauwnet(event.target.checked)} />
+        </label></div>
+        {mapLayers.crossings && <p className="mapLayerNote">{language === "en" ? "Public crossings appear at street level." : "Openbare overwegen verschijnen als je inzoomt tot straatniveau."}</p>}
+        {showBlauwnet && <p className="mapLayerNote" role="status">{blauwnetUnavailable
+          ? (language === "en" ? "Blauwnet positions are temporarily unavailable." : "Blauwnet-posities zijn tijdelijk niet beschikbaar.")
+          : (language === "en" ? "Solid blue markers are measured. Dashed outlines are estimates from station times." : "Volblauwe symbolen zijn gemeten. Een gestippelde rand betekent een schatting op basis van haltetijden.")}</p>}
         {mapLayers.trains && <ul className="positionLegend" aria-label={uiCopy("Positienauwkeurigheid", language)}>
           <li><i className="matched" aria-hidden="true" />{uiCopy("Op spoor", language)}</li>
           <li><i className="gps" aria-hidden="true" />{uiCopy("GPS-punt", language)}</li>

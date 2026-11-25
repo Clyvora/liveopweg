@@ -7,7 +7,6 @@ import { useLanguage } from "./LanguageContext";
 import { useFavoriteStations } from "./useFavoriteStations";
 import { AppIcon } from "./Icons";
 import { TrainImage } from "./TrainImage";
-import { trainArtwork } from "./train-artwork";
 import { RegionalTrainIcon } from "./RegionalTrainIcon";
 import { regionalTrainBrand } from "./train-livery";
 import { StationGuideContent, StationPhoto } from "./StationGuideContent";
@@ -18,7 +17,9 @@ export function boardEntryStatus(entry: StationBoardEntry, en = false): string {
   if (entry.cancelled) return en ? "Cancelled" : "Vervalt";
   if (entry.delaySeconds !== null && entry.delaySeconds >= 60) return `+${Math.floor(entry.delaySeconds / 60)} min`;
   if (entry.trackChanged) return en ? "Platform changed" : "Spoor gewijzigd";
-  if (entry.delaySeconds === null) return en ? "Scheduled" : "Volgens planning";
+  if (entry.delaySeconds === null) return entry.timeBasis === "UPDATED"
+    ? (en ? "Updated time" : "Bijgewerkte tijd")
+    : (en ? "Scheduled" : "Gepland");
   return entry.delaySeconds < 0 ? (en ? "Early" : "Eerder") : (en ? "On time" : "Op tijd");
 }
 type StationSection = "board" | "facilities" | "onward";
@@ -89,6 +90,7 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
   const sectionLabel = en
     ? { board: "Trains", facilities: "Facilities", onward: "Onward travel" }
     : { board: "Treinen", facilities: "Voorzieningen", onward: "Verder reizen" };
+  const stationInfo = `https://www.ns.nl/${en ? "en/station-information" : "stationsinformatie"}/${encodeURIComponent(station.code.toLowerCase())}`;
   const share = async () => {
     const url = new URL(window.location.href); url.search = `?station=${station.code}`;
     try {
@@ -101,7 +103,6 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
     <div className="uiActions"><button onClick={() => toggle(station.code)} aria-pressed={favorites.includes(station.code)}>{favorites.includes(station.code) ? "★" : "☆"} {en ? "Favorite" : "Favoriet"}</button><button onClick={() => void share()}><AppIcon name="share" /> {en ? "Share" : "Delen"}</button></div>
     {shareMessage && <p role="status">{shareMessage}</p>}{favoriteError && <div className="uiNotice" role="status"><p>{en ? "Favorites are kept for this session. Your browser could not save them." : "Je favorieten blijven deze sessie bewaard. Je browser kon ze niet opslaan."}</p><button onClick={retryFavorites}>{en ? "Try saving again" : "Opnieuw opslaan"}</button></div>}
     {guide && <>
-      <StationPhoto key={station.code} photo={guide.photo} en={en} />
       <div className="uiTabs stationSections" role="tablist" aria-label={en ? "Station information" : "Stationsinformatie"}>
         {stationSections.map((kind, index) => <button key={kind} type="button" id={`station-section-${kind}`}
           role="tab" tabIndex={section === kind ? 0 : -1} aria-selected={section === kind} aria-controls="station-section-body"
@@ -119,12 +120,17 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
       </div>
     </>}
     <div id="station-section-body" role={guide ? "tabpanel" : undefined} aria-labelledby={guide ? `station-section-${section}` : undefined} tabIndex={section === "board" ? undefined : 0}>
-    {guide && section !== "board" ? <StationGuideContent en={en} items={guide[section]} /> : <>
+    {guide && section !== "board" ? <>
+      <StationPhoto key={station.code} photo={guide.photo} en={en} />
+      <StationGuideContent en={en} items={guide[section]} />
+    </> : <>
     <div className="uiTabs" role="tablist" aria-label={en ? "Station board" : "Stationbord"}>{(["departures", "arrivals"] as const).map(kind => <button key={kind} id={`station-${kind}-tab`} role="tab" aria-selected={tab === kind} aria-controls="station-board" tabIndex={tab === kind ? 0 : -1} onKeyDown={event => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); const next = kind === "departures" ? "arrivals" : "departures"; setTab(next); document.getElementById(`station-${next}-tab`)?.focus(); } }} onClick={() => { setTab(kind); setSelected(null); }}>{kind === "departures" ? (en ? "Departures" : "Vertrek") : (en ? "Arrivals" : "Aankomst")}</button>)}</div>
     {stale && board && <p className="uiNotice" role="status">{en ? "These times may be out of date." : "Deze tijden kunnen verouderd zijn."}</p>}
     {error && <div className="uiNotice" role="alert"><p>{en ? "The station board is temporarily unavailable." : "Het stationbord is tijdelijk niet beschikbaar."}</p><button onClick={() => setRevision(value => value + 1)}>{en ? "Try again" : "Opnieuw proberen"}</button></div>}
     {!board && !error && <p role="status">{en ? "Loading departures…" : "Ritten ophalen…"}</p>}
     <div id="station-board" role="tabpanel" aria-labelledby={`station-${tab}-tab`}>
+      {(platforms.length > 0 || operators.length > 1) && <details className="stationFilters">
+        <summary>Filters<span>{[activePlatform && `${en ? "Platform" : "Spoor"} ${activePlatform}`, selectedOperator].filter(Boolean).join(" · ")}</span></summary>
       {platforms.length > 0 && <label className="stationOperatorFilter stationPlatformFilter">
         <span><AppIcon name="stations" />{en ? "Platform mode" : "Perronmodus"}</span>
         <select value={activePlatform} onChange={event => { setPlatform(event.target.value); setSelected(null); }}>
@@ -139,6 +145,7 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
           {operators.map(name => <option key={name}>{name}</option>)}
         </select>
       </label>}
+      </details>}
       {board && !visibleEntries.length && <p>{activePlatform
         ? (en ? "No upcoming departures match this platform filter." : "Geen komende vertrekken voor dit perronfilter.")
         : selectedOperator
@@ -148,20 +155,24 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
         const canFollow = !stale && !entry.cancelled && entry.vehicleId !== null && availableVehicleIds.has(entry.vehicleId);
         const operatorName = blauwnetOperators.get(entry.operator?.trim().toLowerCase() ?? "") ?? entry.operator;
         const moved = !entry.cancelled && movedFromPlatform(entry, activePlatform);
+        const planned = entry.plannedAt;
+        const previousTime = planned && !entry.cancelled && entry.timeBasis === "UPDATED" && clock(planned) !== clock(entry.expectedAt) ? planned : null;
         return <li key={entry.id}>
           <button className="uiResultButton stationResult" aria-expanded={selected === entry.id} onClick={() => setSelected(selected === entry.id ? null : entry.id)}>
-            <time dateTime={entry.expectedAt}>{clock(entry.expectedAt)}</time>
+            <span className="stationTimes">
+              <time dateTime={entry.expectedAt}>{clock(entry.expectedAt)}</time>
+              {previousTime && <s><time dateTime={previousTime} aria-label={`${en ? "Scheduled" : "Gepland"} ${clock(previousTime)}`}>{clock(previousTime)}</time></s>}
+            </span>
             <span><strong>{entry.direction}</strong><small className="stationServiceIdentity"><RegionalTrainIcon operator={entry.operator} /><span>{[operatorName, `${entry.serviceType} ${entry.trainNumber}`].filter(Boolean).join(" · ")}</span></small></span>
-            <span>{en ? "Platform" : "Spoor"} {entry.track ?? "—"}</span>
+            <span className={`stationTrack${entry.trackChanged ? " changed" : ""}`}>{entry.track ? `${en ? "Platform" : "Spoor"} ${entry.track}` : (en ? "No platform" : "Spoor onbekend")}</span>
             <small className={moved || entry.cancelled || (entry.delaySeconds ?? 0) >= 60 ? "tpLate" : ""}>
               {moved ? (en ? `Moved to platform ${entry.track}` : `Verplaatst naar spoor ${entry.track}`) : boardEntryStatus(entry, en)}
             </small>
           </button>
           {selected === entry.id && <div className="uiResultDetail">
-            <figure className="stationTrainArt">
-              <TrainImage model={entry.rollingStock} operator={operatorName} />
-              <figcaption>{trainArtwork(entry.rollingStock, operatorName).kind === "model" ? entry.rollingStock : (en ? "Illustration · exact train model unavailable" : "Illustratie · exact treintype onbekend")}</figcaption>
-            </figure>
+            <div className="stationTrainArt">
+              <TrainImage model={entry.rollingStock} operator={operatorName} trainNumber={entry.trainNumber} />
+            </div>
             {entry.trackChanged && <p>{en ? "Platform changed" : "Spoor gewijzigd"}: {entry.plannedTrack ?? "—"} → {entry.track ?? "—"}</p>}
             <button disabled={!canFollow} onClick={() => { if (entry.vehicleId && canFollow) onSelectVehicle(entry.vehicleId); }}>{en ? "View on radar" : "Bekijk op radar"}</button>
             {!canFollow && <p>{entry.cancelled ? (en ? "This service is cancelled." : "Deze rit vervalt.") : stale ? (en ? "The current position cannot be confirmed while the board is out of date." : "De actuele positie kan niet worden bevestigd zolang het stationbord verouderd is.") : (en ? "No current live position available for this train." : "Voor deze trein is geen actuele livepositie beschikbaar.")}</p>}
@@ -172,5 +183,6 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
     <small className="uiSourceNote">{en ? "Received journey information · next 60 minutes" : "Ontvangen ritinformatie · komende 60 minuten"}</small>
     </>}
     </div>
+    <a className="stationSourceLink" href={stationInfo} target="_blank" rel="noreferrer"><AppIcon name="external" />{en ? "Station information at NS" : "Stationsinformatie bij NS"}</a>
   </aside>;
 }

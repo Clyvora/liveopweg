@@ -17,8 +17,16 @@
 .tpDestination h3 { margin:0; color:var(--ui-text); font:650 21px/1.25 var(--font-ui); letter-spacing:-.03em; }
 .tpDestination p { margin:3px 0 0; color:var(--ui-muted); font-size:13px; }
 .tpStock { padding:10px 0 12px; border-bottom:1px solid var(--ui-border); }
-.tpIllustration { display:flex; align-items:center; height:86px; overflow:hidden; }
-.tpIllustration img { display:block; width:100%; height:auto; }
+.tpIllustration { margin-bottom:8px; }
+.trainPhoto { margin:0; min-width:0; }
+.trainPhotoFrame { position:relative; }
+.trainPhoto img { display:block; width:100%; aspect-ratio:2.15; object-fit:cover; object-position:center 50%; border-radius:7px; background:var(--ui-muted-surface); }
+.trainPhotoNav { position:absolute; right:6px; bottom:6px; display:flex; align-items:center; gap:2px; border-radius:6px; background:#15202deb; color:#fff; font-size:12px; font-variant-numeric:tabular-nums; }
+.trainPhotoNav button { display:grid; width:44px; height:44px; place-items:center; padding:0; border:0; border-radius:6px; background:transparent; color:inherit; font-size:22px; line-height:1; cursor:pointer; }
+.trainPhotoNav button:hover { background:#ffffff25; }
+.trainPhotoNav button:focus-visible { outline:2px solid #fff; outline-offset:-4px; }
+.trainPhoto figcaption { display:flex; flex-wrap:wrap; gap:2px 8px; margin-top:4px; color:var(--ui-muted); font-size:11px; }
+.trainPhoto figcaption a { color:inherit; text-underline-offset:2px; }
 .tpStockCaption { color:var(--ui-muted); font-size:10px; text-align:right; }
 .tpFormation { margin-top:6px; }
 .tpFormationRail { overflow-x:auto; }
@@ -60,8 +68,8 @@
 .tpBoardingFacilities strong { font-size:12px; }
 .tpBoardingFacilities small,.tpBoardingNote { color:var(--ui-muted); font-size:11px; line-height:1.45; }
 .tpBoardingNote { margin:5px 0 0; }
-.tpImageFallback { display:flex; width:100%; align-items:center; justify-content:center; gap:10px; color:var(--ui-muted); font-size:12px; }
-.tpImageFallback .uiIcon { width:28px; height:28px; }
+.tpImageFallback { display:flex; align-items:center; gap:8px; margin:0; padding:8px 0; color:var(--ui-muted); font-size:12px; }
+.tpImageFallback .uiIcon { width:20px; height:20px; flex:none; }
 .tpPositionNote { margin:6px 0; color:var(--ui-muted); font-size:10px; }
 .tpFacts { display:grid; grid-template-columns:1fr 1fr 1fr; align-items:center; min-height:46px; padding:12px 0; border-bottom:1px solid var(--ui-border); }
 .tpFacts>div { display:flex; align-items:center; justify-content:center; min-width:0; }

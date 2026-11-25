@@ -97,10 +97,23 @@
 .trainMapPreview { display:grid; gap:2px; }
 .trainMapPreview strong { font-size:13px; }
 .trainMapPreview span { color:var(--ui-muted); font-size:11px; }
-.trainMapPreview img { display:block; width:164px; height:41px; object-fit:contain; margin:5px 0 0; }
-.trainArtGeneric { filter:grayscale(1); }
+.blauwnetEstimateMarker { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; background:transparent; color:#155a91; }
+.blauwnetEstimateMarker::before { position:absolute; inset:9px; border:2px dashed #297abf; border-radius:50%; background:#f4faff; content:""; }
+.blauwnetEstimateMarker.measured { z-index:1; color:#eef8ff; }
+.blauwnetEstimateMarker.measured::before { border:1.5px solid #d1edff; background:#155a91; }
+.blauwnetTrainGlyph { position:relative; width:12px; height:15px; border-radius:4px 4px 3px 3px; background:currentColor; }
+.blauwnetTrainGlyph::before { position:absolute; inset:2px 2px auto; height:5px; border-radius:1px; background:#f4faff; content:""; }
+.blauwnetEstimateMarker.measured .blauwnetTrainGlyph::before { background:#155a91; }
+.blauwnetTrainGlyph::after { position:absolute; left:2px; bottom:3px; width:2px; height:2px; border-radius:50%; background:#ffcf67; box-shadow:6px 0 #ffcf67; content:""; }
+.blauwnetEstimateMarker:focus-visible { z-index:2; }
+.maplibregl-popup.blauwnetPositionPopup { z-index:3; }
+.blauwnetPositionPopup .maplibregl-popup-content { pointer-events:none; }
+.mapLayerNote { margin:8px 0; color:var(--ui-muted); font-size:12px; }
 .stationMapPopup strong { display:block; font-size:13px; }
 .stationMapPopup span { color:var(--ui-muted); font-size:11px; }
+.crossingMapDetails { display:grid; gap:4px; max-width:240px; }
+.crossingMapDetails small { color:var(--ui-muted); }
+.crossingMapDetails a { justify-self:start; font-size:11px; }
 @media (min-width:1024px) {
   .radarPanelOpen .fleetTools { max-width:calc(100vw - var(--radar-feed) - 60px); }
   .radarPanelOpen:not(:has(.trainPanel)) .mapZoomControls { right:calc(var(--radar-feed) + 32px); }

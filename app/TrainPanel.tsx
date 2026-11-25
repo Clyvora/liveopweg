@@ -80,7 +80,7 @@ export function TrainPanel({ observation, journey, now:initialNow, onClose, isFo
       {journeyStale && <p className="uiNotice" role="status">{language === "en" ? "These stop times may be out of date." : "Deze haltetijden kunnen verouderd zijn."}</p>}
       <div className="tpStock">
         <div className="tpIllustration" key={observation.vehicleId}>
-          <TrainImage model={stock.confidence === "UNKNOWN" ? null : stockLabel} operator={journey?.operator} />
+          <TrainImage model={stock.confidence === "UNKNOWN" ? null : stockLabel} operator={journey?.operator} material={observation.materialNumber} trainNumber={observation.trainNumber} />
         </div>
         <div className="tpStockCaption">{stockLabel}{observation.materialNumber ? ` · ${observation.materialNumber}` : ""}{units && units.length>1 ? ` · ${units.length} ${en?"coupled units":"gekoppelde stellen"}` : ""}{journey?.operator ? ` · ${journey.operator}` : ""}</div>
         <TrainFormation units={units?.length ? units : [observation]} now={now} />

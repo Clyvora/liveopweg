@@ -32,15 +32,26 @@
 .uiResultButton[aria-expanded="true"] strong { color:var(--ui-accent); }
 .uiResultDetail { padding:0 0 18px; color:var(--ui-muted); font-size:13px; line-height:1.65; }
 .uiResultDetail p { margin:8px 0; }
-.stationResult { display:grid; grid-template-columns:50px minmax(0,1fr) auto; align-items:center; gap:6px 10px; }
-.stationResult time { font-size:16px; font-weight:650; }
+.stationResult { display:grid; grid-template-columns:46px minmax(0,1fr) auto; align-items:start; gap:6px 10px; }
+.stationTimes { display:grid; gap:2px; line-height:1.2; font-variant-numeric:tabular-nums; }
+.stationTimes>time { font-size:16px; font-weight:650; }
+.stationTimes s { color:var(--ui-muted); font-size:11px; }
 .stationResult>span:nth-child(2) { display:grid; gap:5px; }
-.stationResult>span:nth-child(3) { font-size:12px; white-space:nowrap; }
+.stationTrack { align-self:start; padding:3px 6px; border-radius:5px; background:var(--ui-muted-surface); color:var(--ui-muted); font-size:11px; white-space:nowrap; }
+.stationTrack.changed { background:var(--ui-warning-surface); color:var(--ui-warning); font-weight:650; }
 .stationResult>small { grid-column:2/-1; }
 .stationOperatorFilter { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0 4px; font-size:12px; }
 .stationOperatorFilter select { min-height:44px; max-width:70%; padding:6px 10px; background:var(--ui-surface); color:var(--ui-text); border:1px solid var(--ui-border); border-radius:6px; font:inherit; }
 .stationPlatformFilter>span { display:flex; align-items:center; gap:6px; font-weight:650; }
 .stationPlatformFilter .uiIcon { width:16px; height:16px; }
+.stationFilters { margin:8px 0; padding:0 10px; border:1px solid var(--ui-border); border-radius:6px; }
+.stationFilters summary { display:flex; align-items:center; gap:8px; min-height:44px; list-style:none; font-size:13px; font-weight:600; cursor:pointer; }
+.stationFilters summary::-webkit-details-marker { display:none; }
+.stationFilters summary>span { flex:1; color:var(--ui-muted); font-size:12px; font-weight:400; }
+.stationFilters summary::after { content:"+"; color:var(--ui-muted); font-size:16px; }
+.stationFilters[open] summary::after { content:"−"; }
+.stationSourceLink { display:flex; gap:8px; align-items:center; width:max-content; max-width:100%; min-height:44px; margin-top:8px; font-size:13px; text-underline-offset:2px; }
+.stationSourceLink .uiIcon { width:16px; flex:none; }
 .stationPhoto { margin:12px 0 0; }
 .stationPhoto img { display:block; width:100%; height:110px; object-fit:cover; border-radius:7px; background:var(--ui-muted-surface); }
 .stationPhoto figcaption { margin-top:3px; color:var(--ui-muted); text-align:right; font-size:10px; }
@@ -58,9 +69,7 @@
 .stationGuideList a>.uiIcon { width:16px; height:16px; color:var(--ui-muted); }
 .stationServiceIdentity { display:flex; align-items:center; gap:5px; min-width:0; }
 .stationOperatorIcon { flex:none; width:19px; height:19px; }
-.stationTrainArt { display:grid; gap:4px; margin:0 0 12px; padding:10px 12px 7px; border:1px solid var(--ui-border); border-radius:8px; background:var(--ui-muted-surface); }
-.stationTrainArt img { display:block; width:100%; height:58px; object-fit:contain; }
-.stationTrainArt figcaption { color:var(--ui-muted); font-size:11px; text-align:right; }
+.stationTrainArt { margin:0 0 12px; }
 .radarDirectorySearch,.stationPicker input,.uiField input { width:100%; min-height:44px; padding:10px 12px; border:1px solid var(--ui-border); border-radius:6px; background:var(--ui-surface); color:var(--ui-text); font-size:15px; }
 .radarDirectorySearch::placeholder { color:var(--ui-muted); opacity:1; }
 .radarDirectory ul { margin:18px 0 0; padding:0; list-style:none; }

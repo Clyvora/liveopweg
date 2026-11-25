@@ -12,6 +12,17 @@ async (page) => {
   const refreshFleet = [];
   const now = () => new Date().toISOString();
   const later = minutes => new Date(Date.now() + minutes * 60000).toISOString();
+  await page.route('**/v1/rail/blauwnet/positions', route => route.fulfill({json:{
+    positions:[{
+      id:'test-blauwnet',trainNumber:'7925',operator:'Blauwnet K',service:'Sprinter',destination:'Enschede',
+      from:'Zwolle',to:'Heino',expiresAt:later(1),longitude:6.18,latitude:52.48,
+      kind:'TIMETABLE_TRACK_ESTIMATE',line:null,route:null,measuredAt:null,
+    },{
+      id:'test-blauwnet-measured',trainNumber:null,operator:'Blauwnet A',service:null,destination:null,
+      from:null,to:null,expiresAt:later(1),longitude:6.34,latitude:52.62,
+      kind:'KV6_POSITION',line:'RS20',route:'Zwolle – Emmen',measuredAt:now(),
+    }],
+  }}));
   const stations = [
     { code: 'UT', name: 'Utrecht Centraal', latitude: 52.0894, longitude: 5.1102, category: 'megastation' },
     { code: 'ASD', name: 'Amsterdam Centraal', latitude: 52.378, longitude: 4.9, category: 'megastation' }
@@ -28,7 +39,7 @@ async (page) => {
     entry('test-board','1234','test-train'),
     {...entry('test-positionless','9999',null),operator:'Arriva',serviceType:'Stoptrein',rollingStock:null,track:'8a',plannedTrack:'8a',trackChanged:false},
     {...entry('test-blauwnet-a','3823',null),operator:'Blauwnet A',direction:'Emmen',serviceType:'Sneltrein',rollingStock:null,track:'3',plannedTrack:'3',trackChanged:false},
-    {...entry('test-blauwnet-k','7925',null),operator:'Blauwnet K',direction:'Enschede',serviceType:'Sprinter',rollingStock:null,track:'4',plannedTrack:'4',trackChanged:false},
+    {...entry('test-blauwnet-k','7925',null),operator:'Blauwnet K',direction:'Enschede',serviceType:'Sprinter',rollingStock:'FLIRT',track:'4',plannedTrack:'4',trackChanged:false},
   ];
   await page.route('**/v1/stations/*/board', route => route.fulfill({ json: { stationCode: route.request().url().match(/stations\/(.*?)\/board/)[1], generatedAt:now(), lastReceivedAt:now(), sourceHealthy:true, coverage:'RECEIVED_JOURNEYS', windowMinutes:60, departures:stationDepartures, arrivals:[entry('test-arrival','1234','test-train')] } }));
   let longitude=5.11, journeyRevision='a', routeAvailable=true, updateJourney;
@@ -69,6 +80,23 @@ async (page) => {
   await page.setViewportSize({width:1440,height:1000});
   await page.goto('http://localhost:3000/');
   await page.getByRole('button',{name:'1 trein in beeld',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Kaartlagen',exact:true}).click();
+  const blauwnetLayer=page.getByRole('checkbox',{name:'Blauwnet',exact:true});
+  await blauwnetLayer.check();
+  const estimatedTrain=page.getByRole('button',{name:/Geschatte positie.*Blauwnet \(Keolis\).*7925/});
+  const measuredTrain=page.getByRole('button',{name:/Gemeten positie.*Blauwnet \(Arriva\).*RS20/});
+  await estimatedTrain.waitFor();
+  await page.getByRole('button',{name:'Sluit kaartlagen',exact:true}).click();
+  await estimatedTrain.click();
+  await page.getByText('Geschat op basis van haltetijden',{exact:true}).waitFor();
+  await measuredTrain.click();
+  await page.getByText(/Gemeten positie · NDOV/).waitFor();
+  await page.getByRole('button',{name:'Kaartlagen',exact:true}).click();
+  await blauwnetLayer.uncheck();
+  await estimatedTrain.waitFor({state:'hidden'});
+  await measuredTrain.waitFor({state:'hidden'});
+  await page.getByRole('button',{name:'Sluit kaartlagen',exact:true}).click();
+  checks.push('Blauwnet measured and estimated map positions have distinct labels and can be toggled');
   await page.evaluate(() => { localStorage.removeItem('liveopweg-favorite-stations'); localStorage.removeItem('liveopweg-followed-route'); });
   const search=page.getByRole('combobox',{name:'Zoek trein, station of materieel'});
   await search.fill('1234');
@@ -120,14 +148,15 @@ async (page) => {
   await nav.getByRole('button',{name:'Stations',exact:true}).click();
   await page.getByRole('button',{name:'Bewaar favoriet: Utrecht Centraal',exact:true}).click();
   await page.getByRole('button',{name:'Utrecht Centraal UT',exact:true}).click();
-  await page.locator('.stationPhoto img').waitFor();
-  await page.waitForFunction(()=>document.querySelector('.stationPhoto img')?.naturalWidth>0);
+  check(await page.locator('.stationPhoto').count()===0,'Station board prioritizes departures over the photo');
   await page.getByRole('tab',{name:'Voorzieningen',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.stationPhoto img')?.naturalWidth>0);
   await page.getByRole('link',{name:/Toiletten.*spoor 20 en 21/}).waitFor();
   await page.screenshot({path:'output/playwright/station-voorzieningen-utrecht-TESTGEGEVENS.png'});
   await page.keyboard.press('ArrowRight');
   await page.getByRole('link',{name:/OV-fiets.*Stationsplein 2/}).waitFor();
   await page.getByRole('tab',{name:'Treinen',exact:true}).click();
+  await page.getByText('Filters',{exact:true}).click();
   const platform=page.getByRole('combobox',{name:'Perronmodus',exact:true});
   await platform.selectOption('7');
   await page.getByText('Verplaatst naar spoor 5',{exact:true}).waitFor();
@@ -141,16 +170,17 @@ async (page) => {
   check(await page.getByRole('button').filter({hasText:'Intercity 1234'}).count()===0,'Regional filter hides other operators');
   check(await page.locator('.stationOperatorIcon').count()===1,'Regional departure has its own icon');
   await page.getByRole('button').filter({hasText:'Arriva · Stoptrein 9999'}).click();
-  await page.getByRole('img',{name:'Voorbeeldillustratie trein van Arriva',exact:true}).waitFor();
-  await page.waitForFunction(()=>document.querySelector('.stationTrainArt img')?.naturalWidth>0);
+  await page.getByText('Geen geverifieerde foto voor deze trein',{exact:true}).waitFor();
+  check(await page.locator('.stationTrainArt img').count()===0,'An operator alone does not imply a model photo');
   check(await page.getByRole('button',{name:'Bekijk op radar',exact:true}).isDisabled(),'Positionless row remains readable');
   await operatorFilter.selectOption('Blauwnet');
   const blauwnetArriva=page.getByRole('button').filter({hasText:'Blauwnet (Arriva) · Sneltrein 3823'});
   await blauwnetArriva.waitFor();
-  await page.getByRole('button').filter({hasText:'Blauwnet (Keolis) · Sprinter 7925'}).waitFor();
+  const blauwnetKeolis=page.getByRole('button').filter({hasText:'Blauwnet (Keolis) · Sprinter 7925'});
+  await blauwnetKeolis.waitFor();
   check(await page.locator('.stationResult').count()===2,'The Blauwnet filter groups both operators and excludes other services');
-  await blauwnetArriva.click();
-  check(await page.locator('.stationTrainArt img').getAttribute('src')==='/trains/side-blauwnet.webp','Blauwnet shows its own train illustration');
+  await blauwnetKeolis.click();
+  check(/\/trains\/photos\/blauwnet-flirt(?:-\d+)?\.webp$/.test(await page.locator('.stationTrainArt img').getAttribute('src')),'A confirmed Keolis FLIRT shows its own type photo');
   check(await page.getByRole('button',{name:'Bekijk op radar',exact:true}).isDisabled(),'Blauwnet departure without GPS does not open the radar');
   checks.push('Blauwnet groups Arriva and Keolis and shows its own artwork');
   await operatorFilter.selectOption('');

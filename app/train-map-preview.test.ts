@@ -4,16 +4,16 @@ import { regionalTrainBrand } from "./train-livery";
 
 describe("train marker silhouettes", () => {
   it.each([
-    ["8601", "doubleDeck", "VIRM"],
-    ["7501", "doubleDeck", "DDZ"],
-    ["3101", "icng", "ICNG"],
-    ["2401", "slt", "SLT"],
-    ["2015", "generic", "FLIRT"],
-    [null, "generic", null],
-  ])("uses the correct shape and label for %s", (number, shape, model) => {
+    ["8601", "doubleDeck"],
+    ["7501", "doubleDeck"],
+    ["3101", "icng"],
+    ["2401", "slt"],
+    ["2015", "generic"],
+    [null, "generic"],
+  ])("uses the correct silhouette for %s", (number, shape) => {
     expect(trainMarkerIdentity("1727", number)).toMatchObject({
       shape,
-      identityLabel: model ? `${model} · 1727` : "1727",
+      trainNumber: "1727",
     });
   });
   it("uses the known fleet colors separately from the silhouette", () => {

@@ -70,19 +70,18 @@ async (page) => {
   const preview = page.locator('.trainMapPreview');
   await preview.getByText('Trein 1735',{exact:true}).waitFor();
   await preview.getByText('ICNG · 3120',{exact:true}).waitFor();
-  await page.waitForFunction(()=>document.querySelector('.trainMapPreview img')?.naturalWidth>0);
+  check(await preview.locator('img').count()===0,'The map tooltip stays compact');
   await page.screenshot({path:'output/playwright/train-map-hover-TESTGEGEVENS.png'});
   await page.mouse.move(500,680);
   await preview.waitFor({state:'hidden'});
-  // Choose the label outside the 24 px marker and its click tolerance.
-  await page.mouse.click(775,391);
+  await page.mouse.click(724,391);
   await page.waitForURL(url => url.searchParams.get('train') === '1735');
   await page.keyboard.press('Escape');
   await page.locator('.trainPanel').waitFor({state:'hidden'});
   check(!new URL(page.url()).searchParams.has('train'),'One close clears a replacement train panel');
   await page.goto('http://localhost:3000/?train=1727');
   await page.getByRole('heading',{name:'Amsterdam Centraal',exact:true}).waitFor();
-  checks.push('hover shows matching train artwork; click on train label selects its train');
+  checks.push('hover identifies the train; clicking the icon selects it');
   await page.setViewportSize({width:390,height:844});
   await page.getByRole('button',{name:'Paneel vergroten of verkleinen'}).click();
   await page.screenshot({path:'output/playwright/reference-mobile-TESTGEGEVENS.png'});

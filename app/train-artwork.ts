@@ -1,21 +1,34 @@
-export const genericTrainImage = "/trains/side-unknown.png";
+import { trainSetDetails } from "../packages/domain-rail/rolling-stock";
+import { photographs } from "./train-photo-catalog";
 
-const modelImages: Record<string, string> = {
-  "VIRM": "/trains/side-virm.png",
-  "ICNG": "/trains/side-icng.png",
-  "ICM": "/trains/side-icm.png",
-  "SNG": "/trains/side-sng.png",
-  "SLT": "/trains/side-slt.png",
-  "FLIRT": "/trains/side-flirt.webp",
-  "DDZ": "/trains/side-ddz.webp",
-};
+export function trainPhotos(model: string | null, operator?: string | null, material?: string | null) {
+  let key = model?.trim().match(/^(VIRMM?|ICNG|ICMM?|SNG|SLT|FLIRT\d*|DDZ)\b/i)?.[1].toUpperCase();
+  if (key === "VIRMM") key = "VIRM";
+  if (key === "ICMM") key = "ICM";
+  if (key?.startsWith("FLIRT")) key = "FLIRT";
+  const name = operator?.trim() ?? "";
+  if (/^Blauwnet\b.*(?:\bKeolis\b|\bK$)/i.test(name) && key === "FLIRT") key = "BLAUWNET";
+  else if (key === "FLIRT" && (/^R[ -]?net(?:\s+NS)?$/i.test(name) || ((!name || /^NS$/i.test(name)) && trainSetDetails(material)?.dimensions?.cars === 2))) key = "RNET";
+  else if (name && !/^NS(?:\s+Reizigers|\s+Int)?$/i.test(name)) return [];
+  if (!key || !Object.hasOwn(photographs, key)) return [];
+  const family = key as keyof typeof photographs;
+  return photographs[family].map(photoCredit);
+}
 
-export function trainArtwork(model: string | null, operator?: string | null) {
-  const modelKey = model?.trim().split(/\s+/)[0]?.toUpperCase() ?? "";
-  const src = Object.hasOwn(modelImages, modelKey) ? modelImages[modelKey] : undefined;
-  if (src) return { src, kind: "model" } as const;
-  const brand = operator?.trim().toLowerCase() ?? "";
-  if (/^arriva\b/.test(brand)) return { src: "/trains/side-arriva.webp", kind: "representative" } as const;
-  if (/^blauwnet\b/.test(brand)) return { src: "/trains/side-blauwnet.webp", kind: "representative" } as const;
-  return { src: genericTrainImage, kind: "generic" } as const;
+function photoCredit([file, commons, author, license]: readonly [string, string, string, string]) {
+  const [kind, version] = license.toLowerCase().split(" ");
+  return {
+    src: `/trains/photos/${file}.webp`,
+    origin: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(commons)}`,
+    author,
+    license: kind === "cc0" ? license : `CC ${license}`,
+    licenseUrl: kind === "cc0" ? "https://creativecommons.org/publicdomain/zero/1.0/" : `https://creativecommons.org/licenses/${kind}/${version}/`,
+  };
+}
+
+export function trainPhotoStart(trainNumber: string | null | undefined, total: number) {
+  let index = 0;
+  if (!trainNumber || total < 2) return index;
+  for (const character of trainNumber) index = (index * 31 + character.charCodeAt(0)) % total;
+  return index;
 }

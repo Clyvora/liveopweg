@@ -14,9 +14,9 @@ export type StationGuide = {
 };
 
 const commons = "https://commons.wikimedia.org/wiki/File:";
-const utrecht = "https://stations.nl/stations/utrecht-centraal/";
-const zwolle = "https://stations.nl/stations/zwolle/";
-const groningen = "https://stations.nl/stations/groningen/";
+const utrecht = "https://www.ns.nl/stationsinformatie/ut";
+const zwolle = "https://www.ns.nl/stationsinformatie/zl";
+const groningen = "https://www.ns.nl/stationsinformatie/gn";
 const parking = "https://www.ns.nl/producten/deur-tot-deur/parkeer-en-reis";
 const parkingBike = "https://www.ns.nl/reizen/stallen-en-parkeren/bewaakte-stallingen";
 
@@ -30,7 +30,7 @@ function facilities(source: string, toiletDetail: Copy, shopSource = source, toi
 }
 
 const utrechtToilets = ["Onder meer in de stationshal bij spoor 20 en 21.", "One location is in the main hall near platforms 20 and 21."] as const;
-const stationToilets = ["Op het station. Bekijk de actuele stationsinformatie voor locatie en openingstijden.", "At the station. Check the current station information for location and opening hours."] as const;
+const stationToilets = ["Open het stationsprofiel voor de locatie en openingstijden.", "Open the station profile for the location and opening hours."] as const;
 
 export const stationGuides: Readonly<Partial<Record<string, StationGuide>>> = {
   UT: {
@@ -66,7 +66,7 @@ export const stationGuides: Readonly<Partial<Record<string, StationGuide>>> = {
     facilities: facilities(groningen, stationToilets),
     onward: [
       { icon: "bicycle", title: ["OV-fiets en OV-ebike", "OV-fiets and OV-ebike rental"], detail: ["Verhuur bij Groningen Hoofdstation. Bekijk locaties en openingstijden bij NS.", "Rental at Groningen main station. Check NS for locations and hours."], url: "https://www.ns.nl/stationsinformatie/gn/groningen" },
-      { icon: "bicycle", title: ["Fietsenstalling centrumzijde", "City-side bicycle parking"], detail: ["Bewaakte stalling aan de stadskant.", "Staffed storage on the city side."], url: parkingBike },
+      { icon: "bicycle", title: ["Fietsenstallingen", "Bicycle parking"], detail: ["Bekijk de stallingen en ingangen bij het station.", "Check the bicycle parking facilities and station entrances."], url: "https://www.ns.nl/fietsenstallingen/info/station-groningen" },
       { icon: "stations", title: ["Busstation aan de zuidzijde", "Bus station on the south side"], detail: ["Volg de doorgang naar de zuidzijde. Er is een lift naar het busstation.", "Follow the passage to the south side. A lift serves the bus station."], url: "https://www.prorail.nl/nieuws/busstation-groningen-op-nieuwe-plek" },
       { icon: "parking", title: ["P+R Hoofdstation", "Main station park and ride"], detail: ["Betaald parkeren bij het station.", "Paid parking at the station."], url: parking },
     ],

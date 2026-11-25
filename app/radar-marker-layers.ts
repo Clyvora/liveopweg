@@ -3,8 +3,7 @@ import { trainLiveries } from "./train-livery";
 
 const stationZooms = [5, 7, 8, 10];
 export const stationLayers = stationZooms.map(zoom => `radar-stations-${zoom}`);
-export const trainIdentityLayers = ["rail-fleet-labels", "rail-fleet-selected-label"];
-export const trainHitLayers = ["rail-fleet-points", ...trainIdentityLayers];
+export const trainHitLayers = ["rail-fleet-points"];
 export const trainLayers = ["rail-fleet-selected", "rail-fleet-matched-ring", "rail-fleet-heading", ...trainHitLayers];
 
 export const trainBadgeShapes = {
@@ -30,24 +29,6 @@ export const trainBadgeShapes = {
   },
 };
 
-function addLabelBackground(map: RadarMap, name: string, fill: string, border: string) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 48;
-  canvas.height = 36;
-  const context = canvas.getContext("2d");
-  if (!context) return;
-  context.beginPath();
-  context.roundRect(1, 1, 46, 34, 10);
-  context.fillStyle = fill;
-  context.fill();
-  context.strokeStyle = border;
-  context.lineWidth = 2;
-  context.stroke();
-  map.addImage(name, context.getImageData(0, 0, 48, 36), {
-    pixelRatio: 2, stretchX: [[13, 35]], stretchY: [[12, 24]], content: [9, 5, 39, 31],
-  });
-}
-
 function addBadge(map: RadarMap, name: string, shape: keyof typeof trainBadgeShapes, bodyColor: string, detail: string, rim: string) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 48;
@@ -56,11 +37,11 @@ function addBadge(map: RadarMap, name: string, shape: keyof typeof trainBadgeSha
   context.scale(2, 2);
 
   context.beginPath();
-  context.roundRect(2, 2, 20, 20, 7);
-  context.fillStyle = detail;
+  context.arc(12, 12, 10.5, 0, Math.PI * 2);
+  context.fillStyle = "#142536";
   context.fill();
   context.strokeStyle = rim;
-  context.lineWidth = 1.5;
+  context.lineWidth = 1.25;
   context.stroke();
   const { body, glass, rails } = trainBadgeShapes[shape];
   context.fillStyle = bodyColor;
@@ -80,7 +61,7 @@ function addOverviewDot(map: RadarMap, name: string, fill: string, rim: string) 
   const context = canvas.getContext("2d");
   if (!context) return;
   context.beginPath();
-  context.arc(24, 24, 10, 0, 2 * Math.PI);
+  context.arc(24, 24, 12, 0, 2 * Math.PI);
   context.fillStyle = fill;
   context.fill();
   context.strokeStyle = rim;
@@ -100,8 +81,6 @@ export function addRadarMarkerLayers(map: RadarMap) {
     addOverviewDot(map, `train-${livery}`, body, detail);
   }
   addOverviewDot(map, "train-stale", "#e8ebef", "#95a3b4");
-  addLabelBackground(map, "train-label", "#ffffff", "#a9b8cc");
-  addLabelBackground(map, "train-label-selected", "#153b9a", "#ffffff");
 
   const heading = document.createElement("canvas");
   heading.width = heading.height = 84;
@@ -144,7 +123,7 @@ export function addRadarMarkerLayers(map: RadarMap) {
     id: "rail-fleet-matched-ring", type: "circle", source: "rail-fleet",
     filter: ["==", ["get", "badge"], "train-matched"],
     paint: {
-      "circle-radius": ["step", ["zoom"], 4.5, 8, 11],
+      "circle-radius": ["step", ["zoom"], 5.5, 8, 12],
       "circle-opacity": 0, "circle-stroke-color": "#3779db", "circle-stroke-width": 1.5,
     },
   });
@@ -161,34 +140,9 @@ export function addRadarMarkerLayers(map: RadarMap) {
     id: "rail-fleet-points", type: "symbol", source: "rail-fleet",
     layout: {
       "icon-image": ["step", ["zoom"], ["case", ["get", "selected"], ["get", "detailIcon"], ["get", "dotIcon"]], 8, ["get", "detailIcon"]],
-      "icon-size": ["interpolate", ["linear"], ["zoom"], 5, 0.64, 8, 0.82, 11, 1],
+      "icon-size": ["interpolate", ["linear"], ["zoom"], 5, 0.70, 8, 0.96, 11, 1.08],
       "icon-allow-overlap": true, "icon-ignore-placement": true,
       "symbol-sort-key": ["get", "priority"],
     },
   });
-  for (const [index, id] of trainIdentityLayers.entries()) {
-    const selected = index === 1;
-    map.addLayer({
-      id, type: "symbol", source: "rail-fleet", minzoom: selected ? 0 : 9,
-      filter: ["==", ["get", "selected"], selected],
-      layout: {
-        "text-field": selected ? ["get", "identityLabel"] : ["step", ["zoom"], ["get", "trainNumber"], 10, ["get", "identityLabel"]],
-        "text-font": ["Arial Bold"],
-        "text-size": 11,
-        "text-max-width": 40,
-        "text-anchor": "left",
-        "text-offset": [1.6, 0],
-        "text-padding": 7,
-        "text-allow-overlap": selected,
-        "icon-image": selected ? "train-label-selected" : "train-label",
-        "icon-text-fit": "both",
-        "icon-text-fit-padding": [2, 5, 2, 5],
-        "icon-allow-overlap": selected,
-        "symbol-sort-key": ["-", ["get", "priority"]],
-      },
-      paint: {
-        "text-color": selected ? "#ffffff" : ["case", ["==", ["get", "badge"], "train-stale"], "#5a6678", "#1f3457"],
-      },
-    });
-  }
 }

@@ -7,7 +7,8 @@ async (page)=>{
   const emptyGeometry={type:'FeatureCollection',features:[]};
   await page.route('**/v1/geometry/rail',route=>{railRequests++;return route.fulfill({json:emptyGeometry});});
   await page.route('**/v1/geometry/rail/level-crossings',route=>{crossingRequests++;return route.fulfill({json:emptyGeometry});});
-  await page.route('**/trains/side-virm.png',route=>route.abort());
+  const virmPhotos = /\/trains\/photos\/virm(?:-\d+)?\.webp$/;
+  await page.route(virmPhotos,route=>route.abort());
   await page.route('**/train-virm-v1.png',route=>{spriteRequests++;return route.abort();});
   await page.routeWebSocket(/\/v1\/realtime(?:\?|$)/,ws=>{
     const observation=(id,number,material,sequence)=>{
@@ -32,9 +33,9 @@ async (page)=>{
   await page.screenshot({path:'output/playwright/rail-network-overview-TESTGEGEVENS.png'});
   const search=page.getByRole('combobox',{name:'Zoek trein, station of materieel'});
   await search.fill('9544');check(await page.getByRole('option').count()===1,'One result for a coupled passenger train');
-  await Promise.all([page.waitForRequest('**/v1/geometry/rail/level-crossings'),page.getByRole('option').click()]);
-  await page.getByRole('img',{name:'Algemene treinafbeelding',exact:true}).waitFor();
-  await page.waitForFunction(()=>document.querySelector('.tpIllustration img')?.naturalWidth>0);
+  await page.getByRole('option').click();
+  await page.getByText('Treinfoto’s konden niet worden geladen',{exact:true}).waitFor();
+  check(crossingRequests===0,'Crossings are opt-in');
   check(await page.locator('.tpStockCaption').innerText().then(s=>s.includes('2 gekoppelde stellen')),'Composition remains readable');
   await page.getByText('≈ 270 m · 10 rijtuigen',{exact:true}).waitFor();
   const units = page.locator('.tpFormationUnit');
@@ -56,7 +57,11 @@ async (page)=>{
   await guide.getByRole('button',{name:'Sluit instapgids'}).click();
   check(await secondSet.evaluate(button=>button===document.activeElement),'Closing returns focus to the selected trainset');
   await page.waitForFunction(()=>document.querySelector('.liveMap')?.getAttribute('aria-busy')!=='true');
-  for(let i=0;i<3;i++){await page.getByRole('button',{name:'Inzoomen op kaart'}).click();await page.waitForTimeout(300);}
+  await page.getByRole('button',{name:'Kaartlagen',exact:true}).click();
+  await page.getByRole('checkbox',{name:'Overwegen',exact:true}).check();
+  check(crossingRequests===0,'Enabling crossings does not download them at city zoom');
+  for(let i=0;i<4;i++){await page.getByRole('button',{name:'Inzoomen op kaart'}).click();await page.waitForTimeout(300);}
+  await page.getByRole('button',{name:'Sluit kaartlagen',exact:true}).click();
   await page.waitForTimeout(600);check(spriteRequests===0,'Map badges never download the old train sprite');
   check(railRequests===1&&crossingRequests===1,'Zoom loads each detailed geometry source once');
   age=40_000;sendFleet();
@@ -67,20 +72,32 @@ async (page)=>{
   await page.getByText(/Positie verouderd ·/).waitFor();
   age=360_000;sendFleet();await page.getByText('Geen actuele treinposities',{exact:true}).waitFor();
   age=0;sendFleet();await page.getByRole('button',{name:'2 treinen in beeld',exact:true}).waitFor();
-  await page.unroute('**/trains/side-virm.png');await page.unroute('**/train-virm-v1.png');
+  await page.unroute(virmPhotos);await page.unroute('**/train-virm-v1.png');
+  const loadedPhotos = new Set();
+  page.on('request',request=>{if(virmPhotos.test(request.url()))loadedPhotos.add(new URL(request.url()).pathname);});
   await page.goto('http://localhost:3000/?train=TEST-559');
   await page.locator('.tpIllustration img').waitFor();
   await page.waitForFunction(()=>document.querySelector('.tpIllustration img')?.naturalWidth>0);
-  const ratio=await page.locator('.tpIllustration img').evaluate(img=>{const r=img.getBoundingClientRect();return Math.abs(r.width/r.height-img.naturalWidth/img.naturalHeight);});
-  check(ratio<.02,'Side illustration keeps its intrinsic aspect ratio');
+  const startingPhoto = await page.locator('.tpIllustration img').getAttribute('src');
+  check(loadedPhotos.size===1&&loadedPhotos.has(startingPhoto),'The gallery initially downloads only the displayed photo');
+  const nextPhoto = page.getByRole('button',{name:'Volgende foto'});
+  await nextPhoto.press('Enter');
+  check(startingPhoto!==await page.locator('.tpIllustration img').getAttribute('src'),'Next photo changes the photo without leaving the train');
+  await page.waitForFunction(()=>document.querySelector('.tpIllustration img')?.naturalWidth>0);
+  check(loadedPhotos.size===2,'The next photo is downloaded on demand');
+  await page.getByRole('button',{name:'Vorige foto'}).click();
+  check(startingPhoto===await page.locator('.tpIllustration img').getAttribute('src'),'Previous photo returns to the same image');
+  const photoNav = page.locator('.tpIllustration .trainPhotoNav');
+  check(Number((await photoNav.innerText()).match(/\/\s*(\d+)/)?.[1])>=6,'The VIRM gallery offers a substantial selection');
+  check(await page.locator('.tpIllustration img').evaluate(img=>getComputedStyle(img).objectFit==='cover'),'Type photos crop without stretching');
   await page.getByText('≈ 270 m · 10 rijtuigen',{exact:true}).waitFor();
   await firstSet.click();
   await guide.getByRole('heading',{name:'VIRM dubbeldekker · 8656'}).waitFor();
   await page.locator('.tpStock').screenshot({path:'output/playwright/boarding-guide-desktop-TESTGEGEVENS.png'});
   await search.fill('2015');await page.getByRole('option').click();
-  await page.getByRole('img',{name:'Illustratie van FLIRT',exact:true}).waitFor();
+  await page.getByRole('img',{name:'Voorbeeldfoto van FLIRT',exact:true}).waitFor();
   await page.waitForFunction(()=>document.querySelector('.tpIllustration img')?.naturalWidth>0);
-  check(await page.locator('.tpIllustration img').getAttribute('src')==='/trains/side-flirt.webp','Uses dedicated FLIRT artwork');
+  check(/\/trains\/photos\/rnet(?:-\d+)?\.webp$/.test(await page.locator('.tpIllustration img').getAttribute('src')),'Uses an R-net FLIRT photo for its known trainset');
   await page.getByText('≈ 46 m · 2 rijtuigen',{exact:true}).waitFor();
   check(await units.locator('.tpFormationCars > span').count()===2,'A single two-car set has two carriage segments');
   await page.getByRole('button',{name:'Instapgids voor treinstel 2015'}).click();

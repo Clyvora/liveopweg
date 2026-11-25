@@ -39,7 +39,8 @@ describe("train passenger panel", () => {
     expect(trainClock(null)).toBe("—"); expect(trainDelay(null)).toBe("—");
     expect(trainDelay(0)).toBe("Op tijd"); expect(trainDelay(30)).toBe("+<1 min");
     const html=render(null,{...observation, materialNumber:null, speed:null});
-    expect(html).toContain("Nog niet bekend"); expect(html).toContain("Algemene treinafbeelding");
+    expect(html).toContain("Nog niet bekend"); expect(html).toContain("Geen geverifieerde foto voor deze trein");
+    expect(html).not.toContain("<img");
     expect(html).not.toContain("132 km/u"); expect(html).not.toContain("Op tijd");
   });
   it("renders every stop, cancellations, changed tracks and next-stop status", () => {
@@ -49,10 +50,13 @@ describe("train passenger panel", () => {
     const long=render({...journey,stops:Array.from({length:40},(_,i)=>stop(i,`Station ${i}`,"2026-09-09T13:00:00Z"))});
     expect(long).toContain("Station 39");
   });
-  it("uses a locally available image for each recognized family and unknown stock", () => {
-    for(const [number,file] of [["8601","virm.png"],["3101","icng.png"],["4001","icm.png"],["2301","sng.png"],["2401","slt.png"],["2015","flirt.webp"],["7501","ddz.webp"],["0","unknown.png"]]) {
-      expect(render(journey,{...observation,materialNumber:number})).toContain(`side-${file}`);
-      expect(readFileSync(`public/trains/side-${file}`).length).toBeGreaterThan(1000);
+  it("uses a local type photo and source credit for recognized stock", () => {
+    for(const [number,file] of [["8601","virm"],["3101","icng"],["4001","icm"],["2301","sng"],["2401","slt"],["2230","flirt"],["2015","rnet"],["7501","ddz"]]) {
+      const html = render(journey,{...observation,materialNumber:number});
+      const photo = html.match(new RegExp(`/trains/photos/${file}(?:-\\d+)?\\.webp`))?.[0];
+      expect(photo).toBeDefined();
+      expect(html).toContain("commons.wikimedia.org");
+      expect(readFileSync(`public${photo}`).length).toBeGreaterThan(1000);
     }
   });
   it.each([
