@@ -551,7 +551,10 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       return;
     }
     const train = displayTrains.find((item) => item.observation.vehicleId === selectedVehicleId);
-    if (!train) return;
+    if (!train || train.stale) {
+      followPointRef.current = null;
+      return;
+    }
     const previous = followPointRef.current;
     const movedMeters = previous?.vehicleId === selectedVehicleId
       ? distanceBetweenMeters(
@@ -815,8 +818,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         const trainPopup = new Popup({
           closeButton: false, closeOnClick: false, focusAfterOpen: false, offset: 22, className: "trainMapTooltip",
         });
-        let previewKey: string | null = null;
-        const clearTrainHover = () => { previewKey = null; trainPopup.remove(); };
+        let trainPreview: { key: string; vehicleId: string } | null = null;
+        const clearTrainHover = () => { trainPreview = null; trainPopup.remove(); };
         const clearMarkerHover = () => { clearTrainHover(); stationPopup.remove(); instance.getCanvas().style.cursor = ""; };
         addRadarMarkerLayers(instance);
         const hoverLayers = [...trainHitLayers, ...stationLayers];
@@ -829,8 +832,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             const { vehicleId, trainNumber, materialNumber } = train.properties;
             const key = `${vehicleId}:${trainNumber}:${materialNumber}:${languageRef.current}`;
             const position = train.geometry.coordinates as [number, number];
-            if (previewKey !== key) {
-              previewKey = key;
+            if (trainPreview?.key !== key) {
+              trainPreview = { key, vehicleId };
               trainPopup.setDOMContent(trainMapPreview(trainNumber, materialNumber ?? null, languageRef.current));
               trainPopup.setLngLat(position).addTo(instance);
             } else {
@@ -850,7 +853,10 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         instance.on("mouseleave", hoverLayers, clearMarkerHover);
         instance.on("movestart", clearMarkerHover);
         instance.on("styledata", () => {
-          if (previewKey && instance.getLayoutProperty("rail-fleet-points", "visibility") === "none") clearMarkerHover();
+          if (trainPreview && instance.getLayoutProperty("rail-fleet-points", "visibility") === "none") clearMarkerHover();
+        });
+        instance.on("sourcedata", event => {
+          if (event.sourceId === "rail-fleet" && trainPreview && !fleetMapState.current?.features.has(trainPreview.vehicleId)) clearMarkerHover();
         });
         instance.addSource("user-location", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
         instance.addLayer({ id: "user-location-halo", type: "circle", source: "user-location", paint: { "circle-radius": 13, "circle-color": "#1682ed", "circle-opacity": 0.18 } });

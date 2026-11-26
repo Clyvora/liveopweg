@@ -66,37 +66,16 @@ function addBadge(map: RadarMap, name: string, shape: keyof typeof trainBadgeSha
   front.src = frontUrl;
 }
 
-function addOverviewDot(map: RadarMap, name: string, fill: string, rim: string) {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 48;
-  const context = canvas.getContext("2d");
-  if (!context) return;
-  context.beginPath();
-  context.arc(24, 24, 12, 0, 2 * Math.PI);
-  context.fillStyle = fill;
-  context.fill();
-  context.strokeStyle = rim;
-  context.lineWidth = 3;
-  context.stroke();
-  map.addImage(`${name}-dot`, context.getImageData(0, 0, 48, 48), { pixelRatio: 2 });
-}
-
 export function addRadarMarkerLayers(map: RadarMap) {
   map.setMissingStyleImageResolver(id => {
     const match = /^train-([^-]+)-([^:-]+)(?::([a-z0-9-]+))?$/.exec(id);
     if (!match || !Object.hasOwn(trainBadgeShapes, match[2]) || map.hasImage(id)) return;
     const shape = match[2] as keyof typeof trainBadgeShapes;
-    if (match[1] === "stale") addBadge(map, id, shape, "#e8ebef", "#526173", "#95a3b4", null);
-    else if (Object.hasOwn(trainLiveries, match[1])) {
+    if (Object.hasOwn(trainLiveries, match[1])) {
       const { body, detail } = trainLiveries[match[1] as keyof typeof trainLiveries];
       addBadge(map, id, shape, body, detail, "#ffffff", trainFrontUrl(match[3] ?? null));
     }
   });
-  for (const [livery, { body, detail }] of Object.entries(trainLiveries)) {
-    addOverviewDot(map, `train-${livery}`, body, detail);
-  }
-  addOverviewDot(map, "train-stale", "#e8ebef", "#95a3b4");
-
   const heading = document.createElement("canvas");
   heading.width = heading.height = 84;
   const arrow = heading.getContext("2d");
@@ -131,7 +110,7 @@ export function addRadarMarkerLayers(map: RadarMap) {
   map.addSource("rail-fleet", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   map.addLayer({
     id: "rail-fleet-heading", type: "symbol", source: "rail-fleet", minzoom: 9,
-    filter: ["all", ["==", ["get", "hasHeading"], true], ["!=", ["get", "badge"], "train-stale"]],
+    filter: ["==", ["get", "hasHeading"], true],
     layout: {
       "icon-image": "train-heading", "icon-rotate": ["get", "heading"],
       "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 1.2, 14, 1.55],
@@ -142,7 +121,7 @@ export function addRadarMarkerLayers(map: RadarMap) {
   map.addLayer({
     id: "rail-fleet-points", type: "symbol", source: "rail-fleet",
     layout: {
-      "icon-image": ["step", ["zoom"], ["case", ["get", "selected"], ["get", "detailIcon"], ["get", "dotIcon"]], 8, ["get", "detailIcon"]],
+      "icon-image": ["get", "icon"],
       "icon-size": ["interpolate", ["linear"], ["zoom"],
         5, ["case", ["get", "selected"], 1.2, 0.72],
         7, ["case", ["get", "selected"], 1.32, 0.9],

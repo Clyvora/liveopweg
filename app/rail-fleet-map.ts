@@ -4,9 +4,9 @@ import type { RailObservation } from "../packages/protocol/rail";
 import { trainMarkerIdentity } from "./train-map-preview";
 
 type Position = { longitude: number; latitude: number };
-type MappedTrain = { observation: RailObservation; position: Position; stale: boolean; matched: boolean };
+type MappedTrain = { observation: RailObservation; position: Position; stale: boolean };
 
-function mapTrainFeature({ observation, position, stale, matched }: MappedTrain, selectedVehicleId: string | null) {
+function mapTrainFeature({ observation, position, stale }: MappedTrain, selectedVehicleId: string | null) {
   const selected = observation.vehicleId === selectedVehicleId;
   const { shape, livery, front, ...identity } = trainMarkerIdentity(observation.trainNumber, observation.materialNumber);
   return {
@@ -18,11 +18,9 @@ function mapTrainFeature({ observation, position, stale, matched }: MappedTrain,
       ...identity,
       selected,
       priority: selected ? 2 : stale ? 0 : 1,
-      hasHeading: observation.headingDegrees != null,
+      hasHeading: !stale && observation.headingDegrees != null,
       heading: observation.headingDegrees ?? 0,
-      badge: stale ? "train-stale" : selected ? "train-selected" : matched ? "train-matched" : "train-gps",
-      detailIcon: stale ? `train-stale-${shape}` : front ? `train-${livery}-${shape}:${front}` : `train-${livery}-${shape}`,
-      dotIcon: stale ? "train-stale-dot" : `train-${livery}-dot`,
+      icon: front ? `train-${livery}-${shape}:${front}` : `train-${livery}-${shape}`,
     },
   };
 }

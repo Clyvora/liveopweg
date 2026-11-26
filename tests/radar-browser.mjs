@@ -8,11 +8,6 @@ async (page) => {
     return width >= 44 && height >= 44 && element.contains(document.elementFromPoint(x + width/2, y + height/2));
   });
   const checks = [];
-  const loadedFronts = new Set();
-  page.on('response', response => {
-    const pathname = new URL(response.url()).pathname;
-    if (response.ok() && pathname.startsWith('/trains/fronts/')) loadedFronts.add(pathname);
-  });
   let adviceMode = 'success', noticeMode = 'success', trainPresent = true;
   const refreshFleet = [];
   const now = () => new Date().toISOString();
@@ -88,7 +83,11 @@ async (page) => {
   });
   await page.evaluate(()=>{localStorage.setItem('liveopweg-language','nl');localStorage.setItem('theme','light');});
   await page.setViewportSize({width:1440,height:1000});
-  await page.goto('http://localhost:3000/');
+  const [overviewFront] = await Promise.all([
+    page.waitForResponse('**/trains/fronts/virm.webp'),
+    page.goto('http://localhost:3000/'),
+  ]);
+  check(overviewFront.ok(),'The overview shows the train front before selection or zoom');
   await page.getByRole('button',{name:'1 trein in beeld',exact:true}).waitFor();
   await page.getByRole('button',{name:'Kaartlagen',exact:true}).click();
   const liveLayer=page.getByRole('checkbox',{name:'Live treinen',exact:true});
@@ -117,10 +116,7 @@ async (page) => {
   await page.evaluate(() => { localStorage.removeItem('liveopweg-favorite-stations'); localStorage.removeItem('liveopweg-followed-route'); });
   const search=page.getByRole('combobox',{name:'Zoek trein, station of materieel'});
   await search.fill('1234');
-  const virmFront = '/trains/fronts/virm.webp';
-  const markerReady = loadedFronts.has(virmFront) ? null : page.waitForResponse(response => response.ok() && new URL(response.url()).pathname===virmFront);
   await page.getByRole('option').filter({hasText:'Trein 1234'}).click();
-  await markerReady;
   await page.getByText('Verwachte route',{exact:true}).waitFor();
   await page.getByRole('region',{name:'Volgende halte'}).getByText('Amsterdam Centraal',{exact:true}).waitFor();
   longitude=5.109;

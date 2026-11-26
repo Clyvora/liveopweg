@@ -7,7 +7,6 @@ function train(id: string, longitude: number) {
     observation: { vehicleId: id, trainNumber: id, materialNumber: "8601", headingDegrees: null } as RailObservation,
     position: { longitude, latitude: 52 },
     stale: false,
-    matched: false,
   };
 }
 
@@ -21,10 +20,20 @@ it("updates only changed, added and removed markers", () => {
   expect(fleetMapUpdate(next.features, [train("1", 5.1), train("2", 5), train("4", 5)], null).diff).toBeNull();
 });
 
-it("updates freshness and selection without replacing stationary geometry", () => {
+it("updates selection without replacing stationary geometry", () => {
   const before = fleetMapUpdate(new Map(), [train("1", 5)], null);
-  const after = fleetMapUpdate(before.features, [{ ...train("1", 5), stale: true }], "1");
+  const after = fleetMapUpdate(before.features, [train("1", 5)], "1");
   expect(after.diff?.update?.[0]).not.toHaveProperty("newGeometry");
-  expect(after.diff?.update?.[0]?.addOrUpdateProperties).toContainEqual({ key: "badge", value: "train-stale" });
   expect(after.diff?.update?.[0]?.addOrUpdateProperties).toContainEqual({ key: "selected", value: true });
+});
+
+it("keeps the ordinary train icon and hides its heading when the position ages", () => {
+  const current = train("1", 5);
+  current.observation.headingDegrees = 45;
+  const before = fleetMapUpdate(new Map(), [current], null);
+  const after = fleetMapUpdate(before.features, [{ ...current, stale: true }], null);
+  expect(after.features.get("1")?.properties.icon).toBe(before.features.get("1")?.properties.icon);
+  expect(after.features.get("1")?.properties.hasHeading).toBe(false);
+  expect(after.diff?.remove).toEqual([]);
+  expect(after.diff?.update?.[0]).not.toHaveProperty("newGeometry");
 });
