@@ -1,4 +1,4 @@
-export type Panel = { kind: "search" | "train" | "station" | "planner" | "stats" | "layers" | "nearby" | "stations" | "favorites" | "notices" | "more"; id?: string };
+export type Panel = { kind: "search" | "train" | "regional-train" | "train-choices" | "station" | "planner" | "stats" | "layers" | "nearby" | "stations" | "favorites" | "notices" | "more"; id?: string };
 export type PanelNavigation = { current: Panel | null; history: Panel[] };
 export type PanelAction = { type: "open"; panel: Panel } | { type: "toggle"; panel: Panel } | { type: "dismiss"; kinds: Panel["kind"][] } | { type: "back" } | { type: "close" };
 export function panelReducer(state: PanelNavigation, action: PanelAction): PanelNavigation {
@@ -8,6 +8,7 @@ export function panelReducer(state: PanelNavigation, action: PanelAction): Panel
   if (action.type === "toggle" && state.current?.kind === action.panel.kind) return { current: null, history: [] };
   if (state.current?.kind === action.panel.kind && state.current.id === action.panel.id) return state;
   // Going directly from one train to another replaces the detail view.
-  if (state.current?.kind === "train" && action.panel.kind === "train") return { ...state, current: action.panel };
+  const isTrain = (kind: Panel["kind"] | undefined) => kind === "train" || kind === "regional-train";
+  if (isTrain(state.current?.kind) && isTrain(action.panel.kind)) return { ...state, current: action.panel };
   return { current: action.panel, history: state.current ? [...state.history, state.current].slice(-12) : state.history };
 }

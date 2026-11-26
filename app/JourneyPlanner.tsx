@@ -8,6 +8,7 @@ import { StationPicker } from "./StationPicker";
 import { useFavoriteStations } from "./useFavoriteStations";
 import { AppIcon } from "./Icons";
 import type { FollowedRoute } from "./saved-route";
+import { usePanelNow } from "./usePanelNow";
 
 export type { FollowedRoute } from "./saved-route";
 export type PlannerMemory = Map<string, { from: string; to: string; when: string; results: AdviceResponse | null; expanded: string | null }>;
@@ -25,11 +26,23 @@ function transfer(previous: AdviceLeg, next: AdviceLeg, en: boolean) {
   const minutes = arrival && departure ? Math.round((Date.parse(departure) - Date.parse(arrival)) / 60_000) : null;
   return `${en ? "Change at" : "Overstappen in"} ${next.origin.name}${minutes !== null && minutes >= 0 ? ` · ${minutes} min` : ""}`;
 }
-function AdviceCard({ journey, expanded, onToggle, liveTrainNumbers, onSelectTrain, en }: { journey: AdviceResponse["journeys"][number]; expanded: boolean; onToggle: () => void; liveTrainNumbers: ReadonlySet<string>; onSelectTrain: (number: string) => void; en: boolean }) {
+function AdviceTime({ point, en }: { point: AdviceLeg["origin"]; en: boolean }) {
+  const changed = point.actualAt && point.plannedAt && clock(point.actualAt, en) !== clock(point.plannedAt, en);
+  return <>{clock(point.actualAt ?? point.plannedAt, en)}{changed && <small className="advicePlanned"> ({en ? "planned" : "gepland"} {clock(point.plannedAt, en)})</small>}</>;
+}
+
+function adviceDeparture(journey: AdviceResponse["journeys"][number]) {
+  const origin = journey.legs[0]!.origin;
+  return Date.parse(origin.actualAt ?? origin.plannedAt ?? "");
+}
+
+function AdviceCard({ journey, expanded, onToggle, liveTrainNumbers, onSelectTrain, en, now }: { journey: AdviceResponse["journeys"][number]; expanded: boolean; onToggle: () => void; liveTrainNumbers: ReadonlySet<string>; onSelectTrain: (number: string) => void; en: boolean; now: number }) {
+  const past = adviceDeparture(journey) <= now;
   return <article className={`uiAdvice ${journey.cancelled ? "cancelled" : ""}`}>
     <button className="uiResultButton" aria-expanded={expanded} onClick={onToggle}>
-      <strong>{clock(journey.legs[0]!.origin.actualAt ?? journey.legs[0]!.origin.plannedAt, en)} → {clock(journey.legs.at(-1)!.destination.actualAt ?? journey.legs.at(-1)!.destination.plannedAt, en)}</strong>
+      <strong><AdviceTime point={journey.legs[0]!.origin} en={en} /> → <AdviceTime point={journey.legs.at(-1)!.destination} en={en} /></strong>
       <span>{journey.durationMinutes !== null ? `${journey.durationMinutes} min · ` : ""}{journey.transfers === 0 ? (en ? "Direct" : "Rechtstreeks") : `${journey.transfers} ${en ? (journey.transfers === 1 ? "change" : "changes") : (journey.transfers === 1 ? "overstap" : "overstappen")}`}{journey.cancelled ? (en ? " · Cancelled" : " · Vervalt") : ""}</span>
+      {past && !journey.cancelled && <span className="tpLate">{en ? "Departure time has passed" : "Vertrektijd verstreken"}</span>}
     </button>
     {expanded && <div className="uiResultDetail">
       {journey.messages.map((message, i) => <p key={i} className="uiNotice">{message}</p>)}
@@ -37,8 +50,8 @@ function AdviceCard({ journey, expanded, onToggle, liveTrainNumbers, onSelectTra
         {index > 0 && <p className="uiTransfer">{transfer(journey.legs[index - 1]!, leg, en)}</p>}
         <strong>{leg.mode === "WALK" ? (en ? "Walk" : "Lopen") : leg.service} {leg.trainNumber}</strong>
         {leg.cancelled && <span className="tpLate"> · {en ? "Cancelled" : "Vervalt"}</span>}
-        <p>{clock(leg.origin.actualAt ?? leg.origin.plannedAt, en)} · {leg.origin.name}{platform(leg.origin, en)}</p>
-        <p>{clock(leg.destination.actualAt ?? leg.destination.plannedAt, en)} · {leg.destination.name}{platform(leg.destination, en)}</p>
+        <p><AdviceTime point={leg.origin} en={en} /> · {leg.origin.name}{platform(leg.origin, en)}</p>
+        <p><AdviceTime point={leg.destination} en={en} /> · {leg.destination.name}{platform(leg.destination, en)}</p>
         {leg.messages.map((message, i) => <p key={i}>{message}</p>)}
         {leg.mode === "TRAIN" && leg.trainNumber && liveTrainNumbers.has(leg.trainNumber) && !leg.cancelled && <button onClick={() => onSelectTrain(leg.trainNumber!)}>{en ? "View train on radar" : "Bekijk trein op radar"}</button>}
       </section>)}
@@ -61,6 +74,8 @@ export function JourneyPlanner({ stations, route, onRouteChange, onClose, liveTr
   const [error, setError] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(draft?.expanded ?? null);
   const initialized = useRef(Boolean(draft || route));
+  const now = usePanelNow(0);
+  const journeys = results?.journeys.filter(journey => when || !Number.isFinite(adviceDeparture(journey)) || adviceDeparture(journey) > now) ?? [];
   const { favorites } = useFavoriteStations();
   const request = useRef<AbortController | null>(null);
   const sequence = useRef(0);
@@ -84,7 +99,10 @@ export function JourneyPlanner({ stations, route, onRouteChange, onClose, liveTr
     const version = ++sequence.current; setLoading(true); setError(false); setResults(null);
     try {
       const value = await requestAdvice(origin.code, destination.code, when ? new Date(when).toISOString() : null, language, controller.signal);
-      if (!controller.signal.aborted && version === sequence.current) { setResults(value); setExpanded(value.journeys[0]?.id ?? null); }
+      if (!controller.signal.aborted && version === sequence.current) {
+        setResults(value);
+        setExpanded(value.journeys.find(journey => !journey.cancelled && (when || adviceDeparture(journey) > Date.now()))?.id ?? null);
+      }
     } catch { if (!controller.signal.aborted && version === sequence.current) setError(true); }
     finally { if (version === sequence.current) setLoading(false); }
   };
@@ -106,7 +124,8 @@ export function JourneyPlanner({ stations, route, onRouteChange, onClose, liveTr
     {favorites.length > 0 && <div className="uiFavoriteChips">{stations.filter(station => favorites.includes(station.code)).map(station => <button key={station.code} onClick={() => { invalidate(); if (!origin) setFrom(station.name); else setTo(station.name); }}><AppIcon name="favorites" />{station.name}</button>)}</div>}
     {error && <div className="uiNotice" role="alert"><p>{en ? "Journey advice is temporarily unavailable. Please try again." : "Reisadviezen zijn tijdelijk niet beschikbaar. Probeer het opnieuw."}</p><button onClick={() => void search()}>{en ? "Try again" : "Opnieuw proberen"}</button></div>}
     {results && !results.journeys.length && <p role="status">{en ? "No journeys found for this time and route." : "Geen reizen gevonden voor deze route en dit tijdstip."}</p>}
-    <div className="uiAdviceResults" aria-busy={loading}>{results?.journeys.map(journey => <AdviceCard key={journey.id} journey={journey} expanded={expanded === journey.id} onToggle={() => setExpanded(expanded === journey.id ? null : journey.id)} liveTrainNumbers={liveTrainNumbers} onSelectTrain={onSelectTrain} en={en} />)}</div>
+    {results?.journeys.length && !journeys.length ? <p role="status">{en ? "The departure times in this advice have passed. Search again for current options." : "De vertrektijden in dit advies zijn verstreken. Zoek opnieuw voor actuele opties."}</p> : null}
+    <div className="uiAdviceResults" aria-busy={loading}>{journeys.map(journey => <AdviceCard key={journey.id} journey={journey} expanded={expanded === journey.id} onToggle={() => setExpanded(expanded === journey.id ? null : journey.id)} liveTrainNumbers={liveTrainNumbers} onSelectTrain={onSelectTrain} en={en} now={now} />)}</div>
     <small className="uiSourceNote">{results ? `${en ? "Journey advice" : "Reisadvies"}: NS · ${clock(results.fetchedAt, en)}` : (en ? "Travel information can change. Check before departure." : "Reisinformatie kan wijzigen. Controleer je reis voor vertrek.")}</small>
   </aside>;
 }

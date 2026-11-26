@@ -31,6 +31,12 @@ async (page)=>{
   // Let the map worker tile the downloaded overview before the visual capture.
   await page.waitForTimeout(750);
   await page.screenshot({path:'output/playwright/rail-network-overview-TESTGEGEVENS.png'});
+  // Both fixture trains are at the same Utrecht coordinates in this viewport.
+  await page.mouse.click(691,570);
+  const choices = page.getByRole('complementary',{name:'Kies een trein'});
+  await choices.getByRole('button',{name:/TEST-559/}).waitFor();
+  await choices.getByRole('button',{name:/TEST-8667/}).waitFor();
+  await choices.getByRole('button',{name:'Sluiten',exact:true}).click();
   const search=page.getByRole('combobox',{name:'Zoek trein, station of materieel'});
   await search.fill('9544');check(await page.getByRole('option').count()===1,'One result for a coupled passenger train');
   await page.getByRole('option').click();
@@ -71,7 +77,7 @@ async (page)=>{
   check(await page.locator('.tpFacts strong').first().innerText()==='—','An old speed is not presented as current');
   await page.getByText(/Positie verouderd ·/).waitFor();
   age=360_000;sendFleet();await page.getByText('Geen actuele treinposities',{exact:true}).waitFor();
-  age=0;sendFleet();await page.getByRole('button',{name:'2 treinen in beeld',exact:true}).waitFor();
+  age=0;sendFleet();await page.getByRole('button',{name:'Volg trein op de kaart',exact:true}).waitFor();
   await page.unroute(virmPhotos);await page.unroute('**/train-virm-v1.png');
   const loadedPhotos = new Set();
   page.on('request',request=>{if(virmPhotos.test(request.url()))loadedPhotos.add(new URL(request.url()).pathname);});
@@ -105,5 +111,5 @@ async (page)=>{
   check(await guide.locator('[data-area]').count()===0 && await guide.getByRole('link',{name:/Stiltezones/}).count()===0,'No precise bike location or quiet zone is assumed for R-net');
   await page.waitForTimeout(1200);
   await page.screenshot({path:'output/playwright/api-accuracy-TESTGEGEVENS.png'});
-  return {checks:['coupled train counting/search/composition','carriage strip and rounded length','trainset switching, verified facility locations and focus return','detailed geometry deferred until zoom and loaded once','image failure fallback and no map sprite downloads','stale speed, positions and boarding guidance','recovery after source expiry','intrinsic image ratio','dedicated FLIRT artwork and layout fallback']};
+  return {checks:['overlapping markers open a train chooser','coupled train counting/search/composition','carriage strip and rounded length','trainset switching, verified facility locations and focus return','detailed geometry deferred until zoom and loaded once','image failure fallback and no map sprite downloads','stale speed, positions and boarding guidance','recovery after source expiry','intrinsic image ratio','dedicated FLIRT artwork and layout fallback']};
 }

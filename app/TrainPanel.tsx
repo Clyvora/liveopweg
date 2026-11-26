@@ -10,6 +10,7 @@ import { TrainFormation } from "./TrainFormation";
 import { TrainImage } from "./TrainImage";
 import { measurementTime, observationIsStale } from "../packages/domain-rail/position-quality";
 import { usePanelNow } from "./usePanelNow";
+import { TrainPanelHeader } from "./TrainPanelHeader";
 
 type Stop = RailJourney["stops"][number];
 export function trainDelay(seconds: number | null | undefined, language = "nl") {
@@ -73,22 +74,15 @@ export function TrainPanel({ observation, journey, now:initialNow, onClose, isFo
     }
   };
   return <aside className="observationPanel trainPanel" aria-label={`${category} ${observation.trainNumber}`}>
-    <header className="tpHeader"><h2>{categoryCode ? `${categoryCode} ` : `${t("train.number")} `}{observation.trainNumber}</h2><span>{category}</span><button className="tpCloseButton" type="button" onClick={onClose} aria-label={t("train.close")}><AppIcon name="close" /></button></header>
+    <TrainPanelHeader title={`${categoryCode ?? t("train.number")} ${observation.trainNumber}`} subtitle={category} closeLabel={t("train.close")} onClose={onClose} />
     <div className="tpScroll">
       <div className="tpDestination"><h3>{destination ?? t("train.unknown_destination")}</h3>{next && next.station.longName !== destination && <p>via {next.station.longName}</p>}</div>
       {!canFollow && <p className="uiNotice" role="status">{language === "en" ? "No current live position is available. Previously received train details remain accessible." : "Er is geen actuele livepositie beschikbaar. Eerder ontvangen treininformatie blijft beschikbaar."}</p>}
       {journeyStale && <p className="uiNotice" role="status">{language === "en" ? "These stop times may be out of date." : "Deze haltetijden kunnen verouderd zijn."}</p>}
-      <div className="tpStock">
-        <div className="tpIllustration" key={observation.vehicleId}>
-          <TrainImage model={stock.confidence === "UNKNOWN" ? null : stockLabel} operator={journey?.operator} material={observation.materialNumber} trainNumber={observation.trainNumber} />
-        </div>
-        <div className="tpStockCaption">{stockLabel}{observation.materialNumber ? ` · ${observation.materialNumber}` : ""}{units && units.length>1 ? ` · ${units.length} ${en?"coupled units":"gekoppelde stellen"}` : ""}{journey?.operator ? ` · ${journey.operator}` : ""}</div>
-        <TrainFormation units={units?.length ? units : [observation]} now={now} />
-      </div>
       <section className="tpFacts" aria-label={t("train.route")}>
-        <div aria-label={t("train.speed")}><strong>{observation.speed && !positionStale ? `${Math.round(observation.speed.valueKmh)} ${en ? "km/h" : "km/u"}` : "—"}</strong></div>
-        <div aria-label={t("train.delay")}><strong><Delay seconds={delay} /></strong></div>
-        <div><strong>{en ? "Platform" : "Spoor"} {track ?? "—"}</strong></div>
+        <div><small>{t("train.speed")}</small><strong>{observation.speed && !positionStale ? `${Math.round(observation.speed.valueKmh)} ${en ? "km/h" : "km/u"}` : "—"}</strong></div>
+        <div><small>{t("train.delay")}</small><strong><Delay seconds={delay} /></strong></div>
+        <div><small>{en ? "Platform" : "Spoor"}</small><strong>{track ?? "—"}</strong></div>
       </section>
       <p className="tpPositionNote">{positionStale ? (en ? "Position out of date" : "Positie verouderd") : (positionMatched === false ? (en ? "Position may be imprecise" : "Positie kan afwijken") : (en ? "Last measured position" : "Laatst gemeten positie"))}{age===null ? (en ? " · time unknown" : " · tijdstip onbekend") : ` · ${age<60 ? `${age} s` : `${Math.floor(age/60)} min`} ${en?"ago":"geleden"}`}</p>
       <section className="tpNext" aria-label={t("train.nextStop")}>
@@ -100,6 +94,13 @@ export function TrainPanel({ observation, journey, now:initialNow, onClose, isFo
           {next && (() => { const e = getETA(next, now); return e === null ? null : e <= 0 ? <span className="tpETA">· {event?.departing ? (en ? "at station" : "op het station") : t("train.arrived")}</span> : <span className="tpETA">· {en ? "in" : "over"} {e} min</span>; })()}
         </footer>
       </section>
+      <div className="tpStock">
+        <div className="tpIllustration" key={observation.vehicleId}>
+          <TrainImage model={stock.confidence === "UNKNOWN" ? null : stockLabel} operator={journey?.operator} material={observation.materialNumber} trainNumber={observation.trainNumber} />
+        </div>
+        <div className="tpStockCaption">{stockLabel}{observation.materialNumber ? ` · ${observation.materialNumber}` : ""}{units && units.length>1 ? ` · ${units.length} ${en?"coupled units":"gekoppelde stellen"}` : ""}{journey?.operator ? ` · ${journey.operator}` : ""}</div>
+        <TrainFormation units={units?.length ? units : [observation]} now={now} />
+      </div>
       {(showExpectedRoute || showRecentTrail) && <ul className="tpRouteLegend" aria-label={en ? "Route on the map" : "Route op de kaart"}>
         {showExpectedRoute && <li className="tpExpectedKey">{en ? "Expected route" : "Verwachte route"}</li>}
         {showRecentTrail && <li className="tpRecentKey">{en ? "Recent live positions" : "Recente liveposities"}</li>}

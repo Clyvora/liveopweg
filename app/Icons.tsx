@@ -35,7 +35,3 @@ const paths: Record<string, ReactNode> = {
 export function AppIcon({ name }: { name: string }) {
   return <svg className="uiIcon" viewBox="0 0 24 24" aria-hidden="true">{paths[name] ?? paths.more}</svg>;
 }
-
-export function BrandMark() {
-  return <svg className="radarBrandGlyph" viewBox="0 0 32 28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M13 3 5 25M26 3l-8 22M7 7h23M5 12h23M3 17h23M1 22h23" /></svg>;
-}

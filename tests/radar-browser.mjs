@@ -32,8 +32,9 @@ async (page) => {
     { id: 'test-ut', title: 'TESTGEGEVENS · Utrecht – Amsterdam', type: 'DISRUPTION', description: 'TESTGEGEVENS · minder treinen door een wisselstoring.', start: now(), end: null, stations, geometry: { type: 'MultiLineString', coordinates: [[[5.11,52.09],[4.9,52.378]]] } },
     { id: 'test-no-location', title: 'TESTGEGEVENS · Melding zonder kaartlocatie', type: 'MAINTENANCE', description: 'Details blijven bereikbaar.', start: null, end: null, stations: [], geometry: null }
   ] } }));
-  const point = (s, minute) => ({ code:s.code, name:s.name, plannedAt:later(minute), actualAt:later(minute), track:'5', plannedTrack:'7' });
-  await page.route('**/v1/journeys/advice?*', route => route.fulfill({ status: adviceMode === 'error' ? 503 : 200, json: adviceMode === 'error' ? { error: 'unavailable' } : { source:'NS', fetchedAt:now(), journeys: adviceMode === 'empty' ? [] : [{ id:'test-advice', durationMinutes:30, transfers:0, cancelled:false, messages:['TESTGEGEVENS · controleer spoorwijziging'], legs:[{ id:'test-leg', mode:'TRAIN', service:'Intercity', trainNumber:'1234', origin:point(stations[0],5), destination:point(stations[1],35), cancelled:false, messages:[] }] }] } }));
+  const point = (s, minute) => ({ code:s.code, name:s.name, plannedAt:later(minute - 2), actualAt:later(minute), track:'5', plannedTrack:'7' });
+  const advice = (id, number, minute) => ({ id, durationMinutes:30, transfers:0, cancelled:false, messages:['TESTGEGEVENS · controleer spoorwijziging'], legs:[{ id:`${id}-leg`, mode:'TRAIN', service:'Intercity', trainNumber:number, origin:point(stations[0],minute), destination:point(stations[1],minute + 30), cancelled:false, messages:[] }] });
+  await page.route('**/v1/journeys/advice?*', route => route.fulfill({ status: adviceMode === 'error' ? 503 : 200, json: adviceMode === 'error' ? { error: 'unavailable' } : { source:'NS', fetchedAt:now(), journeys: adviceMode === 'empty' ? [] : [advice('test-past','0001',-7), advice('test-advice','1234',5)] } }));
   const entry = (id, trainNumber, vehicleId) => ({ id, trainNumber, serviceDate:now().slice(0,10), direction:'Amsterdam Centraal', operator:'NS', serviceType:'Intercity', plannedAt:later(8), expectedAt:later(10), timeBasis:'UPDATED', delaySeconds:120, track:'5', plannedTrack:'7', trackChanged:true, cancelled:false, vehicleId, rollingStock:'VIRM' });
   const stationDepartures = [
     entry('test-board','1234','test-train'),
@@ -81,6 +82,10 @@ async (page) => {
   await page.goto('http://localhost:3000/');
   await page.getByRole('button',{name:'1 trein in beeld',exact:true}).waitFor();
   await page.getByRole('button',{name:'Kaartlagen',exact:true}).click();
+  const liveLayer=page.getByRole('checkbox',{name:'Live treinen',exact:true});
+  await liveLayer.uncheck();
+  await page.getByRole('button',{name:'0 treinen in beeld',exact:true}).waitFor();
+  await liveLayer.check();
   const blauwnetLayer=page.getByRole('checkbox',{name:'Blauwnet',exact:true});
   await blauwnetLayer.check();
   const estimatedTrain=page.getByRole('button',{name:/Geschatte positie.*Blauwnet \(Keolis\).*7925/});
@@ -90,7 +95,8 @@ async (page) => {
   await estimatedTrain.click();
   await page.getByText('Geschat op basis van haltetijden',{exact:true}).waitFor();
   await measuredTrain.click();
-  await page.getByText(/Gemeten positie · NDOV/).waitFor();
+  await page.locator('.trainPanel').getByText('Gemeten positie',{exact:true}).waitFor();
+  await page.locator('.trainPanel').getByText(/NDOV/).waitFor();
   await page.getByRole('button',{name:'Kaartlagen',exact:true}).click();
   await blauwnetLayer.uncheck();
   await estimatedTrain.waitFor({state:'hidden'});
@@ -156,7 +162,6 @@ async (page) => {
   await page.keyboard.press('ArrowRight');
   await page.getByRole('link',{name:/OV-fiets.*Stationsplein 2/}).waitFor();
   await page.getByRole('tab',{name:'Treinen',exact:true}).click();
-  await page.getByText('Filters',{exact:true}).click();
   const platform=page.getByRole('combobox',{name:'Perronmodus',exact:true});
   await platform.selectOption('7');
   await page.getByText('Verplaatst naar spoor 5',{exact:true}).waitFor();
@@ -200,6 +205,8 @@ async (page) => {
   check(await page.getByRole('combobox',{name:'Van',exact:true}).inputValue()==='Amsterdam Centraal','Swap');
   await page.getByRole('button',{name:'Stations omwisselen'}).click();
   await page.getByRole('button',{name:'Zoek reizen',exact:true}).click();
+  await page.locator('.uiAdvice').first().getByText(/gepland/).first().waitFor();
+  check(await page.locator('.uiAdvice').count()===1,'Leave now shows only the upcoming trip');
   await page.getByRole('button',{name:'Bekijk trein op radar',exact:true}).click();
   await page.getByRole('button',{name:'Terug',exact:true}).click();
   check(await page.getByText('TESTGEGEVENS · controleer spoorwijziging',{exact:true}).isVisible(),'Advice preserved after radar');

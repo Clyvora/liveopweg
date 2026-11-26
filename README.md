@@ -1,5 +1,16 @@
 # Liveopweg
 
+For a post-release smoke check, run the browser check during normal service:
+
+```sh
+playwright-cli -s=liveopweg-public open https://www.liveopweg.nl/
+playwright-cli -s=liveopweg-public run-code --filename tests/public-smoke-browser.mjs
+```
+
+It checks the first mapped train, the Utrecht Centraal station board and NS
+journey advice to Amsterdam Centraal. The check uses live data and reports
+elapsed times for the three steps.
+
 ## ClyvoraAPI migration (prepared locally, not deployed)
 
 The backend implementation now lives in the sibling checkout

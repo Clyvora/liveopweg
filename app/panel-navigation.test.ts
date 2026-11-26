@@ -22,6 +22,8 @@ describe("panel navigation", () => {
     expect(panelReducer(switched, { type: "back" }).current).toEqual({ kind: "station", id: "UT" });
     const fromMap = panelReducer({ ...state, history: [] }, { type: "open", panel: { kind: "train", id: "1735" } });
     expect(panelReducer(fromMap, { type: "back" }).current).toBeNull();
+    const regional = panelReducer(switched, { type: "open", panel: { kind: "regional-train", id: "7925" } });
+    expect(panelReducer(regional, { type: "back" }).current).toEqual({ kind: "station", id: "UT" });
   });
   it("clears history when closing and avoids duplicate history entries", () => {
     const state: PanelNavigation = { current: { kind: "stations" }, history: [] };

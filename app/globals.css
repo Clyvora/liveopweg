@@ -37,6 +37,10 @@
 }
 * { box-sizing:border-box; }
 html,body { margin:0; min-width:320px; min-height:100%; }
+.brandLogo { display:inline-flex; flex:none; align-items:center; gap:9px; color:#102bb1; }
+[data-theme="dark"] .brandLogo,.radarShell[data-night-map] .brandLogo { color:#fff8e8; }
+.brandLogoSymbol { display:block; flex:none; width:31px; aspect-ratio:201 / 194; background:currentColor; mask:url("/brand/symbol.svg") center / contain no-repeat; }
+.brandLogoWordmark { display:block; width:112px; aspect-ratio:704 / 148; background:currentColor; mask:url("/brand/wordmark.svg") center / contain no-repeat; }
 body { --font-ui:var(--font-geist-sans),"Segoe UI",sans-serif; color:var(--ui-text); background:var(--ui-muted-surface); font:400 14px/1.5 var(--font-ui); -webkit-font-smoothing:antialiased; }
 button,input,select,textarea { font:inherit; }
 button,a,input,select,textarea { -webkit-tap-highlight-color:transparent; }

@@ -1,28 +1,32 @@
 import { MobilityDashboard } from "./MobilityDashboard";
+import { getSiteOrigin, radarDescription, siteName } from "./site";
 
 export default function Home() {
+  const root = `${getSiteOrigin()}/`;
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [
       {
         "@type": "WebSite",
-        "@id": "https://liveopweg.nl/#website",
-        url: "https://liveopweg.nl/",
-        name: "Liveopweg",
-        description: "Live treinlocaties, stations, vertragingen en wegmeldingen in Nederland.",
+        "@id": `${root}#website`,
+        url: root,
+        name: siteName,
+        description: radarDescription,
         inLanguage: "nl-NL",
       },
       {
         "@type": "WebApplication",
-        "@id": "https://liveopweg.nl/#application",
-        name: "Liveopweg live treinkaart",
-        url: "https://liveopweg.nl/",
+        "@id": `${root}#application`,
+        name: siteName,
+        isPartOf: { "@id": `${root}#website` },
+        image: `${root}og.png`,
+        url: root,
         applicationCategory: "TravelApplication",
         operatingSystem: "Web",
         browserRequirements: "Requires JavaScript",
         isAccessibleForFree: true,
         inLanguage: "nl-NL",
-        description: "Bekijk actuele treinposities, stations en treinvertragingen op een kaart van Nederland.",
+        description: radarDescription,
       },
     ],
   };

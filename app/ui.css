@@ -32,7 +32,7 @@
 .uiResultButton[aria-expanded="true"] strong { color:var(--ui-accent); }
 .uiResultDetail { padding:0 0 18px; color:var(--ui-muted); font-size:13px; line-height:1.65; }
 .uiResultDetail p { margin:8px 0; }
-.stationResult { display:grid; grid-template-columns:46px minmax(0,1fr) auto; align-items:start; gap:6px 10px; }
+.stationResult { display:grid; grid-template-columns:46px minmax(0,1fr) auto; align-items:start; gap:3px 8px; padding-block:9px; }
 .stationTimes { display:grid; gap:2px; line-height:1.2; font-variant-numeric:tabular-nums; }
 .stationTimes>time { font-size:16px; font-weight:650; }
 .stationTimes s { color:var(--ui-muted); font-size:11px; }
@@ -44,12 +44,11 @@
 .stationOperatorFilter select { min-height:44px; max-width:70%; padding:6px 10px; background:var(--ui-surface); color:var(--ui-text); border:1px solid var(--ui-border); border-radius:6px; font:inherit; }
 .stationPlatformFilter>span { display:flex; align-items:center; gap:6px; font-weight:650; }
 .stationPlatformFilter .uiIcon { width:16px; height:16px; }
-.stationFilters { margin:8px 0; padding:0 10px; border:1px solid var(--ui-border); border-radius:6px; }
-.stationFilters summary { display:flex; align-items:center; gap:8px; min-height:44px; list-style:none; font-size:13px; font-weight:600; cursor:pointer; }
-.stationFilters summary::-webkit-details-marker { display:none; }
-.stationFilters summary>span { flex:1; color:var(--ui-muted); font-size:12px; font-weight:400; }
-.stationFilters summary::after { content:"+"; color:var(--ui-muted); font-size:16px; }
-.stationFilters[open] summary::after { content:"−"; }
+.stationBoardFilters { display:flex; gap:4px 10px; flex-wrap:wrap; margin:3px 0 7px; }
+.stationBoardFilters .stationOperatorFilter { margin:0; justify-content:flex-start; }
+.stationBoardFilters select { min-width:0; padding-inline:6px; }
+.stationResult .stationOnTime { position:absolute; width:1px; height:1px; clip-path:inset(50%); overflow:hidden; white-space:nowrap; }
+.advicePlanned { font-size:0.8em; font-weight:400; color:var(--ui-muted); }
 .stationSourceLink { display:flex; gap:8px; align-items:center; width:max-content; max-width:100%; min-height:44px; margin-top:8px; font-size:13px; text-underline-offset:2px; }
 .stationSourceLink .uiIcon { width:16px; flex:none; }
 .stationPhoto { margin:12px 0 0; }
@@ -231,3 +230,17 @@
 }
 @media (max-width:700px) { .settingsGrid { grid-template-columns:1fr; } }
 @media (max-width:420px) { .settingsMain { padding:28px 16px; } .settingsCard { padding:16px; } .settingsRow { flex-wrap:wrap; } }
+.radarGuide { min-height:100dvh; background:var(--ui-surface); color:var(--ui-text); }
+.radarGuideHeader { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px max(16px,calc((100% - 1040px) / 2)); border-bottom:1px solid var(--ui-border); }
+.radarGuideHeader>a { display:inline-flex; align-items:center; min-height:44px; color:inherit; }
+.radarGuideLink { gap:6px; text-underline-offset:4px; font-weight:650; font-size:14px; }
+.radarGuideBody { max-width:760px; margin-inline:auto; padding:clamp(36px,7vw,95px) 20px 72px; }
+.radarGuideBody h1 { max-width:15ch; margin:0; font-size:clamp(37px,7vw,70px); font-weight:700; letter-spacing:-.05em; line-height:1.01; }
+.radarGuideBody p,.radarGuideBody li { color:var(--ui-muted); line-height:1.65; }
+.radarGuideBody>p { max-width:60ch; margin:20px 0 34px; font-size:clamp(16px,2.3vw,19px); }
+.radarGuideBody section { border-top:1px solid var(--ui-border); padding:21px 0; }
+.radarGuideBody section h2 { margin:0 0 10px; font-size:22px; letter-spacing:-.02em; }
+.radarGuideBody section p,.radarGuideBody ol { margin:0; }
+.radarGuideBody ol { padding-left:24px; }
+.radarGuideBody li+li { margin-top:8px; }
+.radarGuideBody a { color:var(--ui-accent); text-underline-offset:3px; }

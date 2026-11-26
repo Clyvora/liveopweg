@@ -19,6 +19,11 @@ test("server-renders de treinenkaart zonder overlappend meldingenpaneel", async 
 
   const html = await response.text();
   assert.match(html, /<title>Liveopweg/);
+  assert.match(html, /<h1[^>]*>Live treinlocaties in Nederland<\/h1>/);
+  assert.match(html, /href="https:\/\/www\.liveopweg\.nl\/"[^>]*|https:\/\/www\.liveopweg\.nl\/#website/);
+  assert.match(html, /href="\/favicon-48\.png"/);
+  assert.match(html, /href="\/apple-touch-icon\.png"/);
+  assert.match(html, /href="\/over-de-treinradar"/);
   assert.match(html, /Treinradar/);
   assert.match(html, /Spoormeldingen/);
   assert.match(html, /Favorieten/);
@@ -78,6 +83,26 @@ test("server-renders een eigen instellingenpagina", async () => {
   assert.match(html, /<h1>Instellingen<\/h1>/);
   assert.match(html, /Kleurthema/);
   assert.match(html, /Browsermeldingen/);
+  assert.match(html, /noindex, follow|noindex,follow/);
   assert.match(html, /Kaarten en filters/);
   assert.doesNotMatch(html, /class="liveMap"/);
+});
+
+test("renders a discoverable train radar guide and consistent crawl routes", async () => {
+  const response = await render("/over-de-treinradar");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /<h1>Zo volg je een trein op de kaart<\/h1>/);
+  assert.match(html, /href="https:\/\/www\.liveopweg\.nl\/over-de-treinradar"/);
+  assert.match(html, /href="\/\?panel=stations"/);
+
+  const sitemap = await render("/sitemap.xml");
+  assert.equal(sitemap.status, 200);
+  const xml = await sitemap.text();
+  assert.match(xml, /https:\/\/www\.liveopweg\.nl\/over-de-treinradar/);
+  assert.doesNotMatch(xml, /\/instellingen/);
+
+  const robots = await render("/robots.txt");
+  assert.equal(robots.status, 200);
+  assert.match(await robots.text(), /Sitemap: https:\/\/www\.liveopweg\.nl\/sitemap\.xml/);
 });

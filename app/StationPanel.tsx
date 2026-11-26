@@ -129,8 +129,7 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
     {error && <div className="uiNotice" role="alert"><p>{en ? "The station board is temporarily unavailable." : "Het stationbord is tijdelijk niet beschikbaar."}</p><button onClick={() => setRevision(value => value + 1)}>{en ? "Try again" : "Opnieuw proberen"}</button></div>}
     {!board && !error && <p role="status">{en ? "Loading departures…" : "Ritten ophalen…"}</p>}
     <div id="station-board" role="tabpanel" aria-labelledby={`station-${tab}-tab`}>
-      {(platforms.length > 0 || operators.length > 1) && <details className="stationFilters">
-        <summary>Filters<span>{[activePlatform && `${en ? "Platform" : "Spoor"} ${activePlatform}`, selectedOperator].filter(Boolean).join(" · ")}</span></summary>
+      {(platforms.length > 0 || operators.length > 1) && <div className="stationBoardFilters">
       {platforms.length > 0 && <label className="stationOperatorFilter stationPlatformFilter">
         <span><AppIcon name="stations" />{en ? "Platform mode" : "Perronmodus"}</span>
         <select value={activePlatform} onChange={event => { setPlatform(event.target.value); setSelected(null); }}>
@@ -145,7 +144,7 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
           {operators.map(name => <option key={name}>{name}</option>)}
         </select>
       </label>}
-      </details>}
+      </div>}
       {board && !visibleEntries.length && <p>{activePlatform
         ? (en ? "No upcoming departures match this platform filter." : "Geen komende vertrekken voor dit perronfilter.")
         : selectedOperator
@@ -165,7 +164,7 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
             </span>
             <span><strong>{entry.direction}</strong><small className="stationServiceIdentity"><RegionalTrainIcon operator={entry.operator} /><span>{[operatorName, `${entry.serviceType} ${entry.trainNumber}`].filter(Boolean).join(" · ")}</span></small></span>
             <span className={`stationTrack${entry.trackChanged ? " changed" : ""}`}>{entry.track ? `${en ? "Platform" : "Spoor"} ${entry.track}` : (en ? "No platform" : "Spoor onbekend")}</span>
-            <small className={moved || entry.cancelled || (entry.delaySeconds ?? 0) >= 60 ? "tpLate" : ""}>
+            <small className={moved || entry.cancelled || (entry.delaySeconds ?? 0) >= 60 ? "tpLate" : entry.delaySeconds === 0 && !entry.trackChanged ? "stationOnTime" : ""}>
               {moved ? (en ? `Moved to platform ${entry.track}` : `Verplaatst naar spoor ${entry.track}`) : boardEntryStatus(entry, en)}
             </small>
           </button>

@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { useLanguage } from "./LanguageContext";
 import { useTheme } from "./ThemeContext";
-import { AppIcon, BrandMark } from "./Icons";
+import { AppIcon } from "./Icons";
+import { BrandLogo } from "./BrandLogo";
 import type { Panel } from "./panel-navigation";
 
 export function AppNavigation({ active, onOpen, onHome }: { active: string; onOpen?: (kind: Panel["kind"]) => void; onHome?: () => void }) {
@@ -20,7 +21,7 @@ export function AppNavigation({ active, onOpen, onHome }: { active: string; onOp
   return <>
     <a className="skipLink" href="#main-content">{en ? "Skip to content" : "Ga naar inhoud"}</a>
     <header className="appNavigation topbar">
-      <Link className="radarBrand" href="/" aria-label={en ? "Liveopweg home" : "LiveOpWeg startpagina"} onClick={home}><BrandMark /><span className="radarWordmark">liveopweg</span></Link>
+      <Link className="radarBrand" href="/" aria-label={en ? "Liveopweg home" : "Liveopweg startpagina"} onClick={home}><BrandLogo /></Link>
       <nav className="sideNav" aria-label={en ? "Main navigation" : "Hoofdnavigatie"}>
         <Link className={["radar", "search", "train", "station"].includes(active) ? "active" : ""} href="/" onClick={home} aria-label={en ? "Train radar" : "Treinradar"} aria-current={active === "radar" ? "page" : undefined}><AppIcon name="radar" /><span>Radar</span></Link>
         {item("stations", "Stations")}

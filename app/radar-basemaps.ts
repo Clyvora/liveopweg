@@ -44,7 +44,7 @@ export const baseMapStyle: StyleSpecification = {
   },
   layers: [
     { id: "atlas-paper", type: "background", paint: { "background-opacity": 0 } },
-    { id: "base-standard", type: "raster", source: "base-standard", layout: { visibility: "none" }, paint: { "raster-saturation": -0.35, "raster-opacity": 0.88 } },
+    { id: "base-standard", type: "raster", source: "base-standard", layout: { visibility: "none" }, paint: { "raster-saturation": -0.7, "raster-contrast": -0.2, "raster-opacity": 0.83 } },
     {
       id: nightFallbackLayer, type: "raster", source: "base-standard", layout: { visibility: "none" },
       paint: { "raster-saturation": -1, "raster-brightness-min": 0.04, "raster-brightness-max": 0.24, "raster-opacity": 0.84 },

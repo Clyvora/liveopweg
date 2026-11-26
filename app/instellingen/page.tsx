@@ -1,9 +1,8 @@
 import { SettingsScreen } from "./settings-screen";
 
-export const metadata = {
-  title: "Instellingen | LiveOpWeg",
-  description: "Pas de weergave en meldingen van LiveOpWeg aan.",
-};
+import { pageMetadata } from "../site";
+
+export const metadata = { ...pageMetadata("Instellingen", "Pas de weergave en meldingen van Liveopweg aan.", "/instellingen"), robots: { index: false, follow: true } };
 
 export default function InstellingenPage() {
   return <SettingsScreen />;

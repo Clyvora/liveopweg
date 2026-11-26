@@ -24,23 +24,31 @@ const positionsSchema = z.object({
   })).max(100),
 });
 
-export function BlauwnetLayer({ map, language, onUnavailable }: {
+export type RegionalTrainPosition = z.infer<typeof positionsSchema>["positions"][number];
+
+export function regionalOperator(operator: string) {
+  return operator === "Blauwnet A" ? "Blauwnet (Arriva)" : operator === "Blauwnet K" ? "Blauwnet (Keolis)" : operator;
+}
+
+export function BlauwnetLayer({ map, language, onUnavailable, onPositions, onSelect }: {
   map: RefObject<MapLibreMap | null>;
   language: string;
   onUnavailable: (unavailable: boolean) => void;
+  onPositions: (positions: RegionalTrainPosition[]) => void;
+  onSelect: (position: RegionalTrainPosition) => void;
 }) {
   useEffect(() => {
     const instance = map.current;
     if (!instance) return;
-    const markers = new Map<string, { marker: Marker; expiresAt: number }>();
+    const markers = new Map<string, { marker: Marker; position: RegionalTrainPosition }>();
     let stopped = false;
     let request: AbortController | null = null;
     let refreshTimer: number | undefined;
     const english = language === "en";
-    const clock = new Intl.DateTimeFormat(english ? "en-GB" : "nl-NL", { timeZone: "Europe/Amsterdam", timeStyle: "medium" });
     const clear = () => {
       for (const { marker } of markers.values()) marker.remove();
       markers.clear();
+      onPositions([]);
     };
 
     const load = async () => {
@@ -52,7 +60,7 @@ export function BlauwnetLayer({ map, language, onUnavailable }: {
         const response = await fetch(realtimeHttpUrl("/v1/rail/blauwnet/positions"), { signal: controller.signal });
         if (!response.ok) throw new Error("Blauwnet positions unavailable");
         const { positions } = positionsSchema.parse(await response.json());
-        const { Marker, Popup } = await import("maplibre-gl");
+        const { Marker } = await import("maplibre-gl");
         if (stopped || document.hidden || controller.signal.aborted) return;
         const present = new Set<string>();
         for (const position of positions) {
@@ -61,26 +69,16 @@ export function BlauwnetLayer({ map, language, onUnavailable }: {
           present.add(position.id);
           const measured = position.kind === "KV6_POSITION";
           const label = measured ? (english ? "Measured position" : "Gemeten positie") : (english ? "Estimated position" : "Geschatte positie");
-          const operator = position.operator === "Blauwnet A" ? "Blauwnet (Arriva)" : position.operator === "Blauwnet K" ? "Blauwnet (Keolis)" : position.operator;
+          const operator = regionalOperator(position.operator);
           const title = [operator, position.service, position.trainNumber ?? position.line, position.destination].filter(Boolean).join(" · ");
-          const detail = document.createElement("div");
-          const heading = document.createElement("strong");
-          heading.textContent = title;
-          const section = document.createElement("div");
-          section.textContent = measured ? position.route ?? "" : `${position.from} → ${position.to}`;
-          const explanation = document.createElement("small");
-          explanation.textContent = measured && position.measuredAt
-            ? `${label} · NDOV · ${clock.format(new Date(position.measuredAt))}`
-            : (english ? "Estimated from timetable updates" : "Geschat op basis van haltetijden");
-          detail.append(heading, section, explanation);
           const coordinates: [number, number] = [position.longitude, position.latitude];
           const current = markers.get(position.id);
           if (current) {
-            current.marker.setLngLat(coordinates).getPopup()?.setDOMContent(detail);
+            current.marker.setLngLat(coordinates);
             const button = current.marker.getElement();
             button.classList.toggle("measured", measured);
             button.setAttribute("aria-label", `${label} · ${title}`);
-            current.expiresAt = expiresAt;
+            current.position = position;
             continue;
           }
           const button = document.createElement("button");
@@ -91,19 +89,23 @@ export function BlauwnetLayer({ map, language, onUnavailable }: {
           const glyph = document.createElement("span");
           glyph.className = "blauwnetTrainGlyph";
           button.append(glyph);
-          const popup = new Popup({ offset: 24, closeButton: false, className: "blauwnetPositionPopup" }).setDOMContent(detail);
-          const marker = new Marker({ element: button }).setLngLat(coordinates).setPopup(popup).addTo(instance);
-          markers.set(position.id, { marker, expiresAt });
+          button.addEventListener("click", event => {
+            event.stopPropagation();
+            const selected = markers.get(position.id);
+            if (selected) onSelect(selected.position);
+          });
+          const marker = new Marker({ element: button }).setLngLat(coordinates).addTo(instance);
+          markers.set(position.id, { marker, position });
         }
         for (const [id, { marker }] of markers) {
           if (present.has(id)) continue;
           marker.remove();
           markers.delete(id);
         }
+        onPositions(positions.filter(position => present.has(position.id)));
         onUnavailable(false);
       } catch {
         if (!stopped && !document.hidden) {
-          clear();
           onUnavailable(true);
         }
       } finally {
@@ -121,11 +123,14 @@ export function BlauwnetLayer({ map, language, onUnavailable }: {
     };
     document.addEventListener("visibilitychange", visibility);
     const expiryTimer = window.setInterval(() => {
-      for (const [id, { marker, expiresAt }] of markers) {
-        if (expiresAt > Date.now()) continue;
+      let changed = false;
+      for (const [id, { marker, position }] of markers) {
+        if (Date.parse(position.expiresAt) > Date.now()) continue;
         marker.remove();
         markers.delete(id);
+        changed = true;
       }
+      if (changed) onPositions([...markers.values()].map(({ position }) => position));
     }, 1_000);
     void load();
     return () => {
@@ -136,7 +141,7 @@ export function BlauwnetLayer({ map, language, onUnavailable }: {
       document.removeEventListener("visibilitychange", visibility);
       clear();
     };
-  }, [language, map, onUnavailable]);
+  }, [language, map, onUnavailable, onPositions, onSelect]);
 
   return null;
 }
