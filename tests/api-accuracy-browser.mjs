@@ -78,6 +78,8 @@ async (page)=>{
   await page.getByText(/Positie verouderd ·/).waitFor();
   age=360_000;sendFleet();await page.getByText('Geen actuele treinposities',{exact:true}).waitFor();
   age=0;sendFleet();await page.getByRole('button',{name:'Volg trein op de kaart',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Sluit treininformatie',exact:true}).click();
+  await page.locator('.trainPanel').waitFor({state:'hidden'});
   await page.unroute(virmPhotos);await page.unroute('**/train-virm-v1.png');
   const loadedPhotos = new Set();
   page.on('request',request=>{if(virmPhotos.test(request.url()))loadedPhotos.add(new URL(request.url()).pathname);});

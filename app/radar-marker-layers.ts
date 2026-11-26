@@ -71,12 +71,16 @@ function addOverviewDot(map: RadarMap, name: string, fill: string, rim: string) 
 }
 
 export function addRadarMarkerLayers(map: RadarMap) {
-  for (const shape of Object.keys(trainBadgeShapes) as Array<keyof typeof trainBadgeShapes>) {
-    addBadge(map, `train-stale-${shape}`, shape, "#e8ebef", "#526173", "#95a3b4");
-    for (const [livery, { body, detail }] of Object.entries(trainLiveries)) {
-      addBadge(map, `train-${livery}-${shape}`, shape, body, detail, "#ffffff");
+  map.on("styleimagemissing", ({ id }) => {
+    const match = /^train-([^-]+)-([^-]+)$/.exec(id);
+    if (!match || !Object.hasOwn(trainBadgeShapes, match[2]) || map.hasImage(id)) return;
+    const shape = match[2] as keyof typeof trainBadgeShapes;
+    if (match[1] === "stale") addBadge(map, id, shape, "#e8ebef", "#526173", "#95a3b4");
+    else if (Object.hasOwn(trainLiveries, match[1])) {
+      const { body, detail } = trainLiveries[match[1] as keyof typeof trainLiveries];
+      addBadge(map, id, shape, body, detail, "#ffffff");
     }
-  }
+  });
   for (const [livery, { body, detail }] of Object.entries(trainLiveries)) {
     addOverviewDot(map, `train-${livery}`, body, detail);
   }

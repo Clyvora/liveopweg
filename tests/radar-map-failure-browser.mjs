@@ -24,7 +24,9 @@ async (page) => {
   await page.getByRole('button',{name:'Kaartlagen',exact:true}).click();
   await page.locator('.mapStyleInline .mapStyleCurrent').click();
   await page.getByRole('menuitemradio',{name:'Nacht',exact:true}).click();
-  await page.locator('.mapAttribution').getByText('OpenFreeMap',{exact:true}).waitFor();
+  const credits = page.getByRole('button',{name:'Kaartbronnen',exact:true});
+  if (await credits.getAttribute('aria-expanded') === 'false') await credits.click();
+  await page.locator('#map-credits').getByText('OpenFreeMap',{exact:true}).waitFor();
   const fallbackTile=page.waitForResponse(response=>/^https:\/\/tile\.openstreetmap\.org\/(?:8|9|1\d)\//.test(response.url()) && response.ok());
   await page.getByRole('button',{name:'Inzoomen op kaart',exact:true}).click();
   await page.getByRole('button',{name:'Inzoomen op kaart',exact:true}).click();

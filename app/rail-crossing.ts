@@ -1,3 +1,5 @@
+import type { Map as MapLibreMap } from "maplibre-gl";
+
 export function crossingDetails(properties: Record<string, unknown>, language: string) {
   const en = language === "en";
   const text = (key: string) => typeof properties[key] === "string" ? properties[key].trim() : "";
@@ -37,4 +39,27 @@ export function crossingPopupContent(properties: Record<string, unknown>, langua
   source.textContent = "ProRail / PDOK";
   root.append(heading, details, footnote, source);
   return root;
+}
+
+export function addCrossingLayer(instance: MapLibreMap) {
+  const crossingIcon = document.createElement("canvas");
+  crossingIcon.width = 48;
+  crossingIcon.height = 48;
+  const crossingContext = crossingIcon.getContext("2d");
+  if (crossingContext) {
+    crossingContext.beginPath(); crossingContext.roundRect(5, 5, 38, 38, 10);
+    crossingContext.fillStyle = "#fff7e5"; crossingContext.fill();
+    crossingContext.strokeStyle = "#956329"; crossingContext.lineWidth = 2.5; crossingContext.stroke();
+    crossingContext.beginPath(); crossingContext.lineCap = "round"; crossingContext.lineJoin = "round";
+    crossingContext.moveTo(16, 16); crossingContext.lineTo(32, 32);
+    crossingContext.moveTo(32, 16); crossingContext.lineTo(16, 32);
+    crossingContext.strokeStyle = "#71471e"; crossingContext.lineWidth = 4; crossingContext.stroke();
+  }
+  if (crossingContext) instance.addImage("liveopweg-level-crossing", crossingContext.getImageData(0, 0, 48, 48), { pixelRatio: 2 });
+  instance.addSource("rail-level-crossings", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  instance.addLayer({
+    id: "rail-level-crossing-symbols", type: "symbol", source: "rail-level-crossings", minzoom: 13,
+    filter: ["==", ["get", "karakter"], "Openbare overweg"],
+    layout: { "icon-image": "liveopweg-level-crossing", "icon-size": 0.9 },
+  });
 }

@@ -36,10 +36,11 @@ import { panelReducer, type Panel } from "./panel-navigation";
 import { uiCopy } from "./ui-copy";
 import { addRadarMarkerLayers, stationLayers, trainHitLayers, trainLayers } from "./radar-marker-layers";
 import { trainMapPreview } from "./train-map-preview";
-import { fleetMapFeatures } from "./rail-fleet-map";
+import { fleetMapUpdate, type FleetMapFeatures } from "./rail-fleet-map";
 import { failedBaseMaps } from "./map-source-state";
 import { baseMapLayers, baseMapStyle, nightFallbackLayer, nightMapBackground, type BaseMapKey } from "./radar-basemaps";
 import { AppNavigation } from "./AppNavigation";
+import { MapCredits } from "./MapCredits";
 import { BrandLogo } from "./BrandLogo";
 import { guidePath, radarTitle } from "./site";
 import { AppIcon } from "./Icons";
@@ -49,7 +50,7 @@ import { BlauwnetLayer, type RegionalTrainPosition } from "./BlauwnetLayer";
 import { RegionalTrainPanel } from "./RegionalTrainPanel";
 import { roadPlace } from "./road-presentation";
 import { openRadarConnection, type ConnectionState } from "./radar-connection";
-import { crossingPopupContent } from "./rail-crossing";
+import { addCrossingLayer, crossingPopupContent } from "./rail-crossing";
 import { useDisruptions } from "./useDisruptions";
 import { RailNotices } from "./RailNotices";
 import { SavedRouteCard } from "./SavedRouteCard";
@@ -292,6 +293,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     return () => { disposed = true; controller.abort(); window.clearTimeout(timeout); };
   }, [isAlertsPage]);
   const [fleetReceived, setFleetReceived] = useState(false);
+  const fleetMapState = useRef<{ source: GeoJSONSource; features: FleetMapFeatures } | null>(null);
   const [vehiclesById, setVehiclesById] = useState<Record<string, RailObservation>>({});
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [observation, setObservation] = useState<RailObservation | null>(null);
@@ -845,26 +847,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         instance.on("styledata", () => {
           if (previewKey && instance.getLayoutProperty("rail-fleet-points", "visibility") === "none") clearMarkerHover();
         });
-        const crossingIcon = document.createElement("canvas");
-        crossingIcon.width = 48;
-        crossingIcon.height = 48;
-        const crossingContext = crossingIcon.getContext("2d");
-        if (crossingContext) {
-          crossingContext.beginPath(); crossingContext.roundRect(5, 5, 38, 38, 10);
-          crossingContext.fillStyle = "#fff7e5"; crossingContext.fill();
-          crossingContext.strokeStyle = "#956329"; crossingContext.lineWidth = 2.5; crossingContext.stroke();
-          crossingContext.beginPath(); crossingContext.lineCap = "round"; crossingContext.lineJoin = "round";
-          crossingContext.moveTo(16, 16); crossingContext.lineTo(32, 32);
-          crossingContext.moveTo(32, 16); crossingContext.lineTo(16, 32);
-          crossingContext.strokeStyle = "#71471e"; crossingContext.lineWidth = 4; crossingContext.stroke();
-        }
-        if (crossingContext) instance.addImage("liveopweg-level-crossing", crossingContext.getImageData(0, 0, 48, 48), { pixelRatio: 2 });
-        instance.addSource("rail-level-crossings", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-        instance.addLayer({
-          id: "rail-level-crossing-symbols", type: "symbol", source: "rail-level-crossings", minzoom: 13,
-          filter: ["==", ["get", "karakter"], "Openbare overweg"],
-          layout: { "icon-image": "liveopweg-level-crossing", "icon-size": 0.9 },
-        });
         instance.addSource("user-location", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
         instance.addLayer({ id: "user-location-halo", type: "circle", source: "user-location", paint: { "circle-radius": 13, "circle-color": "#1682ed", "circle-opacity": 0.18 } });
         instance.addLayer({ id: "user-location-dot", type: "circle", source: "user-location", paint: { "circle-radius": 6, "circle-color": "#1682ed", "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
@@ -993,101 +975,100 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             "circle-stroke-width": 3,
           },
         });
-        for (const layer of roadLayerDefinitions) {
-          const pointSourceId = `road-${layer.key}-points-source`;
-          const lineSourceId = `road-${layer.key}-lines-source`;
-          instance.addSource(pointSourceId, {
-            type: "geojson",
-            data: { type: "FeatureCollection", features: [] },
-            cluster: true,
-            clusterRadius: 46,
-            clusterMaxZoom: 9,
-          });
-          instance.addSource(lineSourceId, {
+        if (isAlertsPage) {
+          for (const layer of roadLayerDefinitions) {
+            const pointSourceId = `road-${layer.key}-points-source`;
+            const lineSourceId = `road-${layer.key}-lines-source`;
+            instance.addSource(pointSourceId, {
+              type: "geojson",
+              data: { type: "FeatureCollection", features: [] },
+              cluster: true,
+              clusterRadius: 46,
+              clusterMaxZoom: 9,
+            });
+            instance.addSource(lineSourceId, {
+              type: "geojson",
+              data: { type: "FeatureCollection", features: [] },
+            });
+            instance.addLayer({
+              id: `road-${layer.key}-lines`,
+              type: "line",
+              source: lineSourceId,
+              paint: {
+                "line-color": layer.color,
+                "line-width": ["interpolate", ["linear"], ["zoom"], 5, 2.2, 10, 5.2, 14, 8],
+                "line-opacity": ["case", ["==", ["get", "status"], "PLANNED"], 0.45, 0.86],
+                "line-dasharray": ["case", ["==", ["get", "status"], "PLANNED"], ["literal", [2, 2]], ["literal", [1, 0]]],
+              },
+            }, "rail-fleet-points");
+            instance.addLayer({
+              id: `road-${layer.key}-clusters`,
+              type: "circle",
+              source: pointSourceId,
+              filter: ["has", "point_count"],
+              paint: {
+                "circle-color": layer.color,
+                "circle-radius": ["step", ["get", "point_count"], 14, 10, 18, 40, 23],
+                "circle-opacity": 0.9,
+                "circle-stroke-color": "#fffdf7",
+                "circle-stroke-width": 2,
+              },
+            });
+            instance.addLayer({
+              id: `road-${layer.key}-cluster-count`,
+              type: "symbol",
+              source: pointSourceId,
+              filter: ["has", "point_count"],
+              layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 10 },
+              paint: { "text-color": "#fffdf7" },
+            });
+            instance.addLayer({
+              id: `road-${layer.key}-points`,
+              type: "circle",
+              source: pointSourceId,
+              filter: ["!", ["has", "point_count"]],
+              paint: {
+                "circle-color": layer.color,
+                "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 4, 10, 7],
+                "circle-opacity": ["case", ["==", ["get", "status"], "PLANNED"], 0.5, 0.92],
+                "circle-stroke-color": "#fffdf7",
+                "circle-stroke-width": 1.5,
+              },
+            });
+            for (const layerId of [`road-${layer.key}-lines`, `road-${layer.key}-points`]) {
+              instance.on("click", layerId, (event) => {
+                const eventId = event.features?.[0]?.properties?.eventId;
+                if (typeof eventId === "string") selectRoadFromMapRef.current(eventId);
+              });
+              instance.on("mouseenter", layerId, () => { instance.getCanvas().style.cursor = "pointer"; });
+              instance.on("mouseleave", layerId, () => { instance.getCanvas().style.cursor = ""; });
+            }
+            instance.on("click", `road-${layer.key}-clusters`, (event) => {
+              const feature = event.features?.[0];
+              const clusterId = Number(feature?.properties?.cluster_id);
+              if (!feature || !Number.isFinite(clusterId) || feature.geometry.type !== "Point") return;
+              instance.easeTo({ center: feature.geometry.coordinates as [number, number], duration: 500 });
+            });
+          }
+          instance.addSource("selected-road-event", {
             type: "geojson",
             data: { type: "FeatureCollection", features: [] },
           });
           instance.addLayer({
-            id: `road-${layer.key}-lines`,
+            id: "selected-road-event-line",
             type: "line",
-            source: lineSourceId,
-            paint: {
-              "line-color": layer.color,
-              "line-width": ["interpolate", ["linear"], ["zoom"], 5, 2.2, 10, 5.2, 14, 8],
-              "line-opacity": ["case", ["==", ["get", "status"], "PLANNED"], 0.45, 0.86],
-              "line-dasharray": ["case", ["==", ["get", "status"], "PLANNED"], ["literal", [2, 2]], ["literal", [1, 0]]],
-            },
+            source: "selected-road-event",
+            filter: ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]],
+            paint: { "line-color": "#fffdf7", "line-width": 10, "line-opacity": 0.72 },
           }, "rail-fleet-points");
           instance.addLayer({
-            id: `road-${layer.key}-clusters`,
+            id: "selected-road-event-point",
             type: "circle",
-            source: pointSourceId,
-            filter: ["has", "point_count"],
-            paint: {
-              "circle-color": layer.color,
-              "circle-radius": ["step", ["get", "point_count"], 14, 10, 18, 40, 23],
-              "circle-opacity": 0.9,
-              "circle-stroke-color": "#fffdf7",
-              "circle-stroke-width": 2,
-            },
-          });
-          instance.addLayer({
-            id: `road-${layer.key}-cluster-count`,
-            type: "symbol",
-            source: pointSourceId,
-            filter: ["has", "point_count"],
-            layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 10 },
-            paint: { "text-color": "#fffdf7" },
-          });
-          instance.addLayer({
-            id: `road-${layer.key}-points`,
-            type: "circle",
-            source: pointSourceId,
-            filter: ["!", ["has", "point_count"]],
-            paint: {
-              "circle-color": layer.color,
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 4, 10, 7],
-              "circle-opacity": ["case", ["==", ["get", "status"], "PLANNED"], 0.5, 0.92],
-              "circle-stroke-color": "#fffdf7",
-              "circle-stroke-width": 1.5,
-            },
-          });
-          for (const layerId of [`road-${layer.key}-lines`, `road-${layer.key}-points`]) {
-            instance.on("click", layerId, (event) => {
-              const eventId = event.features?.[0]?.properties?.eventId;
-              if (typeof eventId === "string") selectRoadFromMapRef.current(eventId);
-            });
-            instance.on("mouseenter", layerId, () => { instance.getCanvas().style.cursor = "pointer"; });
-            instance.on("mouseleave", layerId, () => { instance.getCanvas().style.cursor = ""; });
-          }
-          instance.on("click", `road-${layer.key}-clusters`, (event) => {
-            const feature = event.features?.[0];
-            const clusterId = Number(feature?.properties?.cluster_id);
-            if (!feature || !Number.isFinite(clusterId) || feature.geometry.type !== "Point") return;
-            instance.easeTo({ center: feature.geometry.coordinates as [number, number], duration: 500 });
+            source: "selected-road-event",
+            filter: ["==", ["geometry-type"], "Point"],
+            paint: { "circle-color": "#fffdf7", "circle-radius": 11, "circle-stroke-color": "#162528", "circle-stroke-width": 3 },
           });
         }
-        instance.addSource("selected-road-event", {
-          type: "geojson",
-          data: { type: "FeatureCollection", features: [] },
-        });
-        instance.addLayer({
-          id: "selected-road-event-line",
-          type: "line",
-          source: "selected-road-event",
-          filter: ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]],
-          paint: { "line-color": "#fffdf7", "line-width": 10, "line-opacity": 0.72 },
-        }, "rail-fleet-points");
-        instance.addLayer({
-          id: "selected-road-event-point",
-          type: "circle",
-          source: "selected-road-event",
-          filter: ["==", ["geometry-type"], "Point"],
-          paint: { "circle-color": "#fffdf7", "circle-radius": 11, "circle-stroke-color": "#162528", "circle-stroke-width": 3 },
-        });
-        // Wegmeldingen worden na de vloot opgebouwd. Zet de treinlagen daarna
-        // bewust terug bovenaan, zodat de primaire live-objecten zichtbaar en
-        // aanklikbaar blijven op ieder zoomniveau.
         for (const layerId of [...stationLayers, ...trainLayers]) instance.moveLayer(layerId);
         instance.on("mouseenter", "rail-level-crossing-symbols", () => { instance.getCanvas().style.cursor = "pointer"; });
         instance.on("mouseleave", "rail-level-crossing-symbols", () => { instance.getCanvas().style.cursor = ""; });
@@ -1127,7 +1108,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             const station = hits(stationLayers, 8)[0];
             if (station) { stationPopup.remove(); selectStationFromMapRef.current(String(station.properties.code)); return; }
           }
-          if (mapLayersRef.current.crossings) {
+          if (mapLayersRef.current.crossings && instance.getLayer("rail-level-crossing-symbols")) {
             const crossing = hits(["rail-level-crossing-symbols"], 7)[0];
             if (crossing?.geometry.type === "Point") crossingPopup
               .setLngLat(crossing.geometry.coordinates as [number, number])
@@ -1153,7 +1134,12 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
   useEffect(() => {
     const source = map.current?.getSource("rail-fleet") as GeoJSONSource | undefined;
     if (!mapReady || !source || isAlertsPage) return;
-    const frame = window.requestAnimationFrame(() => source.setData(fleetMapFeatures(displayTrains, selectedVehicleId)));
+    const frame = window.requestAnimationFrame(() => {
+      const previous = fleetMapState.current?.source === source ? fleetMapState.current.features : new Map();
+      const { features, diff } = fleetMapUpdate(previous, displayTrains, selectedVehicleId);
+      fleetMapState.current = { source, features };
+      if (diff) void source.updateData(diff);
+    });
     return () => window.cancelAnimationFrame(frame);
   }, [displayTrains, isAlertsPage, mapReady, selectedVehicleId]);
 
@@ -1220,7 +1206,10 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     if (!mapReady || !instance) return;
     const setVisibility = (layerIds: string[], visible: boolean) => {
       for (const layerId of layerIds) {
-        if (instance.getLayer(layerId)) instance.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+        const visibility = visible ? "visible" : "none";
+        if (instance.getLayer(layerId) && (instance.getLayoutProperty(layerId, "visibility") ?? "visible") !== visibility) {
+          instance.setLayoutProperty(layerId, "visibility", visibility);
+        }
       }
     };
     setVisibility(trainLayers, mapLayers.trains);
@@ -1239,6 +1228,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         { id: "rail-level-crossings", path: "/v1/geometry/rail/level-crossings", visible: mapLayers.crossings && instance.getZoom() >= 13, layers: ["rail-level-crossing-symbols"] },
       ];
       for (const layer of layers) {
+        if (layer.id === "rail-level-crossings" && layer.visible && !instance.getSource(layer.id)) addCrossingLayer(instance);
         setVisibility(layer.layers, layer.visible);
         if (!layer.visible || requestedGeometry.current.has(layer.id)) continue;
         const source = instance.getSource(layer.id) as GeoJSONSource | undefined;
@@ -1323,13 +1313,39 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
 
   useEffect(() => {
     let latestSequence: number | null = null;
+    let latestMatchSequence: number | null = null;
     let latestRoadSequence: number | null = null;
-    return openRadarConnection({
+    let fleet: Record<string, RailObservation> = {};
+    let fleetChanged = false;
+    let matchesChanged = false;
+    let frame: number | null = null;
+    const flushRail = () => {
+      frame ??= window.requestAnimationFrame(() => {
+        frame = null;
+        if (fleetChanged) {
+          setVehiclesById({ ...fleet });
+          setFleetReceived(true);
+        }
+        if (matchesChanged) setTrackMatchesByVehicle(Object.fromEntries(trackMatchesRef.current));
+        fleetChanged = matchesChanged = false;
+        setNow(Date.now());
+      });
+    };
+    const updateSelection = (value: RailObservation | undefined | null) => {
+      if (!value || value.vehicleId !== selectedVehicleIdRef.current) return;
+      if (value.trainNumber !== selectedTrainNumberRef.current) {
+        selectedTrainNumberRef.current = value.trainNumber;
+        setJourney(null);
+      }
+      setObservation(current => current?.observationId === value.observationId ? current : value);
+    };
+    const stop = openRadarConnection({
       feed: isAlertsPage ? "road" : "rail",
       recovered: () => latestSequence !== null || latestRoadSequence !== null,
       onStatus: setConnection,
       onSocket: socket => { socketRef.current = socket; },
       onOpen: socket => {
+        latestSequence = latestMatchSequence = latestRoadSequence = null;
         const vehicleId = selectedVehicleIdRef.current;
         if (vehicleId) socket.send(JSON.stringify({ protocolVersion: 2, type: "select", vehicleId }));
       },
@@ -1345,16 +1361,16 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         if (isAlertsPage ? !messageType.startsWith("road.") : !messageType.startsWith("rail.")) return;
         const fleetSnapshot = messageType === "rail.fleet.snapshot" ? railFleetSnapshotMessageSchema.safeParse(decoded) : null;
         if (fleetSnapshot?.success) {
-          setNow(Date.now());
-          setFleetReceived(true);
+          if (latestSequence !== null && fleetSnapshot.data.sequence < latestSequence) return;
           latestSequence = fleetSnapshot.data.sequence;
-          setVehiclesById(toRecord(fleetSnapshot.data.data));
-          return;
+          fleet = toRecord(fleetSnapshot.data.data);
+          fleetChanged = true;
+          if (selectedVehicleIdRef.current) updateSelection(fleet[selectedVehicleIdRef.current]);
+          flushRail();
+          return true;
         }
         const fleetBatch = messageType === "rail.fleet.batch" ? railFleetBatchMessageSchema.safeParse(decoded) : null;
         if (fleetBatch?.success) {
-          setNow(Date.now());
-          setFleetReceived(true);
           // At-least-once levering kan een batch herhalen of te laat afleveren.
           // Zo'n batch mag de vloot nooit bevriezen: een reeds verwerkt of ouder
           // volgnummer wordt genegeerd en de batch wordt daarna altijd toegepast,
@@ -1369,51 +1385,49 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             socket?.send(JSON.stringify({ protocolVersion: 2, type: "resync" }));
           }
           latestSequence = fleetBatch.data.sequence;
-          setVehiclesById((current) => {
-            const next = { ...current };
-            for (const vehicleId of fleetBatch.data.removedVehicleIds) delete next[vehicleId];
-            for (const vehicle of fleetBatch.data.upserts) next[vehicle.vehicleId] = vehicle;
-            return next;
-          });
           for (const vehicleId of fleetBatch.data.removedVehicleIds) {
-            trackMatchesRef.current.delete(vehicleId);
+            delete fleet[vehicleId];
+            if (trackMatchesRef.current.delete(vehicleId)) matchesChanged = true;
           }
-          setConnection("live");
-          return;
+          for (const vehicle of fleetBatch.data.upserts) {
+            fleet[vehicle.vehicleId] = vehicle;
+            updateSelection(vehicle);
+          }
+          fleetChanged = true;
+          flushRail();
+          return true;
         }
         const matchSnapshot = messageType === "rail.match.snapshot" ? railMatchSnapshotMessageSchema.safeParse(decoded) : null;
         if (matchSnapshot?.success) {
-          setNow(Date.now());
-          const matches = new Map(matchSnapshot.data.data.map((match) => [match.vehicleId, match]));
-          trackMatchesRef.current = matches;
-          setTrackMatchesByVehicle(Object.fromEntries(matches));
+          if (latestMatchSequence !== null && matchSnapshot.data.sequence < latestMatchSequence) return;
+          latestMatchSequence = matchSnapshot.data.sequence;
+          trackMatchesRef.current = new Map(matchSnapshot.data.data.map(match => [match.vehicleId, match]));
+          matchesChanged = true;
+          flushRail();
           return;
         }
         const matchBatch = messageType === "rail.match.batch" ? railMatchBatchMessageSchema.safeParse(decoded) : null;
         if (matchBatch?.success) {
-          setNow(Date.now());
-          const matches = new Map(trackMatchesRef.current);
+          if (latestMatchSequence !== null && matchBatch.data.sequence <= latestMatchSequence) return;
+          latestMatchSequence = matchBatch.data.sequence;
+          const matches = trackMatchesRef.current;
           for (const vehicleId of matchBatch.data.removedVehicleIds) {
             matches.delete(vehicleId);
           }
           for (const match of matchBatch.data.upserts) {
             matches.set(match.vehicleId, match);
           }
-          trackMatchesRef.current = matches;
-          setTrackMatchesByVehicle(Object.fromEntries(matches));
+          matchesChanged = true;
+          flushRail();
           return;
         }
         const selection = messageType === "rail.selection.snapshot" ? railSelectionSnapshotMessageSchema.safeParse(decoded) : null;
         if (selection?.success) {
-          setNow(Date.now());
           if (selection.data.vehicleId !== selectedVehicleIdRef.current) return;
-          if (selection.data.data && selection.data.data.trainNumber !== selectedTrainNumberRef.current) {
-            selectedTrainNumberRef.current = selection.data.data.trainNumber;
-            setJourney(null);
-          }
-          setSelectedVehicleId(selection.data.vehicleId);
-          selectedVehicleIdRef.current = selection.data.vehicleId;
-          setObservation(current => selection.data.data ?? (current?.vehicleId === selection.data.vehicleId ? current : null));
+          const value = selection.data.data;
+          const fleetValue = selection.data.vehicleId ? fleet[selection.data.vehicleId] : undefined;
+          if (value && fleetValue && (measurementTime(value) ?? 0) < (measurementTime(fleetValue) ?? 0)) return;
+          updateSelection(value);
           return;
         }
         const journeySnapshot = messageType === "rail.journey.snapshot" ? journeySnapshotMessageSchema.safeParse(decoded) : messageType === "rail.journey.delta" ? journeyDeltaMessageSchema.safeParse(decoded) : null;
@@ -1427,7 +1441,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           latestRoadSequence = roadSnapshot.data.sequence;
           setRoadReceived(true);
           setRoadEventsById(Object.fromEntries(roadSnapshot.data.data.map((roadEvent) => [roadEvent.id, roadEvent])));
-          return;
+          return true;
         }
         const roadBatch = messageType === "road.event.batch" ? roadBatchMessageSchema.safeParse(decoded) : null;
         if (roadBatch?.success) {
@@ -1447,9 +1461,14 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             for (const roadEvent of roadBatch.data.upserts) next[roadEvent.id] = roadEvent;
             return next;
           });
+          return true;
         }
       },
     });
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      stop();
+    };
   }, [isAlertsPage]);
 
   const routeJourney = selectedVehicleId && journey && journey.trainNumber === observation?.trainNumber
@@ -1733,6 +1752,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           <div className="mapZoomControls" aria-label={language === "en" ? "Map zoom" : "Kaartzoom"}>
             <button type="button" onClick={() => map.current?.zoomIn({ duration: 250 })} aria-label={t("map.zoomIn")}><AppIcon name="plus" /></button>
             <button type="button" onClick={() => map.current?.zoomOut({ duration: 250 })} aria-label={t("map.zoomOut")}><AppIcon name="minus" /></button>
+            <MapCredits baseMap={baseMap} roadMap={isAlertsPage} language={language} mapReady={mapReady} />
           </div>
 {isAlertsPage && <>          <div className={`mapStylePicker ${showMapStyles ? "open" : ""}`}>
             <div className="mapStyleMenu" role="menu" aria-label={t("map.style")} aria-hidden={!showMapStyles}>
@@ -1745,13 +1765,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             </button>
           </div>
 </>}
-          <div className="mapAttribution">{baseMap === "satellite" ? <>
-            <a href="https://www.pdok.nl/introductie/-/article/pdok-luchtfoto-rgb-open-">Beeldmateriaal Nederland / PDOK</a> · Kadaster
-          </> : <>
-            <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap</a>
-            {baseMap === "light" && <> · <a href="https://openfreemap.org/">OpenFreeMap</a> · OpenMapTiles</>}
-          </>} · {isAlertsPage ? "wegmeldingen: NDW/leveranciers" : "spoor: ProRail/PDOK (CC0)"}
-          {!isAlertsPage && <span className="mapGuideLink"> · <Link href={guidePath}>{language === "en" ? "About the train radar" : "Over de treinradar"}</Link></span>}</div>
 
         </div>
         {panel && panel.kind !== "search" && <PanelHost memory={panelScroll} panelKey={`${panel.kind}:${panel.id ?? ""}`} onClose={closePrimaryPanel} onBack={navigation.history.length ? backPrimaryPanel : undefined}>
