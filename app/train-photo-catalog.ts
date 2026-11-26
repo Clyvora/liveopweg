@@ -121,4 +121,17 @@ export const photographs = {
     ["blauwnet-flirt-10", "Keolis_Flirt_7401_nadert_Raalte_vanuit_Heino.jpg", "Jan Derk Remmers", "BY-SA 4.0"],
     ["blauwnet-flirt-11", "Keolis_Flirt_in_de_sneeuw_op_station_Zwolle.jpg", "JoshT1302", "BY-SA 4.0"],
   ],
+  ARRIVA_WINK: [
+    ["arriva-wink", "Harlingen_Haven_Arriva_WINK_615_RS2_Leeuwarden_(51367831681).jpg", "Rob Dammers", "BY 2.0"],
+    ["arriva-wink-2", "Arriva_Wink_op_station_Leeuwarden_in_2023.jpg", "JoachimKohler-HB", "BY-SA 4.0"],
+  ],
+  ARRIVA_GTW: [
+    ["arriva-gtw", "Arriva_Stadler_GTW_Leer-Groningen.JPG", "Jacek Rużyczka", "BY-SA 3.0"],
+    ["arriva-gtw-2", "Arriva_GTW_nabij_Appingedam.jpg", "Marcop23", "BY-SA 3.0"],
+    ["arriva-gtw-3", "Arriva_Spurt_Stadler_GTW_(19049611486).jpg", "m66roepers from Nederland", "BY 2.0"],
+  ],
+  BLAUWNET_GTW: [
+    ["blauwnet-gtw", "Arriva_10.517-III.JPG", "Spoorjan", "BY-SA 3.0"],
+    ["blauwnet-gtw-2", "Arriva_10519_Jeroen_Krabbé'_ter_hoogte_van_Mariënberg.jpg", "Jan Derk Remmers", "BY-SA 4.0"],
+  ],
 } as const satisfies Record<string, readonly PhotoSource[]>;

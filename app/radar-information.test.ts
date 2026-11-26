@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { expect, it } from "vitest";
 import { crossingDetails } from "./rail-crossing";
-import { trainPhotos, trainPhotoStart } from "./train-artwork";
+import { trainPhotos } from "./train-artwork";
 import { photographs } from "./train-photo-catalog";
 import { roadPlace } from "./road-presentation";
 import { noticeCategory } from "./RailNotices";
@@ -20,7 +20,7 @@ it("ships every credited photograph in the collection once", () => {
   const files = new Set<string>();
   const sources = new Set<string>();
   for (const gallery of Object.values(photographs)) {
-    expect(gallery.length).toBeGreaterThanOrEqual(8);
+    expect(gallery.length).toBeGreaterThanOrEqual(2);
     for (const [file, source, author, license] of gallery) {
       expect(files.has(file)).toBe(false);
       expect(sources.has(source)).toBe(false);
@@ -33,10 +33,14 @@ it("ships every credited photograph in the collection once", () => {
   }
 });
 
-it("starts different rides with different photos", () => {
-  expect(trainPhotoStart("1234", 2)).toBe(0);
-  expect(trainPhotoStart("1235", 2)).toBe(1);
-  expect(trainPhotoStart(null, 2)).toBe(0);
+it("identifies an exact photo only when the model and the set number match", () => {
+  expect(trainPhotos("VIRM", "NS", "8741").find(photo => photo.exactSet)?.src).toBe("/trains/photos/virm.webp");
+  expect(trainPhotos("VIRM", "NS", "9999").some(photo => photo.exactSet)).toBe(false);
+  expect(trainPhotos("FLIRT", "NS", "2015").find(photo => photo.exactSet)?.src).toBe("/trains/photos/rnet.webp");
+  expect(trainPhotos("FLIRT", "NS")).toEqual([]);
+  expect(trainPhotos("VIRM", "NS", "2015")).toEqual([]);
+  expect(trainPhotos("Stadler WINK", "Arriva", "615").find(photo => photo.exactSet)?.src).toBe("/trains/photos/arriva-wink.webp");
+  expect(trainPhotos("GTW", "Blauwnet (Arriva)", "10519").find(photo => photo.exactSet)?.src).toBe("/trains/photos/blauwnet-gtw-2.webp");
 });
 
 it("describes a crossing without interpreting the equipment as a live status", () => {

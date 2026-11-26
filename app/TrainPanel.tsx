@@ -29,7 +29,7 @@ function getETA(stop: Stop, now: number): number | null {
 
 function Delay({ seconds }: { seconds: number | null | undefined }) {
   const { language } = useLanguage();
-  return <span className={seconds != null && seconds > 0 ? "tpLate" : "tpDelay"}>{trainDelay(seconds, language)}</span>;
+  return <span className={(seconds ?? 0) >= 300 ? "tpSevereDelay" : (seconds ?? 0) > 0 ? "tpLate" : "tpDelay"}>{trainDelay(seconds, language)}</span>;
 }
 
 export function TrainPanel({ observation, journey, now:initialNow, onClose, isFollowing, canFollow:canFollowFromMap, onToggleFollow, units, positionMatched, showExpectedRoute, showRecentTrail }: { observation: RailObservation; journey: RailJourney | null; now: number; positionMatched?: boolean; units?: RailObservation[]; showExpectedRoute?: boolean; showRecentTrail?: boolean; onClose: () => void; isFollowing: boolean; canFollow: boolean; onToggleFollow: () => void }) {

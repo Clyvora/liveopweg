@@ -4,17 +4,19 @@
 .mapWrap { position:absolute; inset:0; overflow:hidden; background:#eef1f5; }
 .radarShell[data-night-map],.radarShell[data-night-map] .mapWrap { background:#0d1623; }
 .liveMap { position:absolute; inset:0; width:100%; height:100%; }
-.appNavigation { position:fixed; inset:0 0 auto; z-index:90; height:var(--app-header); display:flex; align-items:center; gap:44px; padding:0 28px; border-bottom:1px solid var(--ui-border); color:var(--ui-text); background:var(--ui-surface); }
-.radarBrand { display:flex; flex:none; align-items:center; color:var(--ui-text); text-decoration:none; }
+.appNavigation { position:fixed; inset:0 0 auto; z-index:90; height:var(--app-header); display:flex; align-items:center; gap:44px; padding:0 28px; border-bottom:1px solid #304567; color:#f3f6fc; background:var(--rail-navy); }
+.appNavigation .brandLogo { color:inherit; }
+.appNavigation :is(a,button):focus-visible { outline-color:var(--rail-yellow); outline-offset:-4px; }
+.radarBrand { display:flex; flex:none; align-items:center; color:inherit; text-decoration:none; }
 .sideNav { display:flex; align-self:stretch; align-items:stretch; gap:12px; min-width:0; }
-.sideNav>a,.sideNav>button { position:relative; display:flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 12px; border:0; border-bottom:3px solid transparent; border-radius:0; background:transparent; color:var(--ui-text); text-decoration:none; white-space:nowrap; font:500 16px/1.3 var(--font-ui); }
+.sideNav>a,.sideNav>button { position:relative; display:flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 12px; border:0; border-bottom:3px solid transparent; border-radius:0; background:transparent; color:inherit; text-decoration:none; white-space:nowrap; font:500 16px/1.3 var(--font-ui); }
 .sideNav .uiIcon { display:none; }
-.sideNav>a:hover,.sideNav>button:hover { background:var(--ui-muted-surface); }
-.sideNav .active { border-bottom-color:var(--ui-accent); color:var(--ui-text); font-weight:650; }
+.sideNav>a:hover,.sideNav>button:hover { background:#253957; }
+.sideNav .active { border-bottom-color:var(--rail-yellow); color:var(--rail-yellow); font-weight:650; }
 .sideNav .radarMoreButton { display:none; }
 .navigationUtilities { display:flex; align-items:center; gap:4px; margin-left:auto; }
-.navigationUtilities>a,.navigationUtilities>button { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--ui-text); }
-.navigationUtilities>a:hover,.navigationUtilities>button:hover { background:var(--ui-muted-surface); }
+.navigationUtilities>a,.navigationUtilities>button { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:6px; background:transparent; color:inherit; }
+.navigationUtilities>a:hover,.navigationUtilities>button:hover { background:#253957; }
 .navigationUtilities .uiIcon { width:23px; height:23px; }
 .fleetTools { position:absolute; top:80px; left:20px; z-index:60; width:376px; max-width:calc(100% - 40px); }
 .fleetTools>label { display:flex; position:relative; align-items:center; }
@@ -101,6 +103,8 @@
 .blauwnetEstimateMarker.measured { z-index:1; color:#eef8ff; }
 .blauwnetEstimateMarker.measured::before { border:1.5px solid #d1edff; background:#155a91; }
 .blauwnetTrainGlyph { position:relative; width:12px; height:15px; border-radius:4px 4px 3px 3px; background:currentColor; }
+.blauwnetTrainFront:not([hidden]) { position:relative; width:22px; height:22px; object-fit:contain; }
+.blauwnetTrainFront:not([hidden]) + .blauwnetTrainGlyph { display:none; }
 .blauwnetTrainGlyph::before { position:absolute; inset:2px 2px auto; height:5px; border-radius:1px; background:#f4faff; content:""; }
 .blauwnetEstimateMarker.measured .blauwnetTrainGlyph::before { background:#155a91; }
 .blauwnetTrainGlyph::after { position:absolute; left:2px; bottom:3px; width:2px; height:2px; border-radius:50%; background:#ffcf67; box-shadow:6px 0 #ffcf67; content:""; }
@@ -126,7 +130,7 @@
   .radarBrand,.navigationUtilities,.sideNav .radarSecondary { display:none; }
   .sideNav { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); width:100%; gap:0; }
   .sideNav>a,.sideNav>button,.sideNav .radarMoreButton { display:flex; flex-direction:column; gap:4px; min-height:66px; padding:7px 1px; border-bottom:0; border-top:2px solid transparent; font-size:11px; }
-  .sideNav .active { border-top-color:var(--ui-accent); color:var(--ui-accent); }
+  .sideNav .active { border-top-color:var(--rail-yellow); }
   .sideNav .uiIcon { display:block; width:21px; height:21px; }
   .fleetTools { top:var(--radar-search-top); left:max(12px,env(safe-area-inset-left)); right:max(12px,env(safe-area-inset-right)); width:auto; max-width:none; }
   .fleetTools input { height:48px; font-size:16px; }

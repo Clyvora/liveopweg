@@ -19,6 +19,8 @@
 .uiTabs { display:flex; gap:4px; padding:4px; margin:16px 0; background:var(--ui-muted-surface); border:1px solid var(--ui-border); border-radius:6px; }
 .uiTabs button { flex:1; min-height:44px; padding:9px 7px; border:0; background:transparent; color:var(--ui-muted); font-size:12px; font-weight:600; }
 .uiTabs button[aria-selected="true"],.uiTabs button[aria-pressed="true"] { background:var(--ui-surface); color:var(--ui-accent); box-shadow:0 1px 5px #163f3010; }
+.stationPanel .radarEyebrow { color:var(--rail-blue-ink); font-weight:650; }
+.stationPanel .uiTabs button[aria-selected="true"] { background:var(--rail-selected-surface); color:var(--rail-selected-ink); box-shadow:inset 0 -2px var(--rail-yellow); }
 .uiNotice { margin:18px 0; padding:14px; border:1px solid var(--ui-border); border-radius:6px; background:var(--ui-muted-surface); color:var(--ui-muted); font-size:13px; line-height:1.6; }
 .uiNotice p { margin:0 0 10px; }
 .uiNotice button { margin-top:6px; }
@@ -37,9 +39,16 @@
 .stationTimes>time { font-size:16px; font-weight:650; }
 .stationTimes s { color:var(--ui-muted); font-size:11px; }
 .stationResult>span:nth-child(2) { display:grid; gap:5px; }
-.stationTrack { align-self:start; padding:3px 6px; border-radius:5px; background:var(--ui-muted-surface); color:var(--ui-muted); font-size:11px; white-space:nowrap; }
-.stationTrack.changed { background:var(--ui-warning-surface); color:var(--ui-warning); font-weight:650; }
+.stationResult .stationTrack { align-self:start; padding:3px 6px; border-radius:5px; background:var(--ui-muted-surface); font-size:11px; white-space:nowrap; }
+.stationResult .stationTrack.known { background:var(--rail-blue-surface); color:var(--rail-blue-ink); font-weight:650; }
+.stationResult .stationTrack.changed { background:var(--ui-warning-surface); color:var(--ui-warning); font-weight:650; }
 .stationResult>small { grid-column:2/-1; }
+.stationResult>small.tpLate { color:var(--ui-warning); }
+.stationResult>small.tpSevereDelay { color:var(--ui-danger); }
+.stationResultCancelled .stationTimes>time,.stationResultCancelled strong { text-decoration-line:line-through; text-decoration-color:#ce3039; text-decoration-thickness:2px; }
+.stationResultCancelled>small { color:#aa202c; font-weight:700; }
+[data-theme="dark"] .stationResultCancelled>small,.radarShell[data-night-map] .stationResultCancelled>small { color:#ff969b; }
+.stationRecentHeading { padding:9px 0 4px; color:var(--ui-muted); font-size:12px; font-weight:650; }
 .stationOperatorFilter { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0 4px; font-size:12px; }
 .stationOperatorFilter select { min-height:44px; max-width:70%; padding:6px 10px; background:var(--ui-surface); color:var(--ui-text); border:1px solid var(--ui-border); border-radius:6px; font:inherit; }
 .stationPlatformFilter>span { display:flex; align-items:center; gap:6px; font-weight:650; }
@@ -68,6 +77,7 @@
 .stationGuideList a>.uiIcon { width:16px; height:16px; color:var(--ui-muted); }
 .stationServiceIdentity { display:flex; align-items:center; gap:5px; min-width:0; }
 .stationOperatorIcon { flex:none; width:19px; height:19px; }
+.stationTrainFront { width:22px; height:22px; border-radius:5px; object-fit:contain; }
 .stationTrainArt { margin:0 0 12px; }
 .radarDirectorySearch,.stationPicker input,.uiField input { width:100%; min-height:44px; padding:10px 12px; border:1px solid var(--ui-border); border-radius:6px; background:var(--ui-surface); color:var(--ui-text); font-size:15px; }
 .radarDirectorySearch::placeholder { color:var(--ui-muted); opacity:1; }

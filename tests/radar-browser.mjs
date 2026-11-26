@@ -8,6 +8,11 @@ async (page) => {
     return width >= 44 && height >= 44 && element.contains(document.elementFromPoint(x + width/2, y + height/2));
   });
   const checks = [];
+  const loadedFronts = new Set();
+  page.on('response', response => {
+    const pathname = new URL(response.url()).pathname;
+    if (response.ok() && pathname.startsWith('/trains/fronts/')) loadedFronts.add(pathname);
+  });
   let adviceMode = 'success', noticeMode = 'success', trainPresent = true;
   const refreshFleet = [];
   const now = () => new Date().toISOString();
@@ -42,7 +47,11 @@ async (page) => {
     {...entry('test-blauwnet-a','3823',null),operator:'Blauwnet A',direction:'Emmen',serviceType:'Sneltrein',rollingStock:null,track:'3',plannedTrack:'3',trackChanged:false},
     {...entry('test-blauwnet-k','7925',null),operator:'Blauwnet K',direction:'Enschede',serviceType:'Sprinter',rollingStock:'FLIRT',track:'4',plannedTrack:'4',trackChanged:false},
   ];
-  await page.route('**/v1/stations/*/board', route => route.fulfill({ json: { stationCode: route.request().url().match(/stations\/(.*?)\/board/)[1], generatedAt:now(), lastReceivedAt:now(), sourceHealthy:true, coverage:'RECEIVED_JOURNEYS', windowMinutes:60, departures:stationDepartures, arrivals:[entry('test-arrival','1234','test-train')] } }));
+  await page.route('**/v1/stations/*/board', route => route.fulfill({ json: { stationCode: route.request().url().match(/stations\/(.*?)\/board/)[1], generatedAt:now(), lastReceivedAt:now(), sourceHealthy:true, coverage:'RECEIVED_JOURNEYS', windowMinutes:60, arrivalWindow:{pastMinutes:10,upcomingMinutes:90}, departures:stationDepartures, arrivals:[
+    entry('test-arrival','1234','test-train'),
+    {...entry('test-recent','1235',null), expectedAt:later(-4)},
+    {...entry('test-cancelled','1236',null), direction:'Roosendaal', expectedAt:later(75), cancelled:true, track:null},
+  ] } }));
   let longitude=5.11, journeyRevision='a', routeAvailable=true, updateJourney;
   const journeyEvent=(minutes)=>({ plannedAt:new Date(Date.now()+minutes*60_000).toISOString(), actualAt:null, exactDelaySeconds:null, plannedTrack:'5', actualTrack:null });
   const journeyStops=stations.map((station,order)=>({
@@ -91,6 +100,8 @@ async (page) => {
   const estimatedTrain=page.getByRole('button',{name:/Geschatte positie.*Blauwnet \(Keolis\).*7925/});
   const measuredTrain=page.getByRole('button',{name:/Gemeten positie.*Blauwnet \(Arriva\).*RS20/});
   await estimatedTrain.waitFor();
+  await estimatedTrain.locator('img[src="/trains/fronts/blauwnet-flirt.webp"]').waitFor();
+  check(await measuredTrain.locator('img').count()===0,'An unidentified regional train keeps its generic marker');
   await page.getByRole('button',{name:'Sluit kaartlagen',exact:true}).click();
   await estimatedTrain.click();
   await page.getByText('Geschat op basis van haltetijden',{exact:true}).waitFor();
@@ -106,7 +117,10 @@ async (page) => {
   await page.evaluate(() => { localStorage.removeItem('liveopweg-favorite-stations'); localStorage.removeItem('liveopweg-followed-route'); });
   const search=page.getByRole('combobox',{name:'Zoek trein, station of materieel'});
   await search.fill('1234');
+  const virmFront = '/trains/fronts/virm.webp';
+  const markerReady = loadedFronts.has(virmFront) ? null : page.waitForResponse(response => response.ok() && new URL(response.url()).pathname===virmFront);
   await page.getByRole('option').filter({hasText:'Trein 1234'}).click();
+  await markerReady;
   await page.getByText('Verwachte route',{exact:true}).waitFor();
   await page.getByRole('region',{name:'Volgende halte'}).getByText('Amsterdam Centraal',{exact:true}).waitFor();
   longitude=5.109;
@@ -193,6 +207,10 @@ async (page) => {
   await page.getByRole('button',{name:'Bekijk op radar',exact:true}).click();
   await page.getByRole('button',{name:'Terug',exact:true}).click();
   await page.getByRole('tab',{name:'Aankomst',exact:true}).click();
+  await page.getByText('Recente aankomsttijden',{exact:true}).waitFor();
+  const cancelled = page.getByRole('button',{name:/Roosendaal.*1236.*Vervalt/});
+  check(await cancelled.locator('strong').evaluate(el=>getComputedStyle(el).textDecorationLine==='line-through'),'Cancelled arrivals have a visible strike-through');
+  await page.getByText(/komende 90 minuten/).waitFor();
   await nav.getByRole('button',{name:'Favorieten',exact:true}).click();
   check(await page.getByRole('button',{name:'Utrecht Centraal UT',exact:true}).isVisible(),'Favorite shared between panels');
   checks.push('station photo, guide, keyboard tabs and platform changes; regional departure → train; operator filter and favorites');

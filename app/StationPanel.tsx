@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import type { RailStation } from "../packages/domain-rail/stations";
 import { stationBoardSchema, type StationBoard, type StationBoardEntry } from "../packages/protocol/station";
 import { realtimeHttpUrl } from "./realtime-url";
@@ -7,7 +7,7 @@ import { useLanguage } from "./LanguageContext";
 import { useFavoriteStations } from "./useFavoriteStations";
 import { AppIcon } from "./Icons";
 import { TrainImage } from "./TrainImage";
-import { RegionalTrainIcon } from "./RegionalTrainIcon";
+import { StationServiceIcon } from "./StationServiceIcon";
 import { regionalTrainBrand } from "./train-livery";
 import { StationGuideContent, StationPhoto } from "./StationGuideContent";
 import { stationGuides } from "./station-guide";
@@ -77,7 +77,12 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
     return () => { disposed = true; active?.abort(); clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
   }, [station.code, revision, section]);
   const stale = error || !board?.sourceHealthy || now - Date.parse(board?.generatedAt ?? "") > 45_000;
-  const entries = (board?.[tab] ?? []).filter(entry => Date.parse(entry.expectedAt) >= now);
+  const arrivalWindow = board?.arrivalWindow;
+  const entries = (board?.[tab] ?? []).filter(entry => {
+    const at = Date.parse(entry.expectedAt);
+    return at >= now || (tab === "arrivals" && !entry.cancelled && entry.timeBasis === "UPDATED"
+      && at >= now - (arrivalWindow?.pastMinutes ?? 0) * 60_000);
+  });
   const operators = [...new Set([...(board?.departures ?? []), ...(board?.arrivals ?? [])]
     .map(entry => operatorGroup(entry.operator)).filter(Boolean))].sort((left, right) => left.localeCompare(right));
   const savedOperator = operatorGroup(operator);
@@ -87,6 +92,8 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
   if (activePlatform && !platforms.includes(activePlatform)) platforms.push(activePlatform);
   const visibleEntries = entries.filter(entry =>
     (!selectedOperator || operatorGroup(entry.operator) === selectedOperator) && showsOnPlatform(entry, activePlatform));
+  const upcoming = visibleEntries.filter(entry => Date.parse(entry.expectedAt) >= now);
+  const recent = visibleEntries.filter(entry => Date.parse(entry.expectedAt) < now).reverse();
   const sectionLabel = en
     ? { board: "Trains", facilities: "Facilities", onward: "Onward travel" }
     : { board: "Treinen", facilities: "Voorzieningen", onward: "Verder reizen" };
@@ -149,37 +156,46 @@ export function StationPanel({ station, now, availableVehicleIds, onClose, onSel
         ? (en ? "No upcoming departures match this platform filter." : "Geen komende vertrekken voor dit perronfilter.")
         : selectedOperator
         ? (en ? "No upcoming services from this operator." : "Geen komende ritten van deze vervoerder.")
-        : (en ? "No journeys received for the next hour. This does not mean no trains are running." : "Geen ritten ontvangen voor het komende uur. Dit betekent niet dat er geen treinen rijden.")}</p>}
-      <ul className="uiResultList">{visibleEntries.map(entry => {
+        : (en ? "No journey times were received for this period." : "Geen ritinformatie ontvangen voor deze periode.")}</p>}
+      <ul className="uiResultList">{[...upcoming, ...recent].map((entry, index) => {
         const canFollow = !stale && !entry.cancelled && entry.vehicleId !== null && availableVehicleIds.has(entry.vehicleId);
         const operatorName = blauwnetOperators.get(entry.operator?.trim().toLowerCase() ?? "") ?? entry.operator;
         const moved = !entry.cancelled && movedFromPlatform(entry, activePlatform);
         const planned = entry.plannedAt;
         const previousTime = planned && !entry.cancelled && entry.timeBasis === "UPDATED" && clock(planned) !== clock(entry.expectedAt) ? planned : null;
-        return <li key={entry.id}>
-          <button className="uiResultButton stationResult" aria-expanded={selected === entry.id} onClick={() => setSelected(selected === entry.id ? null : entry.id)}>
+        const delay = entry.delaySeconds ?? 0;
+        let statusClass = "";
+        if (!entry.cancelled) {
+          if (delay >= 300) statusClass = "tpSevereDelay";
+          else if (moved || delay >= 60) statusClass = "tpLate";
+          else if (entry.delaySeconds === 0 && !entry.trackChanged) statusClass = "stationOnTime";
+        }
+        return <Fragment key={entry.id}>
+          {index === upcoming.length && <li className="stationRecentHeading">{en ? "Recent arrival times" : "Recente aankomsttijden"}</li>}
+          <li>
+          <button className={`uiResultButton stationResult${entry.cancelled ? " stationResultCancelled" : ""}`} aria-expanded={selected === entry.id} onClick={() => setSelected(selected === entry.id ? null : entry.id)}>
             <span className="stationTimes">
               <time dateTime={entry.expectedAt}>{clock(entry.expectedAt)}</time>
               {previousTime && <s><time dateTime={previousTime} aria-label={`${en ? "Scheduled" : "Gepland"} ${clock(previousTime)}`}>{clock(previousTime)}</time></s>}
             </span>
-            <span><strong>{entry.direction}</strong><small className="stationServiceIdentity"><RegionalTrainIcon operator={entry.operator} /><span>{[operatorName, `${entry.serviceType} ${entry.trainNumber}`].filter(Boolean).join(" · ")}</span></small></span>
-            <span className={`stationTrack${entry.trackChanged ? " changed" : ""}`}>{entry.track ? `${en ? "Platform" : "Spoor"} ${entry.track}` : (en ? "No platform" : "Spoor onbekend")}</span>
-            <small className={moved || entry.cancelled || (entry.delaySeconds ?? 0) >= 60 ? "tpLate" : entry.delaySeconds === 0 && !entry.trackChanged ? "stationOnTime" : ""}>
+            <span><strong>{entry.direction}</strong><small className="stationServiceIdentity"><StationServiceIcon operator={operatorName} serviceType={entry.serviceType} rollingStock={entry.rollingStock} materialNumber={entry.materialNumber} /><span>{[operatorName, `${entry.serviceType} ${entry.trainNumber}`].filter(Boolean).join(" · ")}</span></small></span>
+            <span className={`stationTrack${entry.trackChanged ? " changed" : entry.track ? " known" : ""}`}>{entry.track ? `${en ? "Platform" : "Spoor"} ${entry.track}` : (en ? "No platform" : "Spoor onbekend")}</span>
+            <small className={statusClass}>
               {moved ? (en ? `Moved to platform ${entry.track}` : `Verplaatst naar spoor ${entry.track}`) : boardEntryStatus(entry, en)}
             </small>
           </button>
           {selected === entry.id && <div className="uiResultDetail">
             <div className="stationTrainArt">
-              <TrainImage model={entry.rollingStock} operator={operatorName} trainNumber={entry.trainNumber} />
+              <TrainImage model={entry.rollingStock} operator={operatorName} material={entry.materialNumber} trainNumber={entry.trainNumber} />
             </div>
             {entry.trackChanged && <p>{en ? "Platform changed" : "Spoor gewijzigd"}: {entry.plannedTrack ?? "—"} → {entry.track ?? "—"}</p>}
             <button disabled={!canFollow} onClick={() => { if (entry.vehicleId && canFollow) onSelectVehicle(entry.vehicleId); }}>{en ? "View on radar" : "Bekijk op radar"}</button>
             {!canFollow && <p>{entry.cancelled ? (en ? "This service is cancelled." : "Deze rit vervalt.") : stale ? (en ? "The current position cannot be confirmed while the board is out of date." : "De actuele positie kan niet worden bevestigd zolang het stationbord verouderd is.") : (en ? "No current live position available for this train." : "Voor deze trein is geen actuele livepositie beschikbaar.")}</p>}
           </div>}
-        </li>;
+        </li></Fragment>;
       })}</ul>
     </div>
-    <small className="uiSourceNote">{en ? "Received journey information · next 60 minutes" : "Ontvangen ritinformatie · komende 60 minuten"}</small>
+    <small className="uiSourceNote">{en ? "Received journey information" : "Ontvangen ritinformatie"} · {en ? "next" : "komende"} {tab === "arrivals" ? arrivalWindow?.upcomingMinutes ?? 60 : 60} {en ? "minutes" : "minuten"}</small>
     </>}
     </div>
     <a className="stationSourceLink" href={stationInfo} target="_blank" rel="noreferrer"><AppIcon name="external" />{en ? "Station information at NS" : "Stationsinformatie bij NS"}</a>

@@ -1,4 +1,5 @@
 import type { Map as RadarMap } from "maplibre-gl";
+import { trainFrontUrl } from "./train-fronts";
 import { trainLiveries } from "./train-livery";
 
 const stationZooms = [5, 7, 8, 10];
@@ -29,20 +30,23 @@ export const trainBadgeShapes = {
   },
 };
 
-function addBadge(map: RadarMap, name: string, shape: keyof typeof trainBadgeShapes, bodyColor: string, detail: string, rim: string) {
+function addBadge(map: RadarMap, name: string, shape: keyof typeof trainBadgeShapes, bodyColor: string, detail: string, rim: string, frontUrl: string | null) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 48;
-  const context = canvas.getContext("2d");
+  const context = canvas.getContext("2d", { willReadFrequently: Boolean(frontUrl) });
   if (!context) return;
   context.scale(2, 2);
 
-  context.beginPath();
-  context.arc(12, 12, 10.5, 0, Math.PI * 2);
-  context.fillStyle = "#142536";
-  context.fill();
-  context.strokeStyle = rim;
-  context.lineWidth = 1.25;
-  context.stroke();
+  const drawBackground = () => {
+    context.beginPath();
+    context.arc(12, 12, 10.5, 0, Math.PI * 2);
+    context.fillStyle = "#142536";
+    context.fill();
+    context.strokeStyle = rim;
+    context.lineWidth = 1.25;
+    context.stroke();
+  };
+  drawBackground();
   const { body, glass, rails } = trainBadgeShapes[shape];
   context.fillStyle = bodyColor;
   context.fill(new Path2D(body));
@@ -53,6 +57,22 @@ function addBadge(map: RadarMap, name: string, shape: keyof typeof trainBadgeSha
   context.lineCap = "round";
   context.stroke(new Path2D(rails));
   map.addImage(name, context.getImageData(0, 0, 48, 48), { pixelRatio: 2 });
+  if (!frontUrl) return;
+
+  const front = new Image();
+  front.onload = () => {
+    if (!map.hasImage(name)) return;
+    context.clearRect(0, 0, 24, 24);
+    drawBackground();
+    context.save();
+    context.beginPath();
+    context.arc(12, 12, 10, 0, Math.PI * 2);
+    context.clip();
+    context.drawImage(front, 2, 2, 20, 20);
+    context.restore();
+    map.updateImage(name, context.getImageData(0, 0, 48, 48));
+  };
+  front.src = frontUrl;
 }
 
 function addOverviewDot(map: RadarMap, name: string, fill: string, rim: string) {
@@ -71,14 +91,14 @@ function addOverviewDot(map: RadarMap, name: string, fill: string, rim: string) 
 }
 
 export function addRadarMarkerLayers(map: RadarMap) {
-  map.on("styleimagemissing", ({ id }) => {
-    const match = /^train-([^-]+)-([^-]+)$/.exec(id);
+  map.setMissingStyleImageResolver(id => {
+    const match = /^train-([^-]+)-([^:-]+)(?::([a-z0-9-]+))?$/.exec(id);
     if (!match || !Object.hasOwn(trainBadgeShapes, match[2]) || map.hasImage(id)) return;
     const shape = match[2] as keyof typeof trainBadgeShapes;
-    if (match[1] === "stale") addBadge(map, id, shape, "#e8ebef", "#526173", "#95a3b4");
+    if (match[1] === "stale") addBadge(map, id, shape, "#e8ebef", "#526173", "#95a3b4", null);
     else if (Object.hasOwn(trainLiveries, match[1])) {
       const { body, detail } = trainLiveries[match[1] as keyof typeof trainLiveries];
-      addBadge(map, id, shape, body, detail, "#ffffff");
+      addBadge(map, id, shape, body, detail, "#ffffff", trainFrontUrl(match[3] ?? null));
     }
   });
   for (const [livery, { body, detail }] of Object.entries(trainLiveries)) {

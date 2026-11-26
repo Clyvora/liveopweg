@@ -1,6 +1,7 @@
 import { identifyRollingStock, rollingStockLabel, trainSetDetails } from "../packages/domain-rail/rolling-stock";
 import type { trainBadgeShapes } from "./radar-marker-layers";
 import type { TrainLivery } from "./train-livery";
+import { nsTrainFront } from "./train-fronts";
 
 const modelShapes: Partial<Record<NonNullable<ReturnType<typeof trainSetDetails>>["model"], keyof typeof trainBadgeShapes>> = {
   virm: "doubleDeck",
@@ -20,6 +21,7 @@ export function trainMarkerIdentity(trainNumber: string, materialNumber: string 
     materialNumber,
     shape: stock ? modelShapes[stock.model] ?? "generic" : "generic",
     livery,
+    front: nsTrainFront(stock),
   };
 }
 

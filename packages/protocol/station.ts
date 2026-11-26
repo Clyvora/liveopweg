@@ -17,6 +17,7 @@ const stationBoardEntrySchema = z.object({
   cancelled: z.boolean(),
   vehicleId: z.string().nullable(),
   rollingStock: z.string().nullable(),
+  materialNumber: z.string().nullable().optional(),
 });
 
 export const stationBoardSchema = z.object({
@@ -26,6 +27,7 @@ export const stationBoardSchema = z.object({
   sourceHealthy: z.boolean(),
   coverage: z.literal("RECEIVED_JOURNEYS"),
   windowMinutes: z.literal(60),
+  arrivalWindow: z.object({ pastMinutes: z.number().int().nonnegative(), upcomingMinutes: z.number().int().positive() }).optional(),
   departures: z.array(stationBoardEntrySchema),
   arrivals: z.array(stationBoardEntrySchema),
 });

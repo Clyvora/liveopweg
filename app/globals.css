@@ -13,6 +13,13 @@
   --ui-warning-surface:#fff3d9;
   --ui-danger:#ad3d33;
   --ui-danger-surface:#fff0ed;
+  --rail-navy:#152642;
+  --rail-yellow:#ffd044;
+  --rail-yellow-hover:#ffde73;
+  --rail-selected-surface:#fff2c2;
+  --rail-selected-ink:#523e00;
+  --rail-blue-surface:#edf3fc;
+  --rail-blue-ink:#244b86;
   --ui-radius:8px;
   --ui-shadow:0 2px 10px #00000016;
   --rail-ink:#ffffff;
@@ -33,6 +40,10 @@
   --ui-warning-surface:#3b311d;
   --ui-danger:#ffada1;
   --ui-danger-surface:#422824;
+  --rail-selected-surface:#483a17;
+  --rail-selected-ink:#ffe08a;
+  --rail-blue-surface:#23334c;
+  --rail-blue-ink:#c0d6fb;
   --ui-shadow:0 8px 28px #0003;
 }
 * { box-sizing:border-box; }

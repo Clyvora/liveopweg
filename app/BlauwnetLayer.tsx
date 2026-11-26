@@ -4,6 +4,7 @@ import { useEffect, type RefObject } from "react";
 import type { Map as MapLibreMap, Marker } from "maplibre-gl";
 import { z } from "zod";
 import { realtimeHttpUrl } from "./realtime-url";
+import { keolisBlauwnetFront, trainFrontUrl } from "./train-fronts";
 
 const positionsSchema = z.object({
   positions: z.array(z.object({
@@ -28,6 +29,19 @@ export type RegionalTrainPosition = z.infer<typeof positionsSchema>["positions"]
 
 export function regionalOperator(operator: string) {
   return operator === "Blauwnet A" ? "Blauwnet (Arriva)" : operator === "Blauwnet K" ? "Blauwnet (Keolis)" : operator;
+}
+
+function setRegionalFront(button: HTMLElement, operator: string) {
+  button.querySelector(".blauwnetTrainFront")?.remove();
+  const src = trainFrontUrl(keolisBlauwnetFront(operator));
+  if (!src) return;
+  const image = document.createElement("img");
+  image.className = "blauwnetTrainFront";
+  image.alt = "";
+  image.hidden = true;
+  image.addEventListener("load", () => { image.hidden = false; }, { once: true });
+  image.src = src;
+  button.prepend(image);
 }
 
 export function BlauwnetLayer({ map, language, onUnavailable, onPositions, onSelect }: {
@@ -78,6 +92,7 @@ export function BlauwnetLayer({ map, language, onUnavailable, onPositions, onSel
             const button = current.marker.getElement();
             button.classList.toggle("measured", measured);
             button.setAttribute("aria-label", `${label} · ${title}`);
+            if (current.position.operator !== position.operator) setRegionalFront(button, position.operator);
             current.position = position;
             continue;
           }
@@ -89,6 +104,7 @@ export function BlauwnetLayer({ map, language, onUnavailable, onPositions, onSel
           const glyph = document.createElement("span");
           glyph.className = "blauwnetTrainGlyph";
           button.append(glyph);
+          setRegionalFront(button, position.operator);
           button.addEventListener("click", event => {
             event.stopPropagation();
             const selected = markers.get(position.id);

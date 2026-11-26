@@ -8,7 +8,7 @@ type MappedTrain = { observation: RailObservation; position: Position; stale: bo
 
 function mapTrainFeature({ observation, position, stale, matched }: MappedTrain, selectedVehicleId: string | null) {
   const selected = observation.vehicleId === selectedVehicleId;
-  const { shape, livery, ...identity } = trainMarkerIdentity(observation.trainNumber, observation.materialNumber);
+  const { shape, livery, front, ...identity } = trainMarkerIdentity(observation.trainNumber, observation.materialNumber);
   return {
     type: "Feature" as const,
     id: observation.vehicleId,
@@ -21,7 +21,7 @@ function mapTrainFeature({ observation, position, stale, matched }: MappedTrain,
       hasHeading: observation.headingDegrees != null,
       heading: observation.headingDegrees ?? 0,
       badge: stale ? "train-stale" : selected ? "train-selected" : matched ? "train-matched" : "train-gps",
-      detailIcon: stale ? `train-stale-${shape}` : `train-${livery}-${shape}`,
+      detailIcon: stale ? `train-stale-${shape}` : front ? `train-${livery}-${shape}:${front}` : `train-${livery}-${shape}`,
       dotIcon: stale ? "train-stale-dot" : `train-${livery}-dot`,
     },
   };

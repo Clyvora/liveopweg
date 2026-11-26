@@ -83,27 +83,34 @@ async (page)=>{
   await page.unroute(virmPhotos);await page.unroute('**/train-virm-v1.png');
   const loadedPhotos = new Set();
   page.on('request',request=>{if(virmPhotos.test(request.url()))loadedPhotos.add(new URL(request.url()).pathname);});
-  await page.goto('http://localhost:3000/?train=TEST-559');
-  await page.locator('.tpIllustration img').waitFor();
-  await page.waitForFunction(()=>document.querySelector('.tpIllustration img')?.naturalWidth>0);
-  const startingPhoto = await page.locator('.tpIllustration img').getAttribute('src');
-  check(loadedPhotos.size===1&&loadedPhotos.has(startingPhoto),'The gallery initially downloads only the displayed photo');
-  const nextPhoto = page.getByRole('button',{name:'Volgende foto'});
-  await nextPhoto.press('Enter');
-  check(startingPhoto!==await page.locator('.tpIllustration img').getAttribute('src'),'Next photo changes the photo without leaving the train');
-  await page.waitForFunction(()=>document.querySelector('.tpIllustration img')?.naturalWidth>0);
-  check(loadedPhotos.size===2,'The next photo is downloaded on demand');
-  await page.getByRole('button',{name:'Vorige foto'}).click();
-  check(startingPhoto===await page.locator('.tpIllustration img').getAttribute('src'),'Previous photo returns to the same image');
-  const photoNav = page.locator('.tpIllustration .trainPhotoNav');
-  check(Number((await photoNav.innerText()).match(/\/\s*(\d+)/)?.[1])>=6,'The VIRM gallery offers a substantial selection');
+  const openCoupledTrain = async () => {
+    await search.fill('9544');
+    await page.getByRole('option').click();
+    await page.locator('.tpIllustration img').waitFor();
+    await page.waitForFunction(()=>document.querySelector('.tpIllustration img')?.naturalWidth>0);
+    return page.locator('.tpIllustration img').getAttribute('src');
+  };
+  const startingPhoto = await openCoupledTrain();
+  check(loadedPhotos.size===1&&loadedPhotos.has(startingPhoto),'The panel downloads only the selected photo');
+  check(await page.locator('.tpIllustration button').count()===0,'There are no photo navigation buttons');
+  sendFleet();
+  check(startingPhoto===await page.locator('.tpIllustration img').getAttribute('src'),'Live updates keep the selected photo');
+  let reopenedPhoto = startingPhoto;
+  // A random draw can legitimately return the same photo.
+  for (let attempt=0; attempt<8 && reopenedPhoto===startingPhoto; attempt++) {
+    await page.getByRole('button',{name:'Sluit treininformatie',exact:true}).click();
+    await page.locator('.trainPanel').waitFor({state:'hidden'});
+    reopenedPhoto = await openCoupledTrain();
+  }
+  check(startingPhoto!==reopenedPhoto,'A new draw can show a different photo for the same train');
+  check(loadedPhotos.size===2,'The reopened panel loads only its new photo');
   check(await page.locator('.tpIllustration img').evaluate(img=>getComputedStyle(img).objectFit==='cover'),'Type photos crop without stretching');
   await page.getByText('≈ 270 m · 10 rijtuigen',{exact:true}).waitFor();
   await firstSet.click();
   await guide.getByRole('heading',{name:'VIRM dubbeldekker · 8656'}).waitFor();
   await page.locator('.tpStock').screenshot({path:'output/playwright/boarding-guide-desktop-TESTGEGEVENS.png'});
   await search.fill('2015');await page.getByRole('option').click();
-  await page.getByRole('img',{name:'Voorbeeldfoto van FLIRT',exact:true}).waitFor();
+  await page.locator('.tpIllustration img').waitFor();
   await page.waitForFunction(()=>document.querySelector('.tpIllustration img')?.naturalWidth>0);
   check(/\/trains\/photos\/rnet(?:-\d+)?\.webp$/.test(await page.locator('.tpIllustration img').getAttribute('src')),'Uses an R-net FLIRT photo for its known trainset');
   await page.getByText('≈ 46 m · 2 rijtuigen',{exact:true}).waitFor();
