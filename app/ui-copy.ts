@@ -29,7 +29,7 @@ const english: Record<string, string> = {
   "Richting onbekend": "Direction unknown",
 
   "Treinenkaart": "Train map", "Kaartweergave": "Map view", "Kaart": "Map", "Kaartlagen": "Map layers", "Sluit kaartlagen": "Close map layers",
-  "Live treinen": "Live trains", "Stations": "Stations", "Spoorlijnen": "Railways", "Overwegen": "Level crossings", "Spoormeldingen": "Rail disruptions",
+  "Live treinen": "Live trains", "Stations": "Stations", "Spoorlijnen": "Railways", "Spoormeldingen": "Rail disruptions",
   "Bij mij in de buurt": "Near me", "Wat is er bij mij in de buurt": "Near me", "Bij jou in de buurt": "Near you", "OM JE HEEN": "NEAR YOU", "Sluit buurtpaneel": "Close nearby places",
   "Je locatie ophalen…": "Finding your location…", "Je locatie blijft op dit apparaat en wordt niet opgeslagen.": "Your location stays on this device and is not stored.",
   "Locatietoegang is geblokkeerd. Sta locatie toe in je browser en probeer opnieuw.": "Location permission is blocked. Allow location access in your browser and try again.",

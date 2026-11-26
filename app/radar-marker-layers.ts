@@ -5,7 +5,7 @@ import { trainLiveries } from "./train-livery";
 const stationZooms = [5, 7, 8, 10];
 export const stationLayers = stationZooms.map(zoom => `radar-stations-${zoom}`);
 export const trainHitLayers = ["rail-fleet-points"];
-export const trainLayers = ["rail-fleet-selected", "rail-fleet-matched-ring", "rail-fleet-heading", ...trainHitLayers];
+export const trainLayers = ["rail-fleet-heading", ...trainHitLayers];
 
 export const trainBadgeShapes = {
   generic: {
@@ -37,19 +37,14 @@ function addBadge(map: RadarMap, name: string, shape: keyof typeof trainBadgeSha
   if (!context) return;
   context.scale(2, 2);
 
-  const drawBackground = () => {
-    context.beginPath();
-    context.arc(12, 12, 10.5, 0, Math.PI * 2);
-    context.fillStyle = "#142536";
-    context.fill();
-    context.strokeStyle = rim;
-    context.lineWidth = 1.25;
-    context.stroke();
-  };
-  drawBackground();
   const { body, glass, rails } = trainBadgeShapes[shape];
+  const silhouette = new Path2D(body);
+  context.strokeStyle = rim;
+  context.lineWidth = 1.8;
+  context.lineJoin = "round";
+  context.stroke(silhouette);
   context.fillStyle = bodyColor;
-  context.fill(new Path2D(body));
+  context.fill(silhouette);
   context.fillStyle = detail;
   context.fill(new Path2D(glass));
   context.strokeStyle = bodyColor;
@@ -63,13 +58,9 @@ function addBadge(map: RadarMap, name: string, shape: keyof typeof trainBadgeSha
   front.onload = () => {
     if (!map.hasImage(name)) return;
     context.clearRect(0, 0, 24, 24);
-    drawBackground();
-    context.save();
-    context.beginPath();
-    context.arc(12, 12, 10, 0, Math.PI * 2);
-    context.clip();
-    context.drawImage(front, 2, 2, 20, 20);
-    context.restore();
+    context.shadowColor = "#132239b0";
+    context.shadowBlur = 2;
+    context.drawImage(front, 0, 0, 24, 24);
     map.updateImage(name, context.getImageData(0, 0, 48, 48));
   };
   front.src = frontUrl;
@@ -139,23 +130,11 @@ export function addRadarMarkerLayers(map: RadarMap) {
 
   map.addSource("rail-fleet", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   map.addLayer({
-    id: "rail-fleet-selected", type: "circle", source: "rail-fleet",
-    filter: ["==", ["get", "selected"], true],
-    paint: { "circle-radius": 18, "circle-color": "#4f87ee", "circle-opacity": 0.3, "circle-stroke-width": 2, "circle-stroke-color": "#3b74da" },
-  });
-  map.addLayer({
-    id: "rail-fleet-matched-ring", type: "circle", source: "rail-fleet",
-    filter: ["==", ["get", "badge"], "train-matched"],
-    paint: {
-      "circle-radius": ["step", ["zoom"], 5.5, 8, 12],
-      "circle-opacity": 0, "circle-stroke-color": "#3779db", "circle-stroke-width": 1.5,
-    },
-  });
-  map.addLayer({
     id: "rail-fleet-heading", type: "symbol", source: "rail-fleet", minzoom: 9,
     filter: ["all", ["==", ["get", "hasHeading"], true], ["!=", ["get", "badge"], "train-stale"]],
     layout: {
       "icon-image": "train-heading", "icon-rotate": ["get", "heading"],
+      "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 1.2, 14, 1.55],
       "icon-rotation-alignment": "map", "icon-pitch-alignment": "viewport",
       "icon-allow-overlap": true, "icon-ignore-placement": true,
     },
@@ -164,7 +143,11 @@ export function addRadarMarkerLayers(map: RadarMap) {
     id: "rail-fleet-points", type: "symbol", source: "rail-fleet",
     layout: {
       "icon-image": ["step", ["zoom"], ["case", ["get", "selected"], ["get", "detailIcon"], ["get", "dotIcon"]], 8, ["get", "detailIcon"]],
-      "icon-size": ["interpolate", ["linear"], ["zoom"], 5, 0.70, 8, 0.96, 11, 1.08],
+      "icon-size": ["interpolate", ["linear"], ["zoom"],
+        5, ["case", ["get", "selected"], 1.2, 0.72],
+        7, ["case", ["get", "selected"], 1.32, 0.9],
+        8, ["case", ["get", "selected"], 1.48, 1.25],
+        14, ["case", ["get", "selected"], 1.76, 1.56]],
       "icon-allow-overlap": true, "icon-ignore-placement": true,
       "symbol-sort-key": ["get", "priority"],
     },

@@ -50,7 +50,7 @@ import { BlauwnetLayer, type RegionalTrainPosition } from "./BlauwnetLayer";
 import { RegionalTrainPanel } from "./RegionalTrainPanel";
 import { roadPlace } from "./road-presentation";
 import { openRadarConnection, type ConnectionState } from "./radar-connection";
-import { addCrossingLayer, crossingPopupContent } from "./rail-crossing";
+import { bindRailMapDetail } from "./rail-map-detail";
 import { useDisruptions } from "./useDisruptions";
 import { RailNotices } from "./RailNotices";
 import { SavedRouteCard } from "./SavedRouteCard";
@@ -70,8 +70,8 @@ const DelayStats = lazy(() => import("./DelayStats").then(module => ({ default: 
 const RadarDirectory = lazy(() => import("./RadarDirectory").then(module => ({ default: module.RadarDirectory })));
 
 type RoadLayerKey = "congestion" | "incidents" | "roadworks" | "closures" | "safety";
-type MapLayerKey = "trains" | "stations" | "railways" | "crossings";
-type UiIconName = "map" | "train" | "station" | "rail" | "crossing" | "car" | "bell" | "sliders" | "clock" | "settings" | "queue" | "warning" | "works" | "closure" | "shield" | "chevron";
+type MapLayerKey = "trains" | "stations" | "railways";
+type UiIconName = "map" | "train" | "station" | "rail" | "car" | "bell" | "sliders" | "clock" | "settings" | "queue" | "warning" | "works" | "closure" | "shield" | "chevron";
 const baseMapDefinitions: { key: BaseMapKey; label: string }[] = [
   { key: "standard", label: "Standaard" },
   { key: "light", label: "Nacht" },
@@ -84,7 +84,6 @@ function UiIcon({ name }: { name: UiIconName }) {
     train: <><rect x="6" y="3" width="12" height="15" rx="4" /><path d="M8 21l2-3m6 0 2 3M9 7h6M8 13h8" /><circle cx="9" cy="16" r=".7" /><circle cx="15" cy="16" r=".7" /></>,
     station: <><path d="M3 20h18M5 17V8l7-5 7 5v9M3 8h18M9 12h6M9 16h6" /></>,
     rail: <><path d="M8 3 5 21M16 3l3 18M7 7h10M6 12h12M5 17h14" /></>,
-    crossing: <><path d="M7 3 5 21M17 3l2 18M5.5 7h13M5 17h14M8 12h8" /><path d="m8 9 8 6m0-6-8 6" /></>,
     car: <><path d="m5 11 1.6-4h10.8l1.6 4 1.5 1.5V18h-2v-2H5v2H3v-5.5L5 11Z" /><path d="M5 11h14" /><circle cx="7" cy="14" r="1" /><circle cx="17" cy="14" r="1" /></>,
     bell: <><path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7Z" /><path d="M10 20h4" /></>,
     sliders: <><path d="M4 7h10M18 7h2M4 17h3M11 17h9" /><circle cx="16" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></>,
@@ -112,7 +111,6 @@ const mapLayerDefinitions: { key: MapLayerKey; label: string; color: string }[] 
   { key: "trains", label: "Live treinen", color: "#1467d8" },
   { key: "stations", label: "Stations", color: "#ffffff" },
   { key: "railways", label: "Spoorlijnen", color: "#66516f" },
-  { key: "crossings", label: "Overwegen", color: "#f0a52b" },
 ];
 
 function nearbyDistanceLabel(meters: number) {
@@ -260,7 +258,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     viewport.addEventListener("resize", update);
     return () => viewport.removeEventListener("resize", update);
   }, []);
-  const requestedGeometry = useRef(new Set<string>());
+  const setRailDetailVisible = useRef<((visible: boolean) => void) | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const selectFromMapRef = useRef<(vehicleId: string) => void>(() => undefined);
   const trackMatchesRef = useRef(new Map<string, RailTrackMatch>());
@@ -391,7 +389,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     }
   };
   const [mapLayers, setMapLayers] = useState<Record<MapLayerKey, boolean>>({
-    trains: !isAlertsPage, stations: !isAlertsPage, railways: !isAlertsPage, crossings: false,
+    trains: !isAlertsPage, stations: !isAlertsPage, railways: !isAlertsPage,
   });
   const [showBlauwnet, setShowBlauwnet] = useState(false);
   const [blauwnetUnavailable, setBlauwnetUnavailable] = useState(false);
@@ -570,6 +568,17 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       essential: true,
     });
   }, [displayTrains, isFollowingTrain, selectedVehicleId]);
+
+  function zoomRadar(step: 1 | -1) {
+    const instance = map.current;
+    if (!instance) return;
+    const followed = isFollowingTrain ? followPointRef.current : null;
+    instance.easeTo({
+      zoom: instance.getZoom() + step,
+      duration: 250,
+      ...(followed && { center: [followed.longitude, followed.latitude], offset: radarPanelOffset(instance) }),
+    });
+  }
 
   const selectStation = useCallback((station: RailStation) => {
     if (query.trim()) navigate({ kind: "search", id: query });
@@ -789,8 +798,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       map.current = instance;
       instance.on("dragstart", event => { if (event.originalEvent) setIsFollowingTrain(false); });
       instance.on("error", event => {
-        const sourceId = (event as { sourceId?: string }).sourceId;
-        if (sourceId) requestedGeometry.current.delete(sourceId);
         const sources = failedBaseMaps(event as Parameters<typeof failedBaseMaps>[0]);
         if (sources.length) setMapSourceFailures(current => sources.every(id => current[id]) ? current : { ...current, ...Object.fromEntries(sources.map(id => [id, true])) });
       });
@@ -805,14 +812,12 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         }
         instance.touchZoomRotate.disableRotation();
         const stationPopup = new Popup({ closeButton: false, closeOnClick: true, offset: 12, className: "stationTooltip" });
-        const crossingPopup = new Popup({ closeButton: false, closeOnClick: false, offset: 14 });
         const trainPopup = new Popup({
           closeButton: false, closeOnClick: false, focusAfterOpen: false, offset: 22, className: "trainMapTooltip",
         });
         let previewKey: string | null = null;
         const clearTrainHover = () => { previewKey = null; trainPopup.remove(); };
         const clearMarkerHover = () => { clearTrainHover(); stationPopup.remove(); instance.getCanvas().style.cursor = ""; };
-        requestedGeometry.current.clear();
         addRadarMarkerLayers(instance);
         const hoverLayers = [...trainHitLayers, ...stationLayers];
         instance.on("mousemove", hoverLayers, event => {
@@ -853,7 +858,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         if (!isAlertsPage) {
           instance.addSource("rail-overview", {
             type: "geojson", data: new URL("/rail/overview.geojson", window.location.origin).href,
-            maxzoom: 9,
+            maxzoom: 12, tolerance: 0.12,
           });
           instance.addLayer({
             id: "rail-overview", type: "line", source: "rail-overview",
@@ -868,33 +873,36 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
         instance.addSource("pdok-rail-geometry", {
           type: "geojson",
           data: { type: "FeatureCollection", features: [] },
+          maxzoom: 18, tolerance: 0.08,
         });
-        // Draw a light casing first so official rail geometry remains legible
-        // on every basemap, then render the requested black track line above it.
+        // Draw a casing below the individual track lines for contrast.
         instance.addLayer({
           id: "pdok-rail-geometry-casing",
           type: "line",
           source: "pdok-rail-geometry",
-          minzoom: 4,
+          minzoom: 8,
           paint: {
             "line-color": "#ffffff",
-            "line-width": ["interpolate", ["linear"], ["zoom"], 4, 1.6, 6, 2, 9, 3.1, 12, 4.5, 16, 6.8],
-            "line-opacity": 0.94,
+            "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.2, 12, 2.8, 16, 3.6],
+            "line-opacity": 0.72,
           },
-          layout: { "line-cap": "round", "line-join": "round" },
+          layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
         }, "rail-fleet-points");
         instance.addLayer({
           id: "pdok-rail-geometry-lines",
           type: "line",
           source: "pdok-rail-geometry",
-          minzoom: 4,
+          minzoom: 8,
           paint: {
             "line-color": "#455b78",
-            "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.85, 6, 1.15, 9, 1.8, 12, 2.8, 16, 4.7],
+            "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1.15, 12, 1.45, 16, 2],
             "line-opacity": 1,
           },
-          layout: { "line-cap": "round", "line-join": "round" },
+          layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
         }, "rail-fleet-points");
+        const railDetail = bindRailMapDetail(instance, realtimeHttpUrl("/v1/geometry/rail"));
+        setRailDetailVisible.current = railDetail.setVisible;
+        instance.once("remove", railDetail.dispose);
         instance.addLayer({
           id: "match-candidate-lines",
           type: "line",
@@ -1070,15 +1078,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           });
         }
         for (const layerId of [...stationLayers, ...trainLayers]) instance.moveLayer(layerId);
-        instance.on("mouseenter", "rail-level-crossing-symbols", () => { instance.getCanvas().style.cursor = "pointer"; });
-        instance.on("mouseleave", "rail-level-crossing-symbols", () => { instance.getCanvas().style.cursor = ""; });
-        instance.on("movestart", () => crossingPopup.remove());
-        instance.on("styledata", () => {
-          if (!mapLayersRef.current.crossings) crossingPopup.remove();
-        });
         instance.on("click", (event) => {
           if (isAlertsPage) return;
-          crossingPopup.remove();
           const { x, y } = event.point;
           const hits = (layers: string[], radius: number) => instance.queryRenderedFeatures(
             [[x - radius, y - radius], [x + radius, y + radius]], { layers },
@@ -1108,13 +1109,6 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             const station = hits(stationLayers, 8)[0];
             if (station) { stationPopup.remove(); selectStationFromMapRef.current(String(station.properties.code)); return; }
           }
-          if (mapLayersRef.current.crossings && instance.getLayer("rail-level-crossing-symbols")) {
-            const crossing = hits(["rail-level-crossing-symbols"], 7)[0];
-            if (crossing?.geometry.type === "Point") crossingPopup
-              .setLngLat(crossing.geometry.coordinates as [number, number])
-              .setDOMContent(crossingPopupContent(crossing.properties, languageRef.current))
-              .addTo(instance);
-          }
         });
         instance.on("remove", clearMarkerHover);
         const updateViewport = () => setViewportBounds(instance.getBounds());
@@ -1128,6 +1122,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
       disposed = true;
       map.current?.remove();
       map.current = null;
+      setRailDetailVisible.current = null;
     };
   }, [isAlertsPage, setRadarSection]);
 
@@ -1214,38 +1209,7 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     };
     setVisibility(trainLayers, mapLayers.trains);
     setVisibility(stationLayers, mapLayers.stations);
-    setVisibility(["rail-overview"], mapLayers.railways);
-    const applyDetailVisibility = () => {
-      if (!instance.getLayer("rail-overview")) return;
-      const hasDetailedTracks = instance.getZoom() >= 8
-        && requestedGeometry.current.has("pdok-rail-geometry")
-        && instance.isSourceLoaded("pdok-rail-geometry");
-      setVisibility(["rail-overview"], mapLayers.railways && !hasDetailedTracks);
-    };
-    const applyZoomDensity = () => {
-      const layers = [
-        { id: "pdok-rail-geometry", path: "/v1/geometry/rail", visible: mapLayers.railways && instance.getZoom() >= 8, layers: ["pdok-rail-geometry-casing", "pdok-rail-geometry-lines"] },
-        { id: "rail-level-crossings", path: "/v1/geometry/rail/level-crossings", visible: mapLayers.crossings && instance.getZoom() >= 13, layers: ["rail-level-crossing-symbols"] },
-      ];
-      for (const layer of layers) {
-        if (layer.id === "rail-level-crossings" && layer.visible && !instance.getSource(layer.id)) addCrossingLayer(instance);
-        setVisibility(layer.layers, layer.visible);
-        if (!layer.visible || requestedGeometry.current.has(layer.id)) continue;
-        const source = instance.getSource(layer.id) as GeoJSONSource | undefined;
-        if (source) {
-          requestedGeometry.current.add(layer.id);
-          source.setData(realtimeHttpUrl(layer.path));
-        }
-      }
-      applyDetailVisibility();
-    };
-    applyZoomDensity();
-    const afterGeometryLoad = (event: { sourceId?: string }) => {
-      if (event.sourceId === "pdok-rail-geometry") applyDetailVisibility();
-    };
-    instance.on("sourcedata", afterGeometryLoad);
-    instance.on("zoomend", applyZoomDensity);
-    return () => { instance.off("zoomend", applyZoomDensity); instance.off("sourcedata", afterGeometryLoad); };
+    setRailDetailVisible.current?.(mapLayers.railways);
   }, [mapLayers, mapReady]);
 
   useEffect(() => {
@@ -1555,8 +1519,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
     }
     if (!instance.getSource("ns-disruptions")) {
       instance.addSource("ns-disruptions", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-      instance.addLayer({ id: "ns-disruption-lines", type: "line", source: "ns-disruptions", filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#e87919", "line-width": 5, "line-dasharray": [2, 1] } }, "rail-fleet-selected");
-      instance.addLayer({ id: "ns-disruption-points", type: "circle", source: "ns-disruptions", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 8, "circle-color": "#e87919", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } }, "rail-fleet-selected");
+      instance.addLayer({ id: "ns-disruption-lines", type: "line", source: "ns-disruptions", filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#e87919", "line-width": 5, "line-dasharray": [2, 1] } }, "rail-fleet-heading");
+      instance.addLayer({ id: "ns-disruption-points", type: "circle", source: "ns-disruptions", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 8, "circle-color": "#e87919", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } }, "rail-fleet-heading");
     }
     (instance.getSource("ns-disruptions") as GeoJSONSource).setData({ type: "FeatureCollection", features });
     instance.setPaintProperty("ns-disruption-lines", "line-opacity", disruptions?.stale || disruptionsError ? 0.4 : 0.9);
@@ -1750,8 +1714,8 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
           </div>
           {!isAlertsPage && followedRoute && <SavedRouteCard key={`${followedRoute.originCode}:${followedRoute.destinationCode}`} route={followedRoute} disruptions={disruptions} noticesUnavailable={disruptionsError} liveTrainNumbers={liveTrainNumbers} now={now} onOpenPlanner={openRoutePlanner} onTrain={selectLiveTrain} onNotice={openSavedRouteNotice} />}
           <div className="mapZoomControls" aria-label={language === "en" ? "Map zoom" : "Kaartzoom"}>
-            <button type="button" onClick={() => map.current?.zoomIn({ duration: 250 })} aria-label={t("map.zoomIn")}><AppIcon name="plus" /></button>
-            <button type="button" onClick={() => map.current?.zoomOut({ duration: 250 })} aria-label={t("map.zoomOut")}><AppIcon name="minus" /></button>
+            <button type="button" onClick={() => zoomRadar(1)} aria-label={t("map.zoomIn")}><AppIcon name="plus" /></button>
+            <button type="button" onClick={() => zoomRadar(-1)} aria-label={t("map.zoomOut")}><AppIcon name="minus" /></button>
             <MapCredits baseMap={baseMap} roadMap={isAlertsPage} language={language} mapReady={mapReady} />
           </div>
 {isAlertsPage && <>          <div className={`mapStylePicker ${showMapStyles ? "open" : ""}`}>
@@ -1793,14 +1757,13 @@ export function MobilityDashboard({ mode = "trains" }: { mode?: "trains" | "aler
             </button>
           </div>
         <div className="uiLayerOptions">{mapLayerDefinitions.map(layer => <label key={layer.key}>
-          <UiIcon name={layer.key === "trains" ? "train" : layer.key === "stations" ? "station" : layer.key === "crossings" ? "crossing" : "rail"} />
+          <UiIcon name={layer.key === "trains" ? "train" : layer.key === "stations" ? "station" : "rail"} />
           <span>{uiCopy(layer.label, language)}</span><input type="checkbox" checked={mapLayers[layer.key]} onChange={event => setMapLayers(current => ({ ...current, [layer.key]: event.target.checked }))} />
         </label>)}<label>
           <UiIcon name="train" />
           <span>Blauwnet</span>
           <input type="checkbox" checked={showBlauwnet} onChange={event => setShowBlauwnet(event.target.checked)} />
         </label></div>
-        {mapLayers.crossings && <p className="mapLayerNote">{language === "en" ? "Public crossings appear at street level." : "Openbare overwegen verschijnen als je inzoomt tot straatniveau."}</p>}
         {showBlauwnet && <p className="mapLayerNote" role="status">{blauwnetUnavailable
           ? (language === "en" ? "Blauwnet positions are temporarily unavailable." : "Blauwnet-posities zijn tijdelijk niet beschikbaar.")
           : (language === "en" ? "Solid blue markers are measured. Dashed outlines are estimates from station times." : "Volblauwe symbolen zijn gemeten. Een gestippelde rand betekent een schatting op basis van haltetijden.")}</p>}

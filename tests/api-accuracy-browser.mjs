@@ -41,7 +41,6 @@ async (page)=>{
   await search.fill('9544');check(await page.getByRole('option').count()===1,'One result for a coupled passenger train');
   await page.getByRole('option').click();
   await page.getByText('Treinfoto’s konden niet worden geladen',{exact:true}).waitFor();
-  check(crossingRequests===0,'Crossings are opt-in');
   check(await page.locator('.tpStockCaption').innerText().then(s=>s.includes('2 gekoppelde stellen')),'Composition remains readable');
   await page.getByText('≈ 270 m · 10 rijtuigen',{exact:true}).waitFor();
   const units = page.locator('.tpFormationUnit');
@@ -64,12 +63,11 @@ async (page)=>{
   check(await secondSet.evaluate(button=>button===document.activeElement),'Closing returns focus to the selected trainset');
   await page.waitForFunction(()=>document.querySelector('.liveMap')?.getAttribute('aria-busy')!=='true');
   await page.getByRole('button',{name:'Kaartlagen',exact:true}).click();
-  await page.getByRole('checkbox',{name:'Overwegen',exact:true}).check();
-  check(crossingRequests===0,'Enabling crossings does not download them at city zoom');
+  check(await page.getByRole('checkbox',{name:'Overwegen',exact:true}).count()===0,'Level crossings are absent from map layers');
   for(let i=0;i<4;i++){await page.getByRole('button',{name:'Inzoomen op kaart'}).click();await page.waitForTimeout(300);}
   await page.getByRole('button',{name:'Sluit kaartlagen',exact:true}).click();
   await page.waitForTimeout(600);check(spriteRequests===0,'Map badges never download the old train sprite');
-  check(railRequests===1&&crossingRequests===1,'Zoom loads each detailed geometry source once');
+  check(railRequests===1&&crossingRequests===0,'Zoom loads detailed railway geometry once and makes no crossing requests');
   age=40_000;sendFleet();
   await page.getByRole('button',{name:'Live treinpositie niet beschikbaar',exact:true}).waitFor();
   await page.getByText('Treinlengte onbekend',{exact:true}).waitFor();

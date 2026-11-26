@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 
-def simplify(points, tolerance=0.00055):
+def simplify(points, tolerance=0.0002):
     """Retain endpoints and bends visible on a national or regional map."""
     keep = {0, len(points) - 1}
     pending = [(0, len(points) - 1)]
@@ -63,7 +63,7 @@ def network(features):
             points.reverse()
         rounded = []
         for x, y in simplify(points):
-            point = (round(x, 4), round(y, 4))
+            point = (x, y)
             if not rounded or rounded[-1] != point:
                 rounded.append(point)
         if len(rounded) > 1:
